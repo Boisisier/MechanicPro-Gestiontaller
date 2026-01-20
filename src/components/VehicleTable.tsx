@@ -44,7 +44,7 @@ export default function VehicleTable({
 
   showDelete = true,
 
-  title = 'vehculos registrados',
+  title = 'veh?culos registrados',
 
 }: VehicleTableProps) {
 
@@ -122,7 +122,7 @@ export default function VehicleTable({
 
             <h3 className="text-xl font-bold text-gray-900">{title}</h3>
 
-            <p className="text-sm text-gray-500 mt-1">{filteredvehicles.length} vehculos encontrados</p>
+            <p className="text-sm text-gray-500 mt-1">{filteredvehicles.length} veh?culos encontrados</p>
 
           </div>
 
@@ -160,7 +160,7 @@ export default function VehicleTable({
 
           <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
 
-          <p className="text-gray-500 text-lg font-medium">No hay vehculos registrados</p>
+          <p className="text-gray-500 text-lg font-medium">No hay veh?culos registrados</p>
 
           <p className="text-gray-400 text-sm mt-2">
 

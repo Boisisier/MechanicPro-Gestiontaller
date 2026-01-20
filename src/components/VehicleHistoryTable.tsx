@@ -156,7 +156,7 @@ export default function VehicleHistoryTable({ vehicles }: VehicleHistoryTablePro
 
         <head>
 
-          <title>Historial de vehculos</title>
+          <title>Historial de veh?culos</title>
 
           <style>
 
@@ -178,7 +178,7 @@ export default function VehicleHistoryTable({ vehicles }: VehicleHistoryTablePro
 
         <body>
 
-          <h1>Historial de vehculos</h1>
+          <h1>Historial de veh?culos</h1>
 
           <p>${filters ? escapeHtml(filters) : 'Sin filtros aplicados'}</p>
 
@@ -262,7 +262,7 @@ export default function VehicleHistoryTable({ vehicles }: VehicleHistoryTablePro
 
             <div>
 
-              <h3 className="text-xl font-bold text-gray-900">Historial de vehculos</h3>
+              <h3 className="text-xl font-bold text-gray-900">Historial de veh?culos</h3>
 
               <p className="text-sm text-gray-500 mt-1">
 
