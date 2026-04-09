@@ -119,6 +119,31 @@ export const adminCreateCompany = async (name: string) =>
     })
   );
 
+export const adminCreateUser = async (payload: {
+  full_name: string;
+  email: string;
+  password: string;
+}) =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/users`, {
+      method: 'POST',
+      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload),
+    })
+  );
+
+export const adminAddCompanyMember = async (
+  companyId: string,
+  payload: { user_id: string; role: string }
+) =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/companies/${companyId}/members`, {
+      method: 'POST',
+      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload),
+    })
+  );
+
 export const adminCreateInvitation = async (payload: {
   company_id: string;
   email: string;

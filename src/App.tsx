@@ -8,9 +8,11 @@ import {
 
   acceptInvitation,
 
-
+  adminAddCompanyMember,
 
   adminCreateCompany,
+
+  adminCreateUser,
 
 
 
@@ -357,6 +359,10 @@ function App() {
 
 
   const [adminCompanyName, setAdminCompanyName] = useState('');
+
+  const [adminCompanyEmail, setAdminCompanyEmail] = useState('');
+
+  const [adminCompanyPassword, setAdminCompanyPassword] = useState('');
 
 
 
@@ -1507,19 +1513,19 @@ function App() {
 
   const handleAdminCreateCompany = async (event: FormEvent) => {
 
-
-
     event.preventDefault();
 
+    if (
 
+      !adminCompanyName.trim() ||
 
-    if (!adminCompanyName.trim()) {
+      !adminCompanyEmail.trim() ||
 
+      !adminCompanyPassword.trim()
 
+    ) {
 
       return;
-
-
 
     }
 
@@ -1531,47 +1537,49 @@ function App() {
 
     try {
 
+      const company = await adminCreateCompany(adminCompanyName.trim());
 
+      const user = await adminCreateUser({
 
-      await adminCreateCompany(adminCompanyName.trim());
+        full_name: adminCompanyName.trim(),
 
+        email: adminCompanyEmail.trim(),
 
+        password: adminCompanyPassword,
+
+      });
+
+      await adminAddCompanyMember(company.id, { user_id: user.id, role: 'admin' });
 
       setAdminCompanyName('');
 
+      setAdminCompanyEmail('');
 
+      setAdminCompanyPassword('');
 
       await loadCompanies();
 
-
-
-      showNotification('success', 'Empresa creada');
-
-
+      showNotification('success', 'Empresa y usuario admin creados');
 
     } catch (error) {
 
-
-
       console.error('Admin create company failed', error);
 
+      if (error instanceof Error && error.message === 'email_exists') {
 
+        showNotification('error', 'El correo de empresa ya está registrado');
 
-      showNotification('error', 'No se pudo crear la empresa');
+      } else {
 
+        showNotification('error', 'No se pudo crear la empresa');
 
+      }
 
     } finally {
 
-
-
       setAdminLoading(false);
 
-
-
     }
-
-
 
   };
 
@@ -4125,65 +4133,67 @@ ${
 
 
 
-            <form onSubmit={handleAdminCreateCompany} className="flex flex-col gap-4 md:flex-row">
-
-
+            <form onSubmit={handleAdminCreateCompany} className="grid grid-cols-1 gap-4 md:grid-cols-3">
 
               <input
 
-
-
                 value={adminCompanyName}
-
-
 
                 onChange={(event) => setAdminCompanyName(event.target.value)}
 
-
-
-                className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-
-
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
 
                 placeholder="Nombre de la empresa"
 
-
-
                 required
-
-
 
               />
 
+              <input
 
+                type="email"
+
+                value={adminCompanyEmail}
+
+                onChange={(event) => setAdminCompanyEmail(event.target.value)}
+
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+
+                placeholder="Correo de la empresa"
+
+                required
+
+              />
+
+              <input
+
+                type="password"
+
+                value={adminCompanyPassword}
+
+                onChange={(event) => setAdminCompanyPassword(event.target.value)}
+
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+
+                placeholder="Contraseña de empresa"
+
+                required
+
+              />
 
               <button
 
-
-
                 type="submit"
-
-
 
                 disabled={adminLoading}
 
-
-
-                className="rounded-lg btn-primary px-4 py-2 text-sm font-semibold disabled:opacity-60"
-
-
+                className="rounded-lg btn-primary px-4 py-2 text-sm font-semibold disabled:opacity-60 md:col-span-3"
 
               >
 
-
-
                 {adminLoading ? 'Creando...' : 'Crear'}
 
-
-
               </button>
-
-
 
             </form>
 
@@ -7130,6 +7140,9 @@ ${
 
 
 export default App;
+
+
+
 
 
 

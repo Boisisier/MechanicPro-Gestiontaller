@@ -1,11 +1,15 @@
 ﻿import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 
-dotenv.config();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 const app = express();
 const port = process.env.PORT || 3001;
