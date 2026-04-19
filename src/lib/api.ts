@@ -17,6 +17,7 @@ const handleResponse = async (response: Response) => {
     (error as Error & { status?: number }).status = response.status;
     throw error;
   }
+  console.log(response);
   return response.json();
 };
 

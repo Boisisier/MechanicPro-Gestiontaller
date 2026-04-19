@@ -258,7 +258,7 @@ function App() {
 
 
 
-  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+  const [editingVehicle, setEditingVehicle] = useState<(VehicleFormData & { id: string }) | null>(null);
 
 
 
@@ -1567,7 +1567,7 @@ function App() {
 
       if (error instanceof Error && error.message === 'email_exists') {
 
-        showNotification('error', 'El correo de empresa ya est� registrado');
+        showNotification('error', 'El correo de empresa ya est� registrado');
 
       } else {
 
@@ -1913,19 +1913,19 @@ function App() {
 
 
 
-              ...item,
+            ...item,
 
 
 
-              stock: item.stock + delta,
+            stock: item.stock + delta,
 
 
 
-              updated_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
 
 
 
-            }
+          }
 
 
 
@@ -2629,23 +2629,19 @@ function App() {
 
 
 
-${
+${services.length === 0
 
 
 
-  services.length === 0
+        ? '<p class="muted">Sin servicios registrados.</p>'
 
 
 
-    ? '<p class="muted">Sin servicios registrados.</p>'
+        : `<ul>${services.map((service) => `<li>${escapeHtml(service)}</li>`).join('')}</ul>`
 
 
 
-    : `<ul>${services.map((service) => `<li>${escapeHtml(service)}</li>`).join('')}</ul>`
-
-
-
-}
+      }
 
 
 
@@ -2789,7 +2785,7 @@ ${
 
 
 
-        const updated = await updateVehicle(editingvehicle.id, formData);
+        const updated = await updateVehicle(editingVehicle.id, formData);
 
 
 
@@ -2865,19 +2861,19 @@ ${
 
 
 
-  const handleEdit = (vehicle: Vehicle) => {
+  // const handleEdit = (vehicle: Vehicle) => {
 
 
 
-    setEditingVehicle(vehicle);
+  //   setEditingVehicle(vehicle);
 
 
 
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  //   window.scrollTo({ top: 0, behavior: 'smooth' });
 
 
 
-  };
+  // };
 
 
 
@@ -2989,23 +2985,23 @@ ${
 
 
 
-          id: 'support',
+        id: 'support',
 
 
 
-          title: 'Modo soporte activo',
+        title: 'Modo soporte activo',
 
 
 
-          body: 'Estas en solo lectura dentro de la cuenta del cliente.',
+        body: 'Estas en solo lectura dentro de la cuenta del cliente.',
 
 
 
-          time: 'Ahora',
+        time: 'Ahora',
 
 
 
-        }
+      }
 
 
 
@@ -3021,23 +3017,23 @@ ${
 
 
 
-          id: 'stock',
+        id: 'stock',
 
 
 
-          title: 'Stock bajo',
+        title: 'Stock bajo',
 
 
 
-          body: `${lowStockItems.length} insumos bajo mínimo.`,
+        body: `${lowStockItems.length} insumos bajo mínimo.`,
 
 
 
-          time: 'Hoy',
+        time: 'Hoy',
 
 
 
-        }
+      }
 
 
 
@@ -3053,23 +3049,23 @@ ${
 
 
 
-          id: 'revision',
+        id: 'revision',
 
 
 
-          title: 'vehículos en revisión',
+        title: 'vehículos en revisión',
 
 
 
-          body: `${vehiclesEnRevision.length} trabajos en curso.`,
+        body: `${vehiclesEnRevision.length} trabajos en curso.`,
 
 
 
-          time: 'Hoy',
+        time: 'Hoy',
 
 
 
-        }
+      }
 
 
 
@@ -4175,7 +4171,7 @@ ${
 
                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
 
-                placeholder="Contrase�a de empresa"
+                placeholder="Contrase�a de empresa"
 
                 required
 
@@ -4791,11 +4787,7 @@ ${
 
 
 
-              className={`flex items-center gap-3 px-6 py-4 rounded-lg shadow-lg ${
-
-
-
-                notification.type === 'success'
+              className={`flex items-center gap-3 px-6 py-4 rounded-lg shadow-lg ${notification.type === 'success'
 
 
 
@@ -4807,7 +4799,7 @@ ${
 
 
 
-              }`}
+                }`}
 
 
 
@@ -4931,11 +4923,7 @@ ${
 
 
 
-                      className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-
-
-
-                        vehicleTab === tab.id
+                      className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${vehicleTab === tab.id
 
 
 
@@ -4947,7 +4935,7 @@ ${
 
 
 
-                      }`}
+                        }`}
 
 
 
@@ -5199,11 +5187,7 @@ ${
 
 
 
-                            className={`w-full text-left rounded-lg border px-4 py-3 transition-colors ${
-
-
-
-                              reviewVehicleId === vehicle.id
+                            className={`w-full text-left rounded-lg border px-4 py-3 transition-colors ${reviewVehicleId === vehicle.id
 
 
 
@@ -5215,7 +5199,7 @@ ${
 
 
 
-                            }`}
+                              }`}
 
 
 
@@ -5327,11 +5311,7 @@ ${
 
 
 
-                              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
-
-
-
-                                reviewServices.includes(service)
+                              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${reviewServices.includes(service)
 
 
 
@@ -5343,7 +5323,7 @@ ${
 
 
 
-                              }`}
+                                }`}
 
 
 
@@ -5575,59 +5555,115 @@ ${
 
 
 
-                      <div
+                        <div
 
 
 
-                        key={vehicle.id}
+                          key={vehicle.id}
 
 
 
-                        className={`bg-white rounded-xl border border-gray-200 p-6 shadow-sm fade-item ${
+                          className={`bg-white rounded-xl border border-gray-200 p-6 shadow-sm fade-item ${readyVehicleIds.includes(vehicle.id) ? 'fade-out' : ''
 
 
 
-                          readyVehicleIds.includes(vehicle.id) ? 'fade-out' : ''
+                            }`}
 
 
 
-                        }`}
+                        >
 
 
 
-                      >
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 
 
 
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
 
 
 
-                          <div>
+                              <h3 className="text-lg font-semibold text-gray-900 uppercase">
 
 
 
-                            <h3 className="text-lg font-semibold text-gray-900 uppercase">
+                                {vehicle.patente}
 
 
 
-                              {vehicle.patente}
+                              </h3>
 
 
 
-                            </h3>
+                              <p className="text-sm text-gray-500">
 
 
 
-                            <p className="text-sm text-gray-500">
+                                {vehicle.marca} {vehicle.modelo} · {vehicle.customer_name || 'Sin cliente'}
 
 
 
-                              {vehicle.marca} {vehicle.modelo} · {vehicle.customer_name || 'Sin cliente'}
+                              </p>
 
 
 
-                            </p>
+                            </div>
+
+
+
+                            <div className="flex flex-col gap-2 sm:flex-row">
+
+
+
+                              <button
+
+
+
+                                onClick={() => exportVehiclePdf(vehicle)}
+
+
+
+                                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+
+
+
+                              >
+
+
+
+                                Exportar PDF
+
+
+
+                              </button>
+
+
+
+                              <button
+
+
+
+                                onClick={() => handleVehicleReady(vehicle)}
+
+
+
+                                className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+
+
+
+                              >
+
+
+
+                                vehículo listo
+
+
+
+                              </button>
+
+
+
+                            </div>
 
 
 
@@ -5635,55 +5671,171 @@ ${
 
 
 
-                          <div className="flex flex-col gap-2 sm:flex-row">
 
 
 
-                            <button
+
+                          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
 
 
 
-                              onClick={() => exportVehiclePdf(vehicle)}
+                            <div className="rounded-lg border border-gray-200 p-4">
 
 
 
-                              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                              <p className="text-xs uppercase tracking-wide text-gray-500">Cliente</p>
 
 
 
-                            >
+                              <p className="text-sm font-semibold text-gray-900">
 
 
 
-                              Exportar PDF
+                                {vehicle.customer_name || 'Sin cliente'}
 
 
 
-                            </button>
+                              </p>
 
 
 
-                            <button
+                              <p className="text-xs text-gray-500">{vehicle.customer_rut || '-'}</p>
 
 
 
-                              onClick={() => handleVehicleReady(vehicle)}
+                              <p className="text-xs text-gray-500">{vehicle.customer_phone || '-'}</p>
 
 
 
-                              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+                              <p className="text-xs text-gray-500">
 
 
 
-                            >
+                                {vehicle.customer_address || '-'} {vehicle.customer_city || ''}
 
 
 
-                              vehículo listo
+                              </p>
 
 
 
-                            </button>
+                            </div>
+
+
+
+                            <div className="rounded-lg border border-gray-200 p-4">
+
+
+
+                              <p className="text-xs uppercase tracking-wide text-gray-500">vehículo</p>
+
+
+
+                              <p className="text-sm text-gray-700">
+
+
+
+                                {vehicle.tipo_vehiculo} · {vehicle.ano}
+
+
+
+                              </p>
+
+
+
+                              <p className="text-xs text-gray-500">
+
+
+
+                                KM: {vehicle.kilometraje} · Combustible: {vehicle.cantidad_combustible}%
+
+
+
+                              </p>
+
+
+
+                              <p className="text-xs text-gray-500">Estado: {vehicle.estado}</p>
+
+
+
+                            </div>
+
+
+
+                            <div className="rounded-lg border border-gray-200 p-4">
+
+
+
+                              <p className="text-xs uppercase tracking-wide text-gray-500">Servicios</p>
+
+
+
+                              {vehicle.servicios && vehicle.servicios.length > 0 ? (
+
+
+
+                                <ul className="text-xs text-gray-700 list-disc pl-4 mt-2 space-y-1">
+
+
+
+                                  {vehicle.servicios.map((service) => (
+
+
+
+                                    <li key={service}>{service}</li>
+
+
+
+                                  ))}
+
+
+
+                                </ul>
+
+
+
+                              ) : (
+
+
+
+                                <p className="text-xs text-gray-500 mt-2">Sin servicios registrados.</p>
+
+
+
+                              )}
+
+
+
+                            </div>
+
+
+
+                          </div>
+
+
+
+
+
+
+
+                          <div className="mt-4 rounded-lg border border-gray-200 p-4">
+
+
+
+                            <p className="text-xs uppercase tracking-wide text-gray-500">Detalle del trabajo</p>
+
+
+
+                            <p className="text-sm text-gray-700 mt-2">
+
+
+
+                              {vehicle.observaciones || 'Sin observaciones.'}
+
+
+
+                            </p>
 
 
 
@@ -5695,183 +5847,7 @@ ${
 
 
 
-
-
-
-
-                        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-
-
-
-                          <div className="rounded-lg border border-gray-200 p-4">
-
-
-
-                            <p className="text-xs uppercase tracking-wide text-gray-500">Cliente</p>
-
-
-
-                            <p className="text-sm font-semibold text-gray-900">
-
-
-
-                              {vehicle.customer_name || 'Sin cliente'}
-
-
-
-                            </p>
-
-
-
-                            <p className="text-xs text-gray-500">{vehicle.customer_rut || '-'}</p>
-
-
-
-                            <p className="text-xs text-gray-500">{vehicle.customer_phone || '-'}</p>
-
-
-
-                            <p className="text-xs text-gray-500">
-
-
-
-                              {vehicle.customer_address || '-'} {vehicle.customer_city || ''}
-
-
-
-                            </p>
-
-
-
-                          </div>
-
-
-
-                          <div className="rounded-lg border border-gray-200 p-4">
-
-
-
-                            <p className="text-xs uppercase tracking-wide text-gray-500">vehículo</p>
-
-
-
-                            <p className="text-sm text-gray-700">
-
-
-
-                              {vehicle.tipo_vehiculo} · {vehicle.ano}
-
-
-
-                            </p>
-
-
-
-                            <p className="text-xs text-gray-500">
-
-
-
-                              KM: {vehicle.kilometraje} · Combustible: {vehicle.cantidad_combustible}%
-
-
-
-                            </p>
-
-
-
-                            <p className="text-xs text-gray-500">Estado: {vehicle.estado}</p>
-
-
-
-                          </div>
-
-
-
-                          <div className="rounded-lg border border-gray-200 p-4">
-
-
-
-                            <p className="text-xs uppercase tracking-wide text-gray-500">Servicios</p>
-
-
-
-                            {vehicle.servicios && vehicle.servicios.length > 0 ? (
-
-
-
-                              <ul className="text-xs text-gray-700 list-disc pl-4 mt-2 space-y-1">
-
-
-
-                                {vehicle.servicios.map((service) => (
-
-
-
-                                  <li key={service}>{service}</li>
-
-
-
-                                ))}
-
-
-
-                              </ul>
-
-
-
-                            ) : (
-
-
-
-                              <p className="text-xs text-gray-500 mt-2">Sin servicios registrados.</p>
-
-
-
-                            )}
-
-
-
-                          </div>
-
-
-
-                        </div>
-
-
-
-
-
-
-
-                        <div className="mt-4 rounded-lg border border-gray-200 p-4">
-
-
-
-                          <p className="text-xs uppercase tracking-wide text-gray-500">Detalle del trabajo</p>
-
-
-
-                          <p className="text-sm text-gray-700 mt-2">
-
-
-
-                            {vehicle.observaciones || 'Sin observaciones.'}
-
-
-
-                          </p>
-
-
-
-                        </div>
-
-
-
-                      </div>
-
-
-
-                    ))
+                      ))
 
 
 

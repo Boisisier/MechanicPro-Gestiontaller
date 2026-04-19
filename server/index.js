@@ -3,9 +3,10 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import crypto from 'crypto';
 import { Pool } from 'pg';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+import { createClient} from '@supabase/supabase-js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -14,8 +15,14 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 const app = express();
 const port = process.env.PORT || 3001;
 
-if (!process.env.DATABASE_URL) {
+const supabaseUrl = process.env.DATABASE_URL;
+if (!supabaseUrl) {
   console.warn('DATABASE_URL is not set.');
+}
+
+const supabaseKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+if (!supabaseKey) {
+  console.warn('PUBLISHABLE_KEY is not set.');
 }
 
 const jwtSecret = process.env.JWT_SECRET;
@@ -32,7 +39,7 @@ if (!ownerEmail || !ownerPassword) {
 const appUrl = process.env.APP_URL || 'http://localhost:5173';
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: supabaseUrl,
 });
 
 app.use(cors());
@@ -350,6 +357,7 @@ app.get('/auth/me', (req, res) => {
 });
 
 app.get('/admin/companies', ownerRequired, async (req, res) => {
+  console.log(supabaseUrl);
   try {
     const { rows } = await pool.query(
       'select id, name, created_at from companies order by created_at desc'
