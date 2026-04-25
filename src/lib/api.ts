@@ -83,19 +83,6 @@ export const loginOwner = async (payload: { email: string; password: string }) =
     })
   );
 
-export const acceptInvitation = async (payload: {
-  token: string;
-  full_name: string;
-  password: string;
-}) =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/auth/invitations/accept`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-  );
-
 export const getSession = async () =>
   handleResponse(
     await fetch(`${apiBaseUrl}/auth/me`, {

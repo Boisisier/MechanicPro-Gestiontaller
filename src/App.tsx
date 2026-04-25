@@ -1,12 +1,9 @@
-import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
+﻿import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 
 
 
 import {
 
-
-
-  acceptInvitation,
 
   adminAddCompanyMember,
 
@@ -166,7 +163,7 @@ const serviceCatalog = [
 
 
 
-  'Diagnóstico general',
+  'DiagnÃ³stico general',
 
 
 
@@ -174,11 +171,11 @@ const serviceCatalog = [
 
 
 
-  'Suspensión',
+  'SuspensiÃ³n',
 
 
 
-  'Alineación y balanceo',
+  'AlineaciÃ³n y balanceo',
 
 
 
@@ -198,7 +195,7 @@ const serviceCatalog = [
 
 
 
-  'Neumáticos',
+  'NeumÃ¡ticos',
 
 
 
@@ -308,29 +305,6 @@ function App() {
 
   const [loginLoading, setLoginLoading] = useState(false);
 
-
-
-  const [inviteForm, setInviteForm] = useState({
-
-
-
-    token: '',
-
-
-
-    fullName: '',
-
-
-
-    password: '',
-
-
-
-  });
-
-
-
-  const [inviteLoading, setInviteLoading] = useState(false);
 
 
 
@@ -859,7 +833,7 @@ function App() {
 
 
 
-        showNotification('error', 'Error al cargar los vehículos');
+        showNotification('error', 'Error al cargar los vehÃ­culos');
 
 
 
@@ -901,33 +875,6 @@ function App() {
 
 
 
-
-
-  useEffect(() => {
-
-
-
-    const params = new URLSearchParams(window.location.search);
-
-
-
-    const token = params.get('invite');
-
-
-
-    if (token) {
-
-
-
-      setInviteForm((prev) => ({ ...prev, token }));
-
-
-
-    }
-
-
-
-  }, []);
 
 
 
@@ -1083,21 +1030,6 @@ function App() {
 
 
 
-  const handleInviteChange = (event: ChangeEvent<HTMLInputElement>) => {
-
-
-
-    const { name, value } = event.target;
-
-
-
-    setInviteForm((prev) => ({ ...prev, [name]: value }));
-
-
-
-  };
-
-
 
 
 
@@ -1207,7 +1139,7 @@ function App() {
 
 
 
-      showNotification('success', 'Sesión iniciada correctamente');
+      showNotification('success', 'SesiÃ³n iniciada correctamente');
 
 
 
@@ -1219,7 +1151,7 @@ function App() {
 
 
 
-      setAuthError('No se pudo iniciar Sesión');
+      setAuthError('No se pudo iniciar SesiÃ³n');
 
 
 
@@ -1243,91 +1175,6 @@ function App() {
 
 
 
-  const handleAcceptInvite = async (event: FormEvent) => {
-
-
-
-    event.preventDefault();
-
-
-
-    setAuthError(null);
-
-
-
-    setInviteLoading(true);
-
-
-
-
-
-
-
-    try {
-
-
-
-      const session = await acceptInvitation({
-
-
-
-        token: inviteForm.token.trim(),
-
-
-
-        full_name: inviteForm.fullName.trim(),
-
-
-
-        password: inviteForm.password,
-
-
-
-      });
-
-
-
-      setAuthToken(session.token);
-
-
-
-      setAuthTokenState(session.token);
-
-
-
-      setSessionRole('member');
-
-
-
-      showNotification('success', 'Invitación aceptada correctamente');
-
-
-
-    } catch (error) {
-
-
-
-      console.error('Invite accept failed', error);
-
-
-
-      setAuthError('No se pudo aceptar la Invitación');
-
-
-
-    } finally {
-
-
-
-      setInviteLoading(false);
-
-
-
-    }
-
-
-
-  };
 
 
 
@@ -1387,7 +1234,7 @@ function App() {
 
 
 
-      showNotification('success', 'Sesión de owner iniciada');
+      showNotification('success', 'SesiÃ³n de owner iniciada');
 
 
 
@@ -1399,7 +1246,7 @@ function App() {
 
 
 
-      setAuthError('No se pudo iniciar Sesión como owner');
+      setAuthError('No se pudo iniciar SesiÃ³n como owner');
 
 
 
@@ -1567,7 +1414,7 @@ function App() {
 
       if (error instanceof Error && error.message === 'email_exists') {
 
-        showNotification('error', 'El correo de empresa ya est� registrado');
+        showNotification('error', 'El correo de empresa ya estï¿½ registrado');
 
       } else {
 
@@ -1653,7 +1500,7 @@ function App() {
 
 
 
-      showNotification('success', 'Invitación creada');
+      showNotification('success', 'InvitaciÃ³n creada');
 
 
 
@@ -1665,7 +1512,7 @@ function App() {
 
 
 
-      showNotification('error', 'No se pudo crear la Invitación');
+      showNotification('error', 'No se pudo crear la InvitaciÃ³n');
 
 
 
@@ -2025,7 +1872,7 @@ function App() {
 
 
 
-    showNotification('success', matched ? 'Stock actualizado por código' : 'Código no encontrado');
+    showNotification('success', matched ? 'Stock actualizado por cÃ³digo' : 'CÃ³digo no encontrado');
 
 
 
@@ -2057,7 +1904,7 @@ function App() {
 
 
 
-      showNotification('success', 'Sesión de soporte abierta');
+      showNotification('success', 'SesiÃ³n de soporte abierta');
 
 
 
@@ -2273,7 +2120,7 @@ function App() {
 
 
 
-      showNotification('error', 'Selecciona un vehículo para actualizar');
+      showNotification('error', 'Selecciona un vehÃ­culo para actualizar');
 
 
 
@@ -2317,7 +2164,7 @@ function App() {
 
 
 
-        statusOverride ? 'vehículo enviado a salida' : 'Servicios guardados'
+        statusOverride ? 'vehÃ­culo enviado a salida' : 'Servicios guardados'
 
 
 
@@ -2345,7 +2192,7 @@ function App() {
 
 
 
-      showNotification('error', 'No se pudo actualizar el vehículo');
+      showNotification('error', 'No se pudo actualizar el vehÃ­culo');
 
 
 
@@ -2369,7 +2216,7 @@ function App() {
 
 
 
-      await updateVehicleRecord(vehicle, { estado: 'En revision' }, 'vehículo enviado a revisión');
+      await updateVehicleRecord(vehicle, { estado: 'En revision' }, 'vehÃ­culo enviado a revisiÃ³n');
 
 
 
@@ -2397,7 +2244,7 @@ function App() {
 
 
 
-      showNotification('error', 'No se pudo enviar a revisión');
+      showNotification('error', 'No se pudo enviar a revisiÃ³n');
 
 
 
@@ -2489,7 +2336,7 @@ function App() {
 
 
 
-          <title>Salida de vehículo</title>
+          <title>Salida de vehÃ­culo</title>
 
 
 
@@ -2541,7 +2388,7 @@ function App() {
 
 
 
-          <h1>Reporte de salida de vehículo</h1>
+          <h1>Reporte de salida de vehÃ­culo</h1>
 
 
 
@@ -2561,11 +2408,11 @@ function App() {
 
 
 
-<p><strong>Teléfono:</strong> ${escapeHtml(vehicle.customer_phone || '-')}</p>
+<p><strong>TelÃ©fono:</strong> ${escapeHtml(vehicle.customer_phone || '-')}</p>
 
 
 
-<p><strong>Dirección:</strong> ${escapeHtml(vehicle.customer_address || '-')}</p>
+<p><strong>DirecciÃ³n:</strong> ${escapeHtml(vehicle.customer_address || '-')}</p>
 
 
 
@@ -2573,7 +2420,7 @@ function App() {
 
 
 
-<h2>vehículo</h2>
+<h2>vehÃ­culo</h2>
 
 
 
@@ -2597,11 +2444,11 @@ function App() {
 
 
 
-    <tr><th>Año</th><td>${vehicle.ano}</td></tr>
+    <tr><th>AÃ±o</th><td>${vehicle.ano}</td></tr>
 
 
 
-                              {vehicle.tipo_vehiculo} · {vehicle.ano}
+                              {vehicle.tipo_vehiculo} Â· {vehicle.ano}
 
 
 
@@ -2741,7 +2588,7 @@ ${
 
 
 
-      showNotification('success', `vehículo ${vehicle.patente} listo`);
+      showNotification('success', `vehÃ­culo ${vehicle.patente} listo`);
 
 
 
@@ -2797,7 +2644,7 @@ ${
 
 
 
-        showNotification('success', 'vehículo actualizado correctamente');
+        showNotification('success', 'vehÃ­culo actualizado correctamente');
 
 
 
@@ -2817,7 +2664,7 @@ ${
 
 
 
-        showNotification('success', 'vehículo registrado correctamente');
+        showNotification('success', 'vehÃ­culo registrado correctamente');
 
 
 
@@ -2837,11 +2684,11 @@ ${
 
 
 
-          ? 'La patente ya está registrada'
+          ? 'La patente ya estÃ¡ registrada'
 
 
 
-          : 'Error al guardar el vehículo';
+          : 'Error al guardar el vehÃ­culo';
 
 
 
@@ -2901,7 +2748,7 @@ ${
 
 
 
-      showNotification('success', 'vehículo eliminado correctamente');
+      showNotification('success', 'vehÃ­culo eliminado correctamente');
 
 
 
@@ -2909,7 +2756,7 @@ ${
 
 
 
-      showNotification('error', 'Error al eliminar el vehículo');
+      showNotification('error', 'Error al eliminar el vehÃ­culo');
 
 
 
@@ -3029,7 +2876,7 @@ ${
 
 
 
-          body: `${lowStockItems.length} insumos bajo mínimo.`,
+          body: `${lowStockItems.length} insumos bajo mÃ­nimo.`,
 
 
 
@@ -3057,7 +2904,7 @@ ${
 
 
 
-          title: 'vehículos en revisión',
+          title: 'vehÃ­culos en revisiÃ³n',
 
 
 
@@ -3345,7 +3192,7 @@ ${
 
 
 
-            Ingresa con tu cuenta o acepta una Invitación para activar tu usuario.
+            Ingresa con tu cuenta para acceder al sistema.
 
 
 
@@ -3573,199 +3420,6 @@ ${
 
 
 
-          <div className="my-6 border-t border-gray-200" />
-
-
-
-
-
-
-
-          <form className="space-y-4" onSubmit={handleAcceptInvite}>
-
-
-
-            <h2 className="text-sm font-medium text-gray-700">Aceptar Invitación</h2>
-
-
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-
-
-
-              <div className="md:col-span-2">
-
-
-
-                <label className="text-sm font-medium text-gray-700">Token de Invitación</label>
-
-
-
-                <input
-
-
-
-                  name="token"
-
-
-
-                  value={inviteForm.token}
-
-
-
-                  onChange={handleInviteChange}
-
-
-
-                  className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-
-
-
-                  placeholder="Token"
-
-
-
-                  required
-
-
-
-                />
-
-
-
-              </div>
-
-
-
-              <div>
-
-
-
-                <label className="text-sm font-medium text-gray-700">Nombre completo</label>
-
-
-
-                <input
-
-
-
-                  name="fullName"
-
-
-
-                  value={inviteForm.fullName}
-
-
-
-                  onChange={handleInviteChange}
-
-
-
-                  className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-
-
-
-                  placeholder="Tu nombre"
-
-
-
-                  required
-
-
-
-                />
-
-
-
-              </div>
-
-
-
-              <div>
-
-
-
-                <label className="text-sm font-medium text-gray-700">Password</label>
-
-
-
-                <input
-
-
-
-                  type="password"
-
-
-
-                  name="password"
-
-
-
-                  value={inviteForm.password}
-
-
-
-                  onChange={handleInviteChange}
-
-
-
-                  className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-
-
-
-                  placeholder="mínimo 8 caracteres"
-
-
-
-                  minLength={8}
-
-
-
-                  required
-
-
-
-                />
-
-
-
-              </div>
-
-
-
-            </div>
-
-
-
-            <button
-
-
-
-              type="submit"
-
-
-
-              disabled={inviteLoading}
-
-
-
-              className="w-full rounded-lg btn-primary px-4 py-2 text-sm font-semibold disabled:opacity-60"
-
-
-
-            >
-
-
-
-              {inviteLoading ? 'Activando...' : 'Aceptar Invitación'}
-
-
-
-            </button>
-
-
-
-          </form>
 
 
 
@@ -3841,7 +3495,7 @@ ${
 
 
 
-          <p className="text-gray-500">Cargando Sesión...</p>
+          <p className="text-gray-500">Cargando SesiÃ³n...</p>
 
 
 
@@ -3913,7 +3567,7 @@ ${
 
 
 
-            Cerrar Sesión
+            Cerrar SesiÃ³n
 
 
 
@@ -4017,7 +3671,7 @@ ${
 
 
 
-              Cerrar Sesión
+              Cerrar SesiÃ³n
 
 
 
@@ -4175,7 +3829,7 @@ ${
 
                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
 
-                placeholder="Contrase�a de empresa"
+                placeholder="Contraseï¿½a de empresa"
 
                 required
 
@@ -4523,7 +4177,7 @@ ${
 
 
 
-                {adminLoading ? 'Generando...' : 'Generar Invitación'}
+                {adminLoading ? 'Generando...' : 'Generar InvitaciÃ³n'}
 
 
 
@@ -4547,7 +4201,7 @@ ${
 
 
 
-                Link de Invitación:
+                Link de InvitaciÃ³n:
 
 
 
@@ -4655,7 +4309,7 @@ ${
 
 
 
-                      Owner: {session.owner_email} · Expira:{' '}
+                      Owner: {session.owner_email} Â· Expira:{' '}
 
 
 
@@ -4903,15 +4557,15 @@ ${
 
 
 
-                    { id: 'ingreso', label: 'Ingreso de vehículos' },
+                    { id: 'ingreso', label: 'Ingreso de vehÃ­culos' },
 
 
 
-                    { id: 'revision', label: 'En revisión' },
+                    { id: 'revision', label: 'En revisiÃ³n' },
 
 
 
-                    { id: 'salida', label: 'Salida vehículos' },
+                    { id: 'salida', label: 'Salida vehÃ­culos' },
 
 
 
@@ -5023,7 +4677,7 @@ ${
 
 
 
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">vehículos en taller</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">vehÃ­culos en taller</h3>
 
 
 
@@ -5031,7 +4685,7 @@ ${
 
 
 
-                      <p className="text-sm text-gray-500">No hay vehículos en taller.</p>
+                      <p className="text-sm text-gray-500">No hay vehÃ­culos en taller.</p>
 
 
 
@@ -5083,7 +4737,7 @@ ${
 
 
 
-                                {vehicle.marca} {vehicle.modelo} · {vehicle.customer_name || 'Sin cliente'}
+                                {vehicle.marca} {vehicle.modelo} Â· {vehicle.customer_name || 'Sin cliente'}
 
 
 
@@ -5111,7 +4765,7 @@ ${
 
 
 
-                              Enviar a revisión
+                              Enviar a revisiÃ³n
 
 
 
@@ -5163,7 +4817,7 @@ ${
 
 
 
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">En revisión</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">En revisiÃ³n</h3>
 
 
 
@@ -5171,7 +4825,7 @@ ${
 
 
 
-                      <p className="text-sm text-gray-500">No hay vehículos en revisión.</p>
+                      <p className="text-sm text-gray-500">No hay vehÃ­culos en revisiÃ³n.</p>
 
 
 
@@ -5239,7 +4893,7 @@ ${
 
 
 
-                              {vehicle.marca} {vehicle.modelo} · {vehicle.customer_name || 'Sin cliente'}
+                              {vehicle.marca} {vehicle.modelo} Â· {vehicle.customer_name || 'Sin cliente'}
 
 
 
@@ -5507,7 +5161,7 @@ ${
 
 
 
-                      <p className="text-sm text-gray-500">Selecciona un vehículo para registrar servicios.</p>
+                      <p className="text-sm text-gray-500">Selecciona un vehÃ­culo para registrar servicios.</p>
 
 
 
@@ -5551,7 +5205,7 @@ ${
 
 
 
-                      No hay vehículos en salida.
+                      No hay vehÃ­culos en salida.
 
 
 
@@ -5623,7 +5277,7 @@ ${
 
 
 
-                              {vehicle.marca} {vehicle.modelo} · {vehicle.customer_name || 'Sin cliente'}
+                              {vehicle.marca} {vehicle.modelo} Â· {vehicle.customer_name || 'Sin cliente'}
 
 
 
@@ -5679,7 +5333,7 @@ ${
 
 
 
-                              vehículo listo
+                              vehÃ­culo listo
 
 
 
@@ -5751,7 +5405,7 @@ ${
 
 
 
-                            <p className="text-xs uppercase tracking-wide text-gray-500">vehículo</p>
+                            <p className="text-xs uppercase tracking-wide text-gray-500">vehÃ­culo</p>
 
 
 
@@ -5759,7 +5413,7 @@ ${
 
 
 
-                              {vehicle.tipo_vehiculo} · {vehicle.ano}
+                              {vehicle.tipo_vehiculo} Â· {vehicle.ano}
 
 
 
@@ -5771,7 +5425,7 @@ ${
 
 
 
-                              KM: {vehicle.kilometraje} · Combustible: {vehicle.cantidad_combustible}%
+                              KM: {vehicle.kilometraje} Â· Combustible: {vehicle.cantidad_combustible}%
 
 
 
@@ -6131,7 +5785,7 @@ ${
 
 
 
-                      placeholder="Categoría (aceites, frenos...)"
+                      placeholder="CategorÃ­a (aceites, frenos...)"
 
 
 
@@ -6255,7 +5909,7 @@ ${
 
 
 
-                      placeholder="Stock mínimo"
+                      placeholder="Stock mÃ­nimo"
 
 
 
@@ -6311,7 +5965,7 @@ ${
 
 
 
-                      placeholder="Ubicación en bodega"
+                      placeholder="UbicaciÃ³n en bodega"
 
 
 
@@ -6443,7 +6097,7 @@ ${
 
 
 
-                      Ingreso por código de barras
+                      Ingreso por cÃ³digo de barras
 
 
 
@@ -6471,7 +6125,7 @@ ${
 
 
 
-                        placeholder="Escanear código"
+                        placeholder="Escanear cÃ³digo"
 
 
 
@@ -6483,7 +6137,7 @@ ${
 
 
 
-                        Registrar ingreso rápido
+                        Registrar ingreso rÃ¡pido
 
 
 
@@ -6887,7 +6541,7 @@ ${
 
 
 
-                  <p className="text-gray-500 mt-4">Cargando vehículos...</p>
+                  <p className="text-gray-500 mt-4">Cargando vehÃ­culos...</p>
 
 
 
@@ -6907,7 +6561,7 @@ ${
 
 
 
-                  title="Reporte de vehículos"
+                  title="Reporte de vehÃ­culos"
 
 
 
