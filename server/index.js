@@ -35,6 +35,10 @@ const ownerPassword = process.env.OWNER_PASSWORD;
 if (!ownerEmail || !ownerPassword) {
   console.warn('OWNER_EMAIL or OWNER_PASSWORD is not set.');
 }
+const demoCompanyName = process.env.DEMO_COMPANY_NAME || 'Demo Taller';
+const demoUserName = process.env.DEMO_USER_NAME || 'Demo Cliente';
+const demoUserEmail = process.env.DEMO_USER_EMAIL || 'demo@local';
+const demoUserPassword = process.env.DEMO_USER_PASSWORD || 'demo1234';
 
 const appUrl = process.env.APP_URL || 'http://localhost:5173';
 
@@ -250,6 +254,88 @@ app.post('/auth/login', async (req, res) => {
   } catch (error) {
     console.error('POST /auth/login failed', error);
     res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.post('/auth/demo-login', async (req, res) => {
+  if (!ensureJwtSecret(res)) {
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+
+    let companyResult = await client.query('select id, name from companies where name = $1 limit 1', [
+      demoCompanyName,
+    ]);
+    if (companyResult.rows.length === 0) {
+      companyResult = await client.query(
+        'insert into companies (name) values ($1) returning id, name',
+        [demoCompanyName]
+      );
+    }
+    const company = companyResult.rows[0];
+
+    let userResult = await client.query(
+      'select id, full_name, email, password_hash from users where email = $1 limit 1',
+      [demoUserEmail]
+    );
+    if (userResult.rows.length === 0) {
+      userResult = await client.query(
+        'insert into users (full_name, email, password_hash) values ($1, $2, $3) returning id, full_name, email, password_hash',
+        [demoUserName, demoUserEmail, hashPassword(demoUserPassword)]
+      );
+    } else if (!verifyPassword(demoUserPassword, userResult.rows[0].password_hash)) {
+      userResult = await client.query(
+        'update users set full_name = $1, password_hash = $2 where email = $3 returning id, full_name, email, password_hash',
+        [demoUserName, hashPassword(demoUserPassword), demoUserEmail]
+      );
+    }
+    const user = userResult.rows[0];
+
+    const membershipResult = await client.query(
+      'select id from company_members where company_id = $1 and user_id = $2 limit 1',
+      [company.id, user.id]
+    );
+    if (membershipResult.rows.length === 0) {
+      await client.query(
+        'insert into company_members (company_id, user_id, role) values ($1, $2, $3)',
+        [company.id, user.id, 'admin']
+      );
+    } else {
+      await client.query('update company_members set role = $3 where company_id = $1 and user_id = $2', [
+        company.id,
+        user.id,
+        'admin',
+      ]);
+    }
+
+    await client.query('commit');
+
+    const token = jwt.sign(
+      { user_id: user.id, company_id: company.id, role: 'admin' },
+      jwtSecret,
+      { expiresIn: '8h' }
+    );
+
+    res.json({
+      token,
+      user: { id: user.id, full_name: user.full_name, email: user.email },
+      company: { id: company.id, name: company.name },
+      role: 'admin',
+      demo: true,
+    });
+  } catch (error) {
+    try {
+      await client.query('rollback');
+    } catch {
+      // ignore rollback errors
+    }
+    console.error('POST /auth/demo-login failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  } finally {
+    client.release();
   }
 });
 

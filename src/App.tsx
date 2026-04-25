@@ -57,6 +57,10 @@ import {
 
 
 
+  loginDemo,
+
+
+
   loginOwner,
 
 
@@ -128,12 +132,6 @@ interface Notification {
 
 
 
-
-const uuidRegex =
-
-
-
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const toSoftAccent = (hexColor: string) => {
   const cleaned = hexColor.replace('#', '');
@@ -295,15 +293,15 @@ function App() {
 
 
 
-    companyId: '',
-
-
-
   });
 
 
 
   const [loginLoading, setLoginLoading] = useState(false);
+
+
+
+  const [demoLoading, setDemoLoading] = useState(false);
 
 
 
@@ -1075,34 +1073,6 @@ function App() {
 
 
 
-    const companyId = loginForm.companyId.trim();
-
-
-
-    if (!uuidRegex.test(companyId)) {
-
-
-
-      setAuthError('El Company ID no tiene formato valido');
-
-
-
-      setLoginLoading(false);
-
-
-
-      return;
-
-
-
-    }
-
-
-
-
-
-
-
     try {
 
 
@@ -1116,10 +1086,6 @@ function App() {
 
 
         password: loginForm.password,
-
-
-
-        company_id: companyId,
 
 
 
@@ -1160,6 +1126,70 @@ function App() {
 
 
       setLoginLoading(false);
+
+
+
+    }
+
+
+
+  };
+
+
+
+  const handleDemoLogin = async () => {
+
+
+
+    setAuthError(null);
+
+
+
+    setDemoLoading(true);
+
+
+
+    try {
+
+
+
+      const session = await loginDemo();
+
+
+
+      setAuthToken(session.token);
+
+
+
+      setAuthTokenState(session.token);
+
+
+
+      setSessionRole('member');
+
+
+
+      showNotification('success', 'Acceso demo listo');
+
+
+
+    } catch (error) {
+
+
+
+      console.error('Demo login failed', error);
+
+
+
+      setAuthError('No se pudo iniciar el acceso demo');
+
+
+
+    } finally {
+
+
+
+      setDemoLoading(false);
 
 
 
@@ -3188,7 +3218,7 @@ ${services.length === 0
 
 
 
-            Ingresa con tu cuenta para acceder al sistema.
+            Ingresa con tu cuenta o usa el acceso demo para cargar datos reales.
 
 
 
@@ -3332,47 +3362,6 @@ ${services.length === 0
 
 
 
-              <div className="md:col-span-2">
-
-
-
-                <label className="text-sm font-medium text-gray-700">Company ID</label>
-
-
-
-                <input
-
-
-
-                  name="companyId"
-
-
-
-                  value={loginForm.companyId}
-
-
-
-                  onChange={handleLoginChange}
-
-
-
-                  className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-
-
-
-                  placeholder="UUID de la empresa"
-
-
-
-                  required
-
-
-
-                />
-
-
-
-              </div>
 
 
 
@@ -3380,31 +3369,83 @@ ${services.length === 0
 
 
 
-            <button
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
 
 
 
-              type="submit"
+              <button
 
 
 
-              disabled={loginLoading}
+                type="submit"
 
 
 
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                disabled={loginLoading || demoLoading}
 
 
 
-            >
+                className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
 
 
 
-              {loginLoading ? 'Ingresando...' : 'Ingresar'}
+              >
 
 
 
-            </button>
+                {loginLoading ? 'Ingresando...' : 'Ingresar'}
+
+
+
+              </button>
+
+
+
+              <button
+
+
+
+                type="button"
+
+
+
+                onClick={handleDemoLogin}
+
+
+
+                disabled={loginLoading || demoLoading}
+
+
+
+                className="w-full rounded-lg btn-primary px-4 py-2 text-sm font-semibold disabled:opacity-60"
+
+
+
+              >
+
+
+
+                {demoLoading ? 'Preparando demo...' : 'Entrar con demo'}
+
+
+
+              </button>
+
+
+
+            </div>
+
+
+
+            <p className="text-xs text-gray-500">
+
+
+
+              El acceso demo crea o reutiliza una empresa persistente para que puedas guardar datos y mostrar un preview real.
+
+
+
+            </p>
 
 
 

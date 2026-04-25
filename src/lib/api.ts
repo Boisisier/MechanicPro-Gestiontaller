@@ -84,6 +84,14 @@ export const loginOwner = async (payload: { email: string; password: string }) =
     })
   );
 
+export const loginDemo = async () =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/auth/demo-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
+  );
+
 export const getSession = async () =>
   handleResponse(
     await fetch(`${apiBaseUrl}/auth/me`, {
