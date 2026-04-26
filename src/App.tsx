@@ -105,7 +105,7 @@ import VehicleHistoryTable from './components/VehicleHistoryTable';
 
 
 
-import { CheckCircle, AlertCircle } from 'lucide-react';
+import { CheckCircle, AlertCircle, Search, Trash2, X } from 'lucide-react';
 
 
 
@@ -124,6 +124,14 @@ interface Notification {
   message: string;
 
 
+
+}
+
+interface ReviewServiceItem {
+
+  name: string;
+
+  price: string;
 
 }
 
@@ -206,6 +214,45 @@ const serviceCatalog = [
 
 
 ];
+
+serviceCatalog.push(
+  'Cambio de aceite de caja',
+  'Cambio de filtro de aire',
+  'Cambio de filtro de combustible',
+  'Escaneo computarizado',
+  'RevisiÃ³n precompra',
+  'Rectificado de discos',
+  'Cambio de pastillas',
+  'DirecciÃ³n',
+  'BaterÃ­a y carga',
+  'Motor de arranque',
+  'Alternador',
+  'Radiador',
+  'InyecciÃ³n',
+  'Afinamiento',
+  'DistribuciÃ³n',
+  'Correa de accesorios',
+  'Catalizador',
+  'CalefacciÃ³n',
+  'Limpieza de inyectores',
+  'Cambio de bujÃ­as',
+  'Tren delantero',
+  'Rodamientos',
+  'ABS y control de estabilidad',
+  'RevisiÃ³n de luces'
+);
+
+const parseStoredReviewServices = (services: string[] = []): ReviewServiceItem[] =>
+  services.map((service) => {
+    const match = service.match(/^(.*?)(?:\s+\(\$\s*([^)]+)\))?$/);
+    return {
+      name: match?.[1]?.trim() || service,
+      price: match?.[2]?.replace(/[^\d]/g, '') || '',
+    };
+  });
+
+const serializeReviewService = ({ name, price }: ReviewServiceItem) =>
+  price.trim() ? `${name} ($${price.trim()})` : name;
 
 
 
@@ -578,7 +625,11 @@ function App() {
 
 
 
-  const [reviewServices, setReviewServices] = useState<string[]>([]);
+  const [reviewServices, setReviewServices] = useState<ReviewServiceItem[]>([]);
+
+  const [serviceSearch, setServiceSearch] = useState('');
+
+  const [servicePickerOpen, setServicePickerOpen] = useState(false);
 
 
 
@@ -2098,7 +2149,7 @@ function App() {
 
 
 
-    setReviewServices(vehicle.servicios || []);
+    setReviewServices(parseStoredReviewServices(vehicle.servicios));
 
 
 
@@ -2114,7 +2165,7 @@ function App() {
 
 
 
-  const toggleReviewService = (service: string) => {
+  const handleAddReviewService = (serviceName: string) => {
 
 
 
@@ -2122,11 +2173,55 @@ function App() {
 
 
 
-      prev.includes(service) ? prev.filter((item) => item !== service) : [...prev, service]
+      prev.some((item) => item.name === serviceName) ? prev : [...prev, { name: serviceName, price: '' }]
 
 
 
     );
+
+
+
+    setServiceSearch('');
+
+
+
+    setServicePickerOpen(false);
+
+
+
+  };
+
+
+
+  const handleReviewServicePriceChange = (serviceName: string, price: string) => {
+
+
+
+    const normalizedPrice = price.replace(/[^\d]/g, '');
+
+
+
+    setReviewServices((prev) =>
+
+
+
+      prev.map((item) => (item.name === serviceName ? { ...item, price: normalizedPrice } : item))
+
+
+
+    );
+
+
+
+  };
+
+
+
+  const handleRemoveReviewService = (serviceName: string) => {
+
+
+
+    setReviewServices((prev) => prev.filter((item) => item.name !== serviceName));
 
 
 
@@ -2182,7 +2277,7 @@ function App() {
 
 
 
-          servicios: reviewServices,
+          servicios: reviewServices.map(serializeReviewService),
 
 
 
@@ -2258,7 +2353,7 @@ function App() {
 
 
 
-      setReviewServices(vehicle.servicios || []);
+      setReviewServices(parseStoredReviewServices(vehicle.servicios));
 
 
 
@@ -2446,7 +2541,7 @@ function App() {
 
 
 
-<p><strong>Ciudad:</strong> ${escapeHtml(vehicle.customer_city || '-')}</p>
+<p><strong>Correo:</strong> ${escapeHtml(vehicle.customer_city || '-')}</p>
 
 
 
@@ -2835,6 +2930,32 @@ ${services.length === 0
 
 
   const vehiclesEntregados = vehicles.filter((vehicle) => vehicle.estado === 'Entregado');
+
+  const activeReviewVehicle =
+
+    vehicles.find((vehicle) => vehicle.id === reviewVehicleId) || vehiclesEnRevision[0] || null;
+
+  const filteredServiceCatalog = serviceCatalog.filter((service) => {
+
+    const matchesSearch = service.toLowerCase().includes(serviceSearch.toLowerCase());
+
+    const alreadySelected = reviewServices.some((item) => item.name === service);
+
+    return matchesSearch && !alreadySelected;
+
+  });
+
+
+
+  useEffect(() => {
+
+    if (!reviewVehicleId && vehiclesEnRevision.length > 0) {
+
+      handleReviewSelect(vehiclesEnRevision[0]);
+
+    }
+
+  }, [reviewVehicleId, vehiclesEnRevision]);
 
 
 
@@ -4850,6 +4971,63 @@ ${services.length === 0
 
 
 
+                    {activeReviewVehicle && (
+
+
+
+                      <div className="mb-6 rounded-lg border border-blue-500 bg-blue-50 px-4 py-3">
+
+
+
+                        <p className="text-sm font-semibold text-gray-900 uppercase">
+
+
+
+                          {activeReviewVehicle.patente}
+
+
+
+                        </p>
+
+
+
+                        <p className="mt-1 text-xs text-gray-600">
+
+
+
+                          {activeReviewVehicle.marca} {activeReviewVehicle.modelo} ·{' '}
+                          {activeReviewVehicle.customer_name || 'Sin cliente'}
+
+
+
+                        </p>
+
+
+
+                      </div>
+
+
+
+                    )}
+
+
+
+                    <div className="mb-4 flex items-center justify-between gap-3">
+
+
+
+                      <h4 className="text-sm font-semibold text-gray-900">VehÃ­culos en revisiÃ³n</h4>
+
+
+
+                      <span className="text-xs text-gray-500">{vehiclesEnRevision.length} activos</span>
+
+
+
+                    </div>
+
+
+
                     {vehiclesEnRevision.length === 0 ? (
 
 
@@ -4862,7 +5040,7 @@ ${services.length === 0
 
 
 
-                      <div className="space-y-3">
+                      <div className="space-y-3 max-h-[32rem] overflow-y-auto pr-1">
 
 
 
@@ -4882,19 +5060,11 @@ ${services.length === 0
 
 
 
-                            className={`w-full text-left rounded-lg border px-4 py-3 transition-colors ${reviewVehicleId === vehicle.id
-
-
-
+                            className={`w-full text-left rounded-lg border px-4 py-3 transition-colors ${
+                              reviewVehicleId === vehicle.id
                                 ? 'border-blue-500 bg-blue-50'
-
-
-
                                 : 'border-gray-200 hover:bg-gray-50'
-
-
-
-                              }`}
+                            }`}
 
 
 
@@ -4922,6 +5092,10 @@ ${services.length === 0
 
 
 
+                            </p>
+
+                            <p className="mt-2 text-xs font-semibold text-gray-500">
+                              Sigue en revisiÃ³n hasta pasar a salida
                             </p>
 
 
@@ -4954,7 +5128,7 @@ ${services.length === 0
 
 
 
-                    {reviewVehicleId ? (
+                    {activeReviewVehicle ? (
 
 
 
@@ -4962,23 +5136,59 @@ ${services.length === 0
 
 
 
-                        <div className="mb-4">
+                        <div className="mb-4 flex items-start justify-between gap-4">
 
 
 
-                          <h3 className="text-lg font-semibold text-gray-900">Servicios realizados</h3>
+                          <div>
 
 
 
-                          <p className="text-sm text-gray-500">
+                            <h3 className="text-lg font-semibold text-gray-900">Servicios realizados</h3>
 
 
 
-                            Selecciona los trabajos ejecutados y agrega el detalle final.
+                            <p className="text-sm text-gray-500">
 
 
 
-                          </p>
+                              Busca procedimientos, agrÃ©galos con valor y guarda el trabajo ejecutado.
+
+
+
+                            </p>
+
+
+
+                          </div>
+
+
+
+                          <button
+
+
+
+                            type="button"
+
+
+
+                            onClick={() => setServicePickerOpen((prev) => !prev)}
+
+
+
+                            className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+
+
+
+                          >
+
+
+
+                            {servicePickerOpen ? 'Cerrar buscador' : 'Buscar servicios'}
+
+
+
+                          </button>
 
 
 
@@ -4990,39 +5200,19 @@ ${services.length === 0
 
 
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+                        <div className="relative mb-6">
 
 
 
-                          {serviceCatalog.map((service) => (
+                          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
 
 
 
-                            <label
+                            <div className="relative">
 
 
 
-                              key={service}
-
-
-
-                              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${reviewServices.includes(service)
-
-
-
-                                  ? 'border-blue-500 bg-blue-50'
-
-
-
-                                  : 'border-gray-200'
-
-
-
-                                }`}
-
-
-
-                            >
+                              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
 
 
 
@@ -5030,15 +5220,35 @@ ${services.length === 0
 
 
 
-                                type="checkbox"
+                                value={serviceSearch}
 
 
 
-                                checked={reviewServices.includes(service)}
+                                onFocus={() => setServicePickerOpen(true)}
 
 
 
-                                onChange={() => toggleReviewService(service)}
+                                onChange={(event) => {
+
+
+
+                                  setServiceSearch(event.target.value);
+
+
+
+                                  setServicePickerOpen(true);
+
+
+
+                                }}
+
+
+
+                                className="w-full rounded-lg border border-gray-300 bg-white py-3 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none"
+
+
+
+                                placeholder="Buscar procedimiento o sistema..."
 
 
 
@@ -5046,15 +5256,329 @@ ${services.length === 0
 
 
 
-                              {service}
+                            </div>
 
 
 
-                            </label>
+                            {servicePickerOpen && (
 
 
 
-                          ))}
+                              <div className="mt-3 rounded-xl border border-gray-200 bg-white shadow-lg">
+
+
+
+                                <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+
+
+
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+
+
+
+                                    CatÃ¡logo de procedimientos
+
+
+
+                                  </p>
+
+
+
+                                  <button
+
+
+
+                                    type="button"
+
+
+
+                                    onClick={() => setServicePickerOpen(false)}
+
+
+
+                                    className="rounded p-1 text-gray-500 hover:bg-gray-100"
+
+
+
+                                  >
+
+
+
+                                    <X className="h-4 w-4" />
+
+
+
+                                  </button>
+
+
+
+                                </div>
+
+
+
+                                <div className="max-h-72 overflow-y-auto p-2">
+
+
+
+                                  {filteredServiceCatalog.length === 0 ? (
+
+
+
+                                    <p className="px-3 py-2 text-sm text-gray-500">
+
+
+
+                                      No hay servicios disponibles con esa bÃºsqueda.
+
+
+
+                                    </p>
+
+
+
+                                  ) : (
+
+
+
+                                    filteredServiceCatalog.map((service) => (
+
+
+
+                                      <button
+
+
+
+                                        key={service}
+
+
+
+                                        type="button"
+
+
+
+                                        onClick={() => handleAddReviewService(service)}
+
+
+
+                                        className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-blue-50"
+
+
+
+                                      >
+
+
+
+                                        <span>{service}</span>
+
+
+
+                                        <span className="text-xs font-semibold text-blue-600">Agregar</span>
+
+
+
+                                      </button>
+
+
+
+                                    ))
+
+
+
+                                  )}
+
+
+
+                                </div>
+
+
+
+                              </div>
+
+
+
+                            )}
+
+
+
+                          </div>
+
+
+
+                        </div>
+
+
+
+                        <div className="mb-6 space-y-3">
+
+
+
+                          {reviewServices.length === 0 ? (
+
+
+
+                            <p className="rounded-lg border border-dashed border-gray-300 px-4 py-5 text-sm text-gray-500">
+
+
+
+                              No hay servicios seleccionados todavÃ­a.
+
+
+
+                            </p>
+
+
+
+                          ) : (
+
+
+
+                            reviewServices.map((service) => (
+
+
+
+                              <div
+
+
+
+                                key={service.name}
+
+
+
+                                className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 p-4 md:grid-cols-[minmax(0,1fr)_180px_44px]"
+
+
+
+                              >
+
+
+
+                                <div>
+
+
+
+                                  <p className="text-sm font-semibold text-gray-900">{service.name}</p>
+
+
+
+                                  <p className="text-xs text-gray-500">
+
+
+
+                                    Servicio aplicable a sistemas automotrices.
+
+
+
+                                  </p>
+
+
+
+                                </div>
+
+
+
+                                <div>
+
+
+
+                                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+
+
+
+                                    Valor
+
+
+
+                                  </label>
+
+
+
+                                  <input
+
+
+
+                                    type="text"
+
+
+
+                                    inputMode="numeric"
+
+
+
+                                    value={service.price}
+
+
+
+                                    onChange={(event) =>
+                                      handleReviewServicePriceChange(service.name, event.target.value)
+                                    }
+
+
+
+                                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+
+
+
+                                    placeholder="15000"
+
+
+
+                                  />
+
+
+
+                                </div>
+
+
+
+                                <div className="flex items-end">
+
+
+
+                                  <button
+
+
+
+                                    type="button"
+
+
+
+                                    onClick={() => handleRemoveReviewService(service.name)}
+
+
+
+                                    className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
+
+
+
+                                    title="Eliminar servicio"
+
+
+
+                                  >
+
+
+
+                                    <Trash2 className="h-4 w-4" />
+
+
+
+                                  </button>
+
+
+
+                                </div>
+
+
+
+                              </div>
+
+
+
+                            ))
+
+
+
+                          )}
 
 
 
@@ -5138,7 +5662,7 @@ ${services.length === 0
 
 
 
-                            Guardar servicios
+                            Guardar selecciÃ³n
 
 
 
@@ -5182,7 +5706,7 @@ ${services.length === 0
 
 
 
-                      <p className="text-sm text-gray-500">Selecciona un vehÃ­culo para registrar servicios.</p>
+                      <p className="text-sm text-gray-500">EnvÃ­a un vehÃ­culo a revisiÃ³n para registrar servicios.</p>
 
 
 
@@ -5402,15 +5926,8 @@ ${services.length === 0
 
 
 
-                              <p className="text-xs text-gray-500">
-
-
-
-                                {vehicle.customer_address || '-'} {vehicle.customer_city || ''}
-
-
-
-                              </p>
+                              <p className="text-xs text-gray-500">{vehicle.customer_address || '-'}</p>
+                              <p className="text-xs text-gray-500">{vehicle.customer_city || '-'}</p>
 
 
 

@@ -49,13 +49,13 @@ const allowedRoles = new Set(['admin', 'mecanico', 'recepcionista']);
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const validateVehicle = (payload) => {
-  const requiredFields = ['patente', 'marca', 'modelo', 'ano', 'tipo_vehiculo', 'estado'];
+  const requiredFields = ['patente', 'marca', 'modelo', 'ano', 'estado'];
   for (const field of requiredFields) {
     if (!payload[field]) {
       return `Missing field: ${field}`;
     }
   }
-  if (!allowedTipos.has(payload.tipo_vehiculo)) {
+  if (payload.tipo_vehiculo && !allowedTipos.has(payload.tipo_vehiculo)) {
     return 'Invalid tipo_vehiculo';
   }
   if (!allowedStatuses.has(payload.estado)) {
@@ -662,7 +662,7 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
     marca,
     modelo,
     ano,
-    tipo_vehiculo,
+    tipo_vehiculo = 'Auto',
     kilometraje = 0,
     cantidad_combustible = 0,
     estado = 'En taller',
@@ -726,7 +726,7 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
     marca,
     modelo,
     ano,
-    tipo_vehiculo,
+    tipo_vehiculo = 'Auto',
     kilometraje = 0,
     cantidad_combustible = 0,
     estado,

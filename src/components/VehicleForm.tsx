@@ -318,45 +318,7 @@ export default function VehicleForm({ onSubmit, editingVehicle, onCancelEdit }: 
 
 
 
-          <div>
-
-            <label htmlFor="tipo_vehiculo" className="block text-sm font-medium text-gray-700 mb-2">Tipo de vehculo *</label>
-
-            <select
-
-              id="tipo_vehiculo"
-
-              name="tipo_vehiculo"
-
-              value={formData.tipo_vehiculo}
-
-              onChange={handleChange}
-
-              required
-
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-
-            >
-
-              <option value="Auto">Auto</option>
-
-              <option value="Camioneta">Camioneta</option>
-
-              <option value="SUV">SUV</option>
-
-              <option value="Moto">Moto</option>
-
-              <option value="Camion">Camion</option>
-
-              <option value="Furgon">Furgn</option>
-
-            </select>
-
-          </div>
-
-
-
-          <div>
+            <div>
 
             <label htmlFor="kilometraje" className="block text-sm font-medium text-gray-700 mb-2">
 
@@ -558,13 +520,13 @@ export default function VehicleForm({ onSubmit, editingVehicle, onCancelEdit }: 
 
               <label htmlFor="customer_city" className="block text-sm font-medium text-gray-700 mb-2">
 
-                Ciudad
+                Correo
 
               </label>
 
               <input
 
-                type="text"
+                type="email"
 
                 id="customer_city"
 
@@ -576,7 +538,7 @@ export default function VehicleForm({ onSubmit, editingVehicle, onCancelEdit }: 
 
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
 
-                placeholder="Ciudad"
+                placeholder="cliente@correo.com"
 
               />
 
