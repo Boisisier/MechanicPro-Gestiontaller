@@ -12,6 +12,8 @@ export interface Vehicle {
   modelo: string;
   ano: number;
   tipo_vehiculo: string;
+  codigo_vin?: string;
+  codigo_motor?: string;
   kilometraje: number;
   cantidad_combustible: number;
   estado: VehicleStatus;

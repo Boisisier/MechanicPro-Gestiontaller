@@ -41,6 +41,8 @@ CREATE TABLE IF NOT EXISTS vehicles (
   modelo text NOT NULL,
   ano integer NOT NULL,
   tipo_vehiculo text NOT NULL,
+  codigo_vin text,
+  codigo_motor text,
   kilometraje integer NOT NULL DEFAULT 0,
   cantidad_combustible integer NOT NULL DEFAULT 0,
   estado text NOT NULL DEFAULT 'En taller',

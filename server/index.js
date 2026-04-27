@@ -47,6 +47,29 @@ const allowedStatuses = new Set(['En taller', 'En revision', 'Entregado']);
 const allowedTipos = new Set(['Auto', 'Camioneta', 'SUV', 'Moto', 'Camion', 'Furgon']);
 const allowedRoles = new Set(['admin', 'mecanico', 'recepcionista']);
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const patenteRegex = /^(?:[A-Z]{2}-\d{4}|[A-Z]{4}-\d{2})$/;
+
+const normalizePatente = (value = '') => {
+  const normalized = String(value).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+  if (normalized.length <= 2) {
+    return normalized;
+  }
+  if (/^[A-Z]{2}\d/.test(normalized)) {
+    return `${normalized.slice(0, 2)}-${normalized.slice(2)}`;
+  }
+  if (normalized.length <= 4) {
+    return normalized;
+  }
+  return `${normalized.slice(0, 4)}-${normalized.slice(4)}`;
+};
+
+const ensureVehicleColumns = async () => {
+  await pool.query(`
+    alter table vehicles
+      add column if not exists codigo_vin text,
+      add column if not exists codigo_motor text
+  `);
+};
 
 const validateVehicle = (payload) => {
   const requiredFields = ['patente', 'marca', 'modelo', 'ano', 'estado'];
@@ -57,6 +80,12 @@ const validateVehicle = (payload) => {
   }
   if (payload.tipo_vehiculo && !allowedTipos.has(payload.tipo_vehiculo)) {
     return 'Invalid tipo_vehiculo';
+  }
+  if (!payload.customer_name || !payload.customer_rut || !payload.customer_phone || !payload.customer_address || !payload.customer_city) {
+    return 'Missing customer fields';
+  }
+  if (!patenteRegex.test(payload.patente)) {
+    return 'Invalid patente';
   }
   if (!allowedStatuses.has(payload.estado)) {
     return 'Invalid estado';
@@ -651,6 +680,7 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
   if (!Array.isArray(req.body.servicios)) {
     req.body.servicios = [];
   }
+  req.body.patente = normalizePatente(req.body.patente);
 
   const errorMessage = validateVehicle(req.body);
   if (errorMessage) {
@@ -663,6 +693,8 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
     modelo,
     ano,
     tipo_vehiculo = 'Auto',
+    codigo_vin = '',
+    codigo_motor = '',
     kilometraje = 0,
     cantidad_combustible = 0,
     estado = 'En taller',
@@ -678,9 +710,9 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
   try {
     const { rows } = await pool.query(
       `insert into vehicles
-        (company_id, customer_name, customer_rut, customer_phone, customer_address, customer_city, patente, marca, modelo, ano, tipo_vehiculo, kilometraje, cantidad_combustible, estado, servicios, observaciones)
+        (company_id, customer_name, customer_rut, customer_phone, customer_address, customer_city, patente, marca, modelo, ano, tipo_vehiculo, codigo_vin, codigo_motor, kilometraje, cantidad_combustible, estado, servicios, observaciones)
        values
-        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
        returning *`,
       [
         companyId,
@@ -694,6 +726,8 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
         modelo,
         ano,
         tipo_vehiculo,
+        codigo_vin,
+        codigo_motor,
         kilometraje,
         cantidad_combustible,
         estado,
@@ -714,6 +748,7 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
 
 app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
+  req.body.patente = normalizePatente(req.body.patente);
 
   const errorMessage = validateVehicle(req.body);
   if (errorMessage) {
@@ -727,6 +762,8 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
     modelo,
     ano,
     tipo_vehiculo = 'Auto',
+    codigo_vin = '',
+    codigo_motor = '',
     kilometraje = 0,
     cantidad_combustible = 0,
     estado,
@@ -752,13 +789,15 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
            modelo = $8,
            ano = $9,
            tipo_vehiculo = $10,
-           kilometraje = $11,
-           cantidad_combustible = $12,
-           estado = $13,
-           servicios = $14,
-           observaciones = $15,
+           codigo_vin = $11,
+           codigo_motor = $12,
+           kilometraje = $13,
+           cantidad_combustible = $14,
+           estado = $15,
+           servicios = $16,
+           observaciones = $17,
            updated_at = now()
-       where id = $16 and company_id = $17
+       where id = $18 and company_id = $19
        returning *`,
       [
         customer_name,
@@ -771,6 +810,8 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
         modelo,
         ano,
         tipo_vehiculo,
+        codigo_vin,
+        codigo_motor,
         kilometraje,
         cantidad_combustible,
         estado,
@@ -815,6 +856,13 @@ app.delete('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`API listening on port ${port}`);
-});
+ensureVehicleColumns()
+  .then(() => {
+    app.listen(port, () => {
+      console.log(`API listening on port ${port}`);
+    });
+  })
+  .catch((error) => {
+    console.error('Vehicle schema initialization failed', error);
+    process.exit(1);
+  });

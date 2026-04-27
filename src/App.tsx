@@ -2045,6 +2045,14 @@ function App() {
 
 
 
+    codigo_vin: vehicle.codigo_vin || '',
+
+
+
+    codigo_motor: vehicle.codigo_motor || '',
+
+
+
     kilometraje: vehicle.kilometraje,
 
 
