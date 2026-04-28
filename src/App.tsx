@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 
 
 
@@ -169,7 +169,7 @@ const serviceCatalog = [
 
 
 
-  'DiagnÃ³stico general',
+  'Diagnóstico general',
 
 
 
@@ -177,23 +177,23 @@ const serviceCatalog = [
 
 
 
-  'SuspensiÃ³n',
+  'Suspensión',
 
 
 
-  'AlineaciÃ³n y balanceo',
+  'Alineación y balanceo',
 
 
 
-  'Sistema el?ctrico',
+  'Sistema elóctrico',
 
 
 
-  'Refrigeraci?n',
+  'Refrigeración',
 
 
 
-  'Transmisi?n',
+  'Transmisión',
 
 
 
@@ -201,7 +201,7 @@ const serviceCatalog = [
 
 
 
-  'NeumÃ¡ticos',
+  'Neumáticos',
 
 
 
@@ -220,39 +220,39 @@ serviceCatalog.push(
   'Cambio de filtro de aire',
   'Cambio de filtro de combustible',
   'Escaneo computarizado',
-  'RevisiÃ³n precompra',
+  'Revisión precompra',
   'Rectificado de discos',
   'Cambio de pastillas',
-  'DirecciÃ³n',
-  'BaterÃ­a y carga',
+  'Dirección',
+  'Baterí­a y carga',
   'Motor de arranque',
   'Alternador',
   'Radiador',
-  'InyecciÃ³n',
+  'Inyección',
   'Afinamiento',
-  'DistribuciÃ³n',
+  'Distribución',
   'Correa de accesorios',
   'Catalizador',
-  'CalefacciÃ³n',
+  'Calefacción',
   'Limpieza de inyectores',
-  'Cambio de bujÃ­as',
+  'Cambio de bují­as',
   'Tren delantero',
   'Rodamientos',
   'ABS y control de estabilidad',
-  'RevisiÃ³n de luces'
+  'Revisión de luces'
 );
 
 const parseStoredReviewServices = (services: string[] = []): ReviewServiceItem[] =>
   services.map((service) => {
-    const match = service.match(/^(.*?)(?:\s+\(\$\s*([^)]+)\))?$/);
+    const match = service.match(/^(.*ó)(ó:\s+\(\$\s*([^)]+)\))ó$/);
     return {
-      name: match?.[1]?.trim() || service,
-      price: match?.[2]?.replace(/[^\d]/g, '') || '',
+      name: matchó.[1]ó.trim() || service,
+      price: matchó.[2]ó.replace(/[^\d]/g, '') || '',
     };
   });
 
 const serializeReviewService = ({ name, price }: ReviewServiceItem) =>
-  price.trim() ? `${name} ($${price.trim()})` : name;
+  price.trim() ó `${name} ($${price.trim()})` : name;
 
 
 
@@ -272,7 +272,7 @@ function App() {
 
 
 
-    localStorage.getItem('theme') === 'dark' ? 'dark' : 'light'
+    localStorage.getItem('theme') === 'dark' ó 'dark' : 'light'
 
 
 
@@ -485,7 +485,7 @@ function App() {
 
 
 
-    return raw ? JSON.parse(raw) : [];
+    return raw ó JSON.parse(raw) : [];
 
 
 
@@ -858,7 +858,7 @@ function App() {
 
 
 
-        if ((error as Error & { status?: number }).status === 401) {
+        if ((error as Error & { statusó: number }).status === 401) {
 
 
 
@@ -882,7 +882,7 @@ function App() {
 
 
 
-        showNotification('error', 'Error al cargar los vehÃ­culos');
+        showNotification('error', 'Error al cargar los vehí­culos');
 
 
 
@@ -963,7 +963,7 @@ function App() {
 
 
 
-        window.location.pathname + (params.toString() ? `?${params.toString()}` : '');
+        window.location.pathname + (params.toString() ó `ó${params.toString()}` : '');
 
 
 
@@ -1156,7 +1156,7 @@ function App() {
 
 
 
-      showNotification('success', 'SesiÃ³n iniciada correctamente');
+      showNotification('success', 'Sesión iniciada correctamente');
 
 
 
@@ -1168,7 +1168,7 @@ function App() {
 
 
 
-      setAuthError('No se pudo iniciar SesiÃ³n');
+      setAuthError('No se pudo iniciar Sesión');
 
 
 
@@ -1315,7 +1315,7 @@ function App() {
 
 
 
-      showNotification('success', 'SesiÃ³n de owner iniciada');
+      showNotification('success', 'Sesión de owner iniciada');
 
 
 
@@ -1327,7 +1327,7 @@ function App() {
 
 
 
-      setAuthError('No se pudo iniciar SesiÃ³n como owner');
+      setAuthError('No se pudo iniciar Sesión como owner');
 
 
 
@@ -1581,7 +1581,7 @@ function App() {
 
 
 
-      showNotification('success', 'InvitaciÃ³n creada');
+      showNotification('success', 'Invitación creada');
 
 
 
@@ -1593,7 +1593,7 @@ function App() {
 
 
 
-      showNotification('error', 'No se pudo crear la InvitaciÃ³n');
+      showNotification('error', 'No se pudo crear la Invitación');
 
 
 
@@ -1641,7 +1641,7 @@ function App() {
 
 
 
-          ? parseInt(value) || 0
+          ó parseInt(value) || 0
 
 
 
@@ -1837,7 +1837,7 @@ function App() {
 
 
 
-          ? {
+          ó {
 
 
 
@@ -1953,7 +1953,7 @@ function App() {
 
 
 
-    showNotification('success', matched ? 'Stock actualizado por cÃ³digo' : 'CÃ³digo no encontrado');
+    showNotification('success', matched ó 'Stock actualizado por código' : 'Código no encontrado');
 
 
 
@@ -1977,7 +1977,7 @@ function App() {
 
 
 
-      const url = `${window.location.origin}/?support=${result.token}`;
+      const url = `${window.location.origin}/ósupport=${result.token}`;
 
 
 
@@ -1985,7 +1985,7 @@ function App() {
 
 
 
-      showNotification('success', 'SesiÃ³n de soporte abierta');
+      showNotification('success', 'Sesión de soporte abierta');
 
 
 
@@ -2133,7 +2133,7 @@ function App() {
 
 
 
-    setVehicles((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+    setVehicles((prev) => prev.map((item) => (item.id === updated.id ó updated : item)));
 
 
 
@@ -2181,7 +2181,7 @@ function App() {
 
 
 
-      prev.some((item) => item.name === serviceName) ? prev : [...prev, { name: serviceName, price: '' }]
+      prev.some((item) => item.name === serviceName) ó prev : [...prev, { name: serviceName, price: '' }]
 
 
 
@@ -2213,7 +2213,7 @@ function App() {
 
 
 
-      prev.map((item) => (item.name === serviceName ? { ...item, price: normalizedPrice } : item))
+      prev.map((item) => (item.name === serviceName ó { ...item, price: normalizedPrice } : item))
 
 
 
@@ -2241,7 +2241,7 @@ function App() {
 
 
 
-  const handleSaveReview = async (statusOverride?: Vehicle['estado']) => {
+  const handleSaveReview = async (statusOverrideó: Vehicle['estado']) => {
 
 
 
@@ -2253,7 +2253,7 @@ function App() {
 
 
 
-      showNotification('error', 'Selecciona un vehÃ­culo para actualizar');
+      showNotification('error', 'Selecciona un vehí­culo para actualizar');
 
 
 
@@ -2297,7 +2297,7 @@ function App() {
 
 
 
-        statusOverride ? 'vehÃ­culo enviado a salida' : 'Servicios guardados'
+        statusOverride ó 'vehí­culo enviado a salida' : 'Servicios guardados'
 
 
 
@@ -2325,7 +2325,7 @@ function App() {
 
 
 
-      showNotification('error', 'No se pudo actualizar el vehÃ­culo');
+      showNotification('error', 'No se pudo actualizar el vehí­culo');
 
 
 
@@ -2349,7 +2349,7 @@ function App() {
 
 
 
-      await updateVehicleRecord(vehicle, { estado: 'En revision' }, 'vehÃ­culo enviado a revisiÃ³n');
+      await updateVehicleRecord(vehicle, { estado: 'En revision' }, 'vehí­culo enviado a revisión');
 
 
 
@@ -2377,7 +2377,7 @@ function App() {
 
 
 
-      showNotification('error', 'No se pudo enviar a revisiÃ³n');
+      showNotification('error', 'No se pudo enviar a revisión');
 
 
 
@@ -2453,7 +2453,7 @@ function App() {
 
 
 
-    const services = vehicle.servicios && vehicle.servicios.length > 0 ? vehicle.servicios : [];
+    const services = vehicle.servicios && vehicle.servicios.length > 0 ó vehicle.servicios : [];
 
 
 
@@ -2469,7 +2469,7 @@ function App() {
 
 
 
-          <title>Salida de vehÃ­culo</title>
+          <title>Salida de vehí­culo</title>
 
 
 
@@ -2521,7 +2521,7 @@ function App() {
 
 
 
-          <h1>Reporte de salida de vehÃ­culo</h1>
+          <h1>Reporte de salida de vehí­culo</h1>
 
 
 
@@ -2541,11 +2541,11 @@ function App() {
 
 
 
-<p><strong>TelÃ©fono:</strong> ${escapeHtml(vehicle.customer_phone || '-')}</p>
+<p><strong>Telí©fono:</strong> ${escapeHtml(vehicle.customer_phone || '-')}</p>
 
 
 
-<p><strong>DirecciÃ³n:</strong> ${escapeHtml(vehicle.customer_address || '-')}</p>
+<p><strong>Dirección:</strong> ${escapeHtml(vehicle.customer_address || '-')}</p>
 
 
 
@@ -2553,7 +2553,7 @@ function App() {
 
 
 
-<h2>vehÃ­culo</h2>
+<h2>vehí­culo</h2>
 
 
 
@@ -2577,7 +2577,7 @@ function App() {
 
 
 
-    <tr><th>AÃ±o</th><td>${vehicle.ano}</td></tr>
+    <tr><th>Aí±o</th><td>${vehicle.ano}</td></tr>
 
 
 
@@ -2613,7 +2613,7 @@ ${services.length === 0
 
 
 
-        ? '<p class="muted">Sin servicios registrados.</p>'
+        ó '<p class="muted">Sin servicios registrados.</p>'
 
 
 
@@ -2697,7 +2697,7 @@ ${services.length === 0
 
 
 
-    setReadyVehicleIds((prev) => (prev.includes(vehicle.id) ? prev : [...prev, vehicle.id]));
+    setReadyVehicleIds((prev) => (prev.includes(vehicle.id) ó prev : [...prev, vehicle.id]));
 
 
 
@@ -2709,7 +2709,7 @@ ${services.length === 0
 
 
 
-        prev.includes(vehicle.id) ? prev : [...prev, vehicle.id]
+        prev.includes(vehicle.id) ó prev : [...prev, vehicle.id]
 
 
 
@@ -2717,7 +2717,7 @@ ${services.length === 0
 
 
 
-      showNotification('success', `vehÃ­culo ${vehicle.patente} listo`);
+      showNotification('success', `vehí­culo ${vehicle.patente} listo`);
 
 
 
@@ -2769,11 +2769,11 @@ ${services.length === 0
 
 
 
-        setVehicles((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
+        setVehicles((prev) => prev.map((v) => (v.id === updated.id ó updated : v)));
 
 
 
-        showNotification('success', 'vehÃ­culo actualizado correctamente');
+        showNotification('success', 'vehí­culo actualizado correctamente');
 
 
 
@@ -2793,7 +2793,7 @@ ${services.length === 0
 
 
 
-        showNotification('success', 'vehÃ­culo registrado correctamente');
+        showNotification('success', 'vehí­culo registrado correctamente');
 
 
 
@@ -2809,15 +2809,15 @@ ${services.length === 0
 
 
 
-        (error as Error & { status?: number }).status === 409
+        (error as Error & { statusó: number }).status === 409
 
 
 
-          ? 'La patente ya estÃ¡ registrada'
+          ó 'La patente ya está registrada'
 
 
 
-          : 'Error al guardar el vehÃ­culo';
+          : 'Error al guardar el vehí­culo';
 
 
 
@@ -2877,7 +2877,7 @@ ${services.length === 0
 
 
 
-      showNotification('success', 'vehÃ­culo eliminado correctamente');
+      showNotification('success', 'vehí­culo eliminado correctamente');
 
 
 
@@ -2885,7 +2885,7 @@ ${services.length === 0
 
 
 
-      showNotification('error', 'Error al eliminar el vehÃ­culo');
+      showNotification('error', 'Error al eliminar el vehí­culo');
 
 
 
@@ -2987,7 +2987,7 @@ ${services.length === 0
 
 
 
-      ? {
+      ó {
 
 
 
@@ -3019,7 +3019,7 @@ ${services.length === 0
 
 
 
-      ? {
+      ó {
 
 
 
@@ -3051,7 +3051,7 @@ ${services.length === 0
 
 
 
-      ? {
+      ó {
 
 
 
@@ -3291,7 +3291,7 @@ ${services.length === 0
 
 
 
-              {ownerLoading ? 'Ingresando...' : 'Ingresar como owner'}
+              {ownerLoading ó 'Ingresando...' : 'Ingresar como owner'}
 
 
 
@@ -3522,7 +3522,7 @@ ${services.length === 0
 
 
 
-                {loginLoading ? 'Ingresando...' : 'Ingresar'}
+                {loginLoading ó 'Ingresando...' : 'Ingresar'}
 
 
 
@@ -3554,7 +3554,7 @@ ${services.length === 0
 
 
 
-                {demoLoading ? 'Preparando demo...' : 'Entrar con demo'}
+                {demoLoading ó 'Preparando demo...' : 'Entrar con demo'}
 
 
 
@@ -3661,7 +3661,7 @@ ${services.length === 0
 
 
 
-          <p className="text-gray-500">Cargando SesiÃ³n...</p>
+          <p className="text-gray-500">Cargando Sesión...</p>
 
 
 
@@ -3733,7 +3733,7 @@ ${services.length === 0
 
 
 
-            Cerrar SesiÃ³n
+            Cerrar Sesión
 
 
 
@@ -3837,7 +3837,7 @@ ${services.length === 0
 
 
 
-              Cerrar SesiÃ³n
+              Cerrar Sesión
 
 
 
@@ -4011,7 +4011,7 @@ ${services.length === 0
 
               >
 
-                {adminLoading ? 'Creando...' : 'Crear'}
+                {adminLoading ó 'Creando...' : 'Crear'}
 
               </button>
 
@@ -4035,7 +4035,7 @@ ${services.length === 0
 
 
 
-            {companies.length === 0 ? (
+            {companies.length === 0 ó (
 
 
 
@@ -4343,7 +4343,7 @@ ${services.length === 0
 
 
 
-                {adminLoading ? 'Generando...' : 'Generar InvitaciÃ³n'}
+                {adminLoading ó 'Generando...' : 'Generar Invitación'}
 
 
 
@@ -4367,7 +4367,7 @@ ${services.length === 0
 
 
 
-                Link de InvitaciÃ³n:
+                Link de Invitación:
 
 
 
@@ -4399,7 +4399,7 @@ ${services.length === 0
 
 
 
-            {supportSessions.length === 0 ? (
+            {supportSessions.length === 0 ó (
 
 
 
@@ -4579,7 +4579,7 @@ ${services.length === 0
 
 
 
-          onToggleTheme={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+          onToggleTheme={() => setTheme((prev) => (prev === 'dark' ó 'light' : 'dark'))}
 
 
 
@@ -4615,7 +4615,7 @@ ${services.length === 0
 
 
 
-                  ? 'bg-green-50 text-green-800 border border-green-200'
+                  ó 'bg-green-50 text-green-800 border border-green-200'
 
 
 
@@ -4631,7 +4631,7 @@ ${services.length === 0
 
 
 
-              {notification.type === 'success' ? (
+              {notification.type === 'success' ó (
 
 
 
@@ -4719,15 +4719,15 @@ ${services.length === 0
 
 
 
-                    { id: 'ingreso', label: 'Ingreso de vehÃ­culos' },
+                    { id: 'ingreso', label: 'Ingreso de vehí­culos' },
 
 
 
-                    { id: 'revision', label: 'En revisiÃ³n' },
+                    { id: 'revision', label: 'En revisión' },
 
 
 
-                    { id: 'salida', label: 'Salida vehÃ­culos' },
+                    { id: 'salida', label: 'Salida vehí­culos' },
 
 
 
@@ -4751,7 +4751,7 @@ ${services.length === 0
 
 
 
-                          ? 'btn-primary'
+                          ó 'btn-primary'
 
 
 
@@ -4835,15 +4835,15 @@ ${services.length === 0
 
 
 
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">vehÃ­culos en taller</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">vehí­culos en taller</h3>
 
 
 
-                    {vehiclesEnTaller.length === 0 ? (
+                    {vehiclesEnTaller.length === 0 ó (
 
 
 
-                      <p className="text-sm text-gray-500">No hay vehÃ­culos en taller.</p>
+                      <p className="text-sm text-gray-500">No hay vehí­culos en taller.</p>
 
 
 
@@ -4923,7 +4923,7 @@ ${services.length === 0
 
 
 
-                              Enviar a revisiÃ³n
+                              Enviar a revisión
 
 
 
@@ -4975,7 +4975,7 @@ ${services.length === 0
 
 
 
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">En revisiÃ³n</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">En revisión</h3>
 
 
 
@@ -5024,7 +5024,7 @@ ${services.length === 0
 
 
 
-                      <h4 className="text-sm font-semibold text-gray-900">VehÃ­culos en revisiÃ³n</h4>
+                      <h4 className="text-sm font-semibold text-gray-900">Vehí­culos en revisión</h4>
 
 
 
@@ -5036,11 +5036,11 @@ ${services.length === 0
 
 
 
-                    {vehiclesEnRevision.length === 0 ? (
+                    {vehiclesEnRevision.length === 0 ó (
 
 
 
-                      <p className="text-sm text-gray-500">No hay vehÃ­culos en revisiÃ³n.</p>
+                      <p className="text-sm text-gray-500">No hay vehí­culos en revisión.</p>
 
 
 
@@ -5070,7 +5070,7 @@ ${services.length === 0
 
                             className={`w-full text-left rounded-lg border px-4 py-3 transition-colors ${
                               reviewVehicleId === vehicle.id
-                                ? 'border-blue-500 bg-blue-50'
+                                ó 'border-blue-500 bg-blue-50'
                                 : 'border-gray-200 hover:bg-gray-50'
                             }`}
 
@@ -5103,7 +5103,7 @@ ${services.length === 0
                             </p>
 
                             <p className="mt-2 text-xs font-semibold text-gray-500">
-                              Sigue en revisiÃ³n hasta pasar a salida
+                              Sigue en revisión hasta pasar a salida
                             </p>
 
 
@@ -5136,7 +5136,7 @@ ${services.length === 0
 
 
 
-                    {activeReviewVehicle ? (
+                    {activeReviewVehicle ó (
 
 
 
@@ -5160,7 +5160,7 @@ ${services.length === 0
 
 
 
-                              Busca procedimientos, agrÃ©galos con valor y guarda el trabajo ejecutado.
+                              Busca procedimientos, agrí©galos con valor y guarda el trabajo ejecutado.
 
 
 
@@ -5192,7 +5192,7 @@ ${services.length === 0
 
 
 
-                            {servicePickerOpen ? 'Cerrar buscador' : 'Buscar servicios'}
+                            {servicePickerOpen ó 'Cerrar buscador' : 'Buscar servicios'}
 
 
 
@@ -5284,7 +5284,7 @@ ${services.length === 0
 
 
 
-                                    CatÃ¡logo de procedimientos
+                                    Catálogo de procedimientos
 
 
 
@@ -5328,7 +5328,7 @@ ${services.length === 0
 
 
 
-                                  {filteredServiceCatalog.length === 0 ? (
+                                  {filteredServiceCatalog.length === 0 ó (
 
 
 
@@ -5336,7 +5336,7 @@ ${services.length === 0
 
 
 
-                                      No hay servicios disponibles con esa bÃºsqueda.
+                                      No hay servicios disponibles con esa bíºsqueda.
 
 
 
@@ -5420,7 +5420,7 @@ ${services.length === 0
 
 
 
-                          {reviewServices.length === 0 ? (
+                          {reviewServices.length === 0 ó (
 
 
 
@@ -5428,7 +5428,7 @@ ${services.length === 0
 
 
 
-                              No hay servicios seleccionados todavÃ­a.
+                              No hay servicios seleccionados todaví­a.
 
 
 
@@ -5670,7 +5670,7 @@ ${services.length === 0
 
 
 
-                            Guardar selecciÃ³n
+                            Guardar selección
 
 
 
@@ -5714,7 +5714,7 @@ ${services.length === 0
 
 
 
-                      <p className="text-sm text-gray-500">EnvÃ­a un vehÃ­culo a revisiÃ³n para registrar servicios.</p>
+                      <p className="text-sm text-gray-500">Enví­a un vehí­culo a revisión para registrar servicios.</p>
 
 
 
@@ -5750,7 +5750,7 @@ ${services.length === 0
 
 
 
-                    .length === 0 ? (
+                    .length === 0 ó (
 
 
 
@@ -5758,7 +5758,7 @@ ${services.length === 0
 
 
 
-                      No hay vehÃ­culos en salida.
+                      No hay vehí­culos en salida.
 
 
 
@@ -5790,7 +5790,7 @@ ${services.length === 0
 
 
 
-                          className={`bg-white rounded-xl border border-gray-200 p-6 shadow-sm fade-item ${readyVehicleIds.includes(vehicle.id) ? 'fade-out' : ''
+                          className={`bg-white rounded-xl border border-gray-200 p-6 shadow-sm fade-item ${readyVehicleIds.includes(vehicle.id) ó 'fade-out' : ''
 
 
 
@@ -5991,7 +5991,7 @@ ${services.length === 0
 
 
 
-                              {vehicle.servicios && vehicle.servicios.length > 0 ? (
+                              {vehicle.servicios && vehicle.servicios.length > 0 ó (
 
 
 
@@ -6131,7 +6131,7 @@ ${services.length === 0
 
 
 
-              {loading ? (
+              {loading ó (
 
 
 
@@ -6327,7 +6327,7 @@ ${services.length === 0
 
 
 
-                      placeholder="CategorÃ­a (aceites, frenos...)"
+                      placeholder="Categorí­a (aceites, frenos...)"
 
 
 
@@ -6451,7 +6451,7 @@ ${services.length === 0
 
 
 
-                      placeholder="Stock mÃ­nimo"
+                      placeholder="Stock mí­nimo"
 
 
 
@@ -6507,7 +6507,7 @@ ${services.length === 0
 
 
 
-                      placeholder="UbicaciÃ³n en bodega"
+                      placeholder="Ubicación en bodega"
 
 
 
@@ -6639,7 +6639,7 @@ ${services.length === 0
 
 
 
-                      Ingreso por cÃ³digo de barras
+                      Ingreso por código de barras
 
 
 
@@ -6667,7 +6667,7 @@ ${services.length === 0
 
 
 
-                        placeholder="Escanear cÃ³digo"
+                        placeholder="Escanear código"
 
 
 
@@ -6679,7 +6679,7 @@ ${services.length === 0
 
 
 
-                        Registrar ingreso rÃ¡pido
+                        Registrar ingreso rápido
 
 
 
@@ -6895,7 +6895,7 @@ ${services.length === 0
 
 
 
-                {inventoryItems.length === 0 ? (
+                {inventoryItems.length === 0 ó (
 
 
 
@@ -7071,7 +7071,7 @@ ${services.length === 0
 
 
 
-              {loading ? (
+              {loading ó (
 
 
 
@@ -7083,7 +7083,7 @@ ${services.length === 0
 
 
 
-                  <p className="text-gray-500 mt-4">Cargando vehÃ­culos...</p>
+                  <p className="text-gray-500 mt-4">Cargando vehí­culos...</p>
 
 
 
@@ -7103,7 +7103,7 @@ ${services.length === 0
 
 
 
-                  title="Reporte de vehÃ­culos"
+                  title="Reporte de vehí­culos"
 
 
 
