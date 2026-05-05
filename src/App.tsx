@@ -1,145 +1,54 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 
-
-
 import {
-
-
   adminAddCompanyMember,
-
   adminCreateCompany,
-
   adminCreateUser,
-
-
-
   adminCreateInvitation,
-
-
-
   adminGetCompanies,
-
-
-
   adminGetSupportSessions,
-
-
-
   adminImpersonate,
-
-
-
   clearAuthToken,
-
-
-
   createVehicle,
-
-
-
   deleteVehicle,
-
-
-
   getAuthToken,
-
-
-
   getSession,
-
-
-
   getVehicles,
-
-
-
   login,
-
-
-
   loginDemo,
-
-
-
   loginOwner,
-
-
-
   setAuthToken,
-
-
-
   updateVehicle,
-
-
-
 } from './lib/api';
-
-
 
 import type { Vehicle } from './lib/types';
 
-
-
 import Sidebar from './components/Sidebar';
-
-
 
 import Header from './components/Header';
 
-
-
 import MetricsCards from './components/MetricsCards';
-
-
 
 import VehicleForm, { VehicleFormData } from './components/VehicleForm';
 
-
-
 import VehicleTable from './components/VehicleTable';
 
-
-
 import VehicleHistoryTable from './components/VehicleHistoryTable';
-
-
 
 import { CheckCircle, AlertCircle, Search, Trash2, X } from 'lucide-react';
 
 
 
 
-
-
-
 interface Notification {
-
-
-
   type: 'success' | 'error';
-
-
-
   message: string;
-
-
-
 }
 
 interface ReviewServiceItem {
-
   name: string;
-
   price: string;
-
 }
-
-
-
-
-
-
 
 const toSoftAccent = (hexColor: string) => {
   const cleaned = hexColor.replace('#', '');
@@ -154,65 +63,19 @@ const toSoftAccent = (hexColor: string) => {
   return `#${toHex(mix(r))}${toHex(mix(g))}${toHex(mix(b))}`;
 };
 
-
-
-
-
-
-
-
 const serviceCatalog = [
-
-
-
   'Cambio de aceite y filtros',
-
-
-
   'Diagnóstico general',
-
-
-
   'Frenos',
-
-
-
   'Suspensión',
-
-
-
   'Alineación y balanceo',
-
-
-
-  'Sistema elóctrico',
-
-
-
+  'Sistema eléctrico',
   'Refrigeración',
-
-
-
   'Transmisión',
-
-
-
   'Embrague',
-
-
-
   'Neumáticos',
-
-
-
   'Escape',
-
-
-
   'Aire acondicionado',
-
-
-
 ];
 
 serviceCatalog.push(
@@ -246,136 +109,60 @@ const parseStoredReviewServices = (services: string[] = []): ReviewServiceItem[]
   services.map((service) => {
     const match = service.match(/^(.*ó)(ó:\s+\(\$\s*([^)]+)\))ó$/);
     return {
-      name: matchó.[1]ó.trim() || service,
-      price: matchó.[2]ó.replace(/[^\d]/g, '') || '',
+      name: match?.[1]?.trim() || service,
+      price: match?.[2]?.replace(/[^\d]/g, '') || '',
     };
   });
 
 const serializeReviewService = ({ name, price }: ReviewServiceItem) =>
-  price.trim() ó `${name} ($${price.trim()})` : name;
-
-
-
-
-
+  price.trim() ? `${name} ($${price.trim()})` : name;
 
 
 function App() {
-
-
-
   const isOwnerRoute = window.location.pathname.startsWith('/owner');
-
-
-
   const [theme, setTheme] = useState<'light' | 'dark'>(() =>
-
-
-
-    localStorage.getItem('theme') === 'dark' ó 'dark' : 'light'
-
-
-
+    localStorage.getItem('theme') === 'dark' ? 'dark' : 'light'
   );
-
-
 
   const [accentColor, setAccentColor] = useState(() =>
-
-
-
     localStorage.getItem('accentColor') || '#1f3a5f'
-
-
-
   );
-
-
 
   const [activeSection, setActiveSection] = useState('vehiculos');
 
-
-
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-
-
 
   const [editingVehicle, setEditingVehicle] = useState<(VehicleFormData & { id: string }) | null>(null);
 
-
-
   const [notification, setNotification] = useState<Notification | null>(null);
-
-
 
   const [loading, setLoading] = useState(true);
 
-
-
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-
 
   const [authToken, setAuthTokenState] = useState<string | null>(() => getAuthToken());
 
-
-
   const [sessionRole, setSessionRole] = useState<'owner' | 'member' | null>(null);
-
-
 
   const [authError, setAuthError] = useState<string | null>(null);
 
-
-
   const [loginForm, setLoginForm] = useState({
-
-
-
     email: '',
-
-
-
     password: '',
-
-
-
   });
-
-
 
   const [loginLoading, setLoginLoading] = useState(false);
 
-
-
   const [demoLoading, setDemoLoading] = useState(false);
 
-
-
-
   const [ownerForm, setOwnerForm] = useState({
-
-
-
     email: '',
-
-
-
     password: '',
-
-
-
   });
-
-
 
   const [ownerLoading, setOwnerLoading] = useState(false);
 
-
-
   const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([]);
-
-
 
   const [adminCompanyName, setAdminCompanyName] = useState('');
 
@@ -383,247 +170,76 @@ function App() {
 
   const [adminCompanyPassword, setAdminCompanyPassword] = useState('');
 
-
-
   const [adminInvite, setAdminInvite] = useState({
-
-
-
     companyId: '',
-
-
-
     email: '',
-
-
-
     role: 'admin',
-
-
-
   });
-
-
 
   const [adminLoading, setAdminLoading] = useState(false);
 
-
-
   const [adminInviteResult, setAdminInviteResult] = useState<string | null>(null);
 
-
-
   const [inventoryItems, setInventoryItems] = useState<
-
-
-
     Array<{
-
-
-
       id: string;
-
-
-
       name: string;
-
-
-
       category: string;
-
-
-
       sku: string;
-
-
-
       barcode: string;
-
-
-
       stock: number;
-
-
-
       minStock: number;
-
-
-
       unit: string;
-
-
-
       location: string;
-
-
-
       supplier: string;
-
-
-
       cost: number;
-
-
-
       notes: string;
-
-
-
       updated_at: string;
-
-
-
     }>
-
-
-
   >(() => {
-
-
-
     const raw = localStorage.getItem('inventoryItems');
-
-
-
-    return raw ó JSON.parse(raw) : [];
-
-
-
+    return raw ? JSON.parse(raw) : [];
   });
-
-
 
   const [inventoryForm, setInventoryForm] = useState({
-
-
-
     name: '',
-
-
-
     category: '',
-
-
-
     sku: '',
-
-
-
     barcode: '',
-
-
-
     stock: 0,
-
-
-
     minStock: 0,
-
-
-
     unit: 'unidad',
-
-
-
     location: '',
-
-
-
     supplier: '',
-
-
-
     cost: 0,
-
-
-
     notes: '',
-
-
-
   });
-
-
 
   const [inventoryAdjust, setInventoryAdjust] = useState({
-
-
-
     itemId: '',
-
-
-
     quantity: 0,
-
-
-
     reason: '',
-
-
-
   });
-
-
 
   const [barcodeInput, setBarcodeInput] = useState('');
 
-
-
   const [supportSessions, setSupportSessions] = useState<
-
-
-
     Array<{
-
-
-
       id: string;
-
-
-
       company_id: string;
-
-
-
       company_name: string;
-
-
-
       owner_email: string;
-
-
-
       created_at: string;
-
-
-
       expires_at: string;
-
-
-
       ended_at: string | null;
-
-
-
     }>
-
-
-
   >([]);
-
-
 
   const [supportMode, setSupportMode] = useState(false);
 
-
-
   const [vehicleTab, setVehicleTab] = useState<'ingreso' | 'revision' | 'salida'>('ingreso');
 
-
-
   const [reviewVehicleId, setReviewVehicleId] = useState<string | null>(null);
-
-
 
   const [reviewServices, setReviewServices] = useState<ReviewServiceItem[]>([]);
 
@@ -631,1259 +247,320 @@ function App() {
 
   const [servicePickerOpen, setServicePickerOpen] = useState(false);
 
-
-
   const [reviewNotes, setReviewNotes] = useState('');
-
-
 
   const [readyVehicleIds, setReadyVehicleIds] = useState<string[]>([]);
 
-
-
   const [hiddenSalidaIds, setHiddenSalidaIds] = useState<string[]>([]);
 
-
-
-
-
-
-
   useEffect(() => {
-
-
-
     if (!authToken) {
-
-
-
       setSessionRole(null);
-
-
-
       return;
-
-
-
     }
-
-
-
-
-
-
-
     const loadSession = async () => {
-
-
-
       try {
-
-
-
         const session = await getSession();
-
-
-
         if (session.role === 'owner') {
-
-
-
           setSessionRole('owner');
-
-
-
         } else {
-
-
-
           setSessionRole('member');
-
-
-
         }
-
-
-
         setSupportMode(!!session.support);
-
-
-
       } catch (error) {
-
-
-
         clearAuthToken();
-
-
-
         setAuthTokenState(null);
-
-
-
         setSessionRole(null);
-
-
-
         setSupportMode(false);
-
-
-
       }
-
-
-
     };
-
-
-
-
-
-
-
     loadSession();
-
-
-
   }, [authToken]);
 
-
-
-
-
-
-
   useEffect(() => {
-
-
-
     document.documentElement.classList.toggle('theme-dark', theme === 'dark');
-
-
-
     localStorage.setItem('theme', theme);
-
-
-
   }, [theme]);
 
-
-
-
-
-
-
   useEffect(() => {
-
-
-
     document.documentElement.style.setProperty('--accent', accentColor);
     document.documentElement.style.setProperty('--accent-soft', toSoftAccent(accentColor));
-
-
-
     localStorage.setItem('accentColor', accentColor);
-
-
-
   }, [accentColor]);
 
-
-
-
-
-
-
   useEffect(() => {
-
-
-
     localStorage.setItem('inventoryItems', JSON.stringify(inventoryItems));
-
-
-
   }, [inventoryItems]);
 
-
-
-
-
-
-
   useEffect(() => {
-
-
-
     if (!authToken || sessionRole !== 'member') {
-
-
-
       setVehicles([]);
-
-
-
       setLoading(false);
-
-
-
       return;
-
-
-
     }
-
-
-
-
-
-
 
     const load = async () => {
-
-
-
       try {
-
-
-
         const data = await getVehicles();
-
-
-
         setVehicles(data);
-
-
-
       } catch (error) {
-
-
-
-        if ((error as Error & { statusó: number }).status === 401) {
-
-
-
+        if ((error as Error & { status?: number }).status === 401) {
           clearAuthToken();
-
-
-
           setAuthTokenState(null);
-
-
-
           setSessionRole(null);
-
-
-
           return;
-
-
-
         }
-
-
-
         showNotification('error', 'Error al cargar los vehí­culos');
-
-
-
         console.error('Error:', error);
-
-
-
       } finally {
-
-
-
         setLoading(false);
-
-
-
       }
-
-
-
     };
-
-
-
-
-
-
-
     setLoading(true);
-
-
-
     load();
-
-
-
   }, [authToken, sessionRole]);
 
-
-
-
-
-
-
-
-
-
-
-
   useEffect(() => {
-
-
-
     const params = new URLSearchParams(window.location.search);
-
-
-
     const supportToken = params.get('support');
-
-
-
     if (supportToken) {
-
-
-
       setAuthToken(supportToken);
-
-
-
       setAuthTokenState(supportToken);
-
-
-
       params.delete('support');
-
-
-
       const cleanUrl =
-
-
-
-        window.location.pathname + (params.toString() ó `ó${params.toString()}` : '');
-
-
-
+        window.location.pathname + (params.toString() ? `ó${params.toString()}` : '');
       window.history.replaceState({}, '', cleanUrl);
-
-
-
     }
-
-
-
   }, []);
 
-
-
-
-
-
-
   useEffect(() => {
-
-
-
     if (authToken && sessionRole === 'owner') {
-
-
-
       loadCompanies();
-
-
-
     }
-
-
-
   }, [authToken, sessionRole]);
 
-
-
-
-
-
-
   useEffect(() => {
-
-
-
     if (reviewVehicleId && !vehicles.find((item) => item.id === reviewVehicleId)) {
-
-
-
       setReviewVehicleId(null);
-
-
-
       setReviewServices([]);
-
-
-
       setReviewNotes('');
-
-
-
     }
-
-
-
   }, [vehicles, reviewVehicleId]);
 
-
-
-
-
-
-
   const showNotification = (type: 'success' | 'error', message: string) => {
-
-
-
     setNotification({ type, message });
-
-
-
     setTimeout(() => setNotification(null), 4000);
-
-
-
   };
-
-
-
-
-
-
 
   const handleLoginChange = (event: ChangeEvent<HTMLInputElement>) => {
-
-
-
     const { name, value } = event.target;
-
-
-
     setLoginForm((prev) => ({ ...prev, [name]: value }));
-
-
-
   };
-
-
-
-
-
-
-
-
-
-
-
 
   const handleOwnerChange = (event: ChangeEvent<HTMLInputElement>) => {
-
-
-
     const { name, value } = event.target;
-
-
-
     setOwnerForm((prev) => ({ ...prev, [name]: value }));
-
-
-
   };
-
-
-
-
-
-
 
   const handleLogin = async (event: FormEvent) => {
-
-
-
     event.preventDefault();
-
-
-
     setAuthError(null);
-
-
-
     setLoginLoading(true);
-
-
-
-
-
-
-
     try {
-
-
-
       const session = await login({
-
-
-
         email: loginForm.email.trim(),
-
-
-
         password: loginForm.password,
-
-
-
       });
-
-
-
       setAuthToken(session.token);
-
-
-
       setAuthTokenState(session.token);
-
-
-
       setSessionRole('member');
-
-
-
       showNotification('success', 'Sesión iniciada correctamente');
-
-
-
     } catch (error) {
-
-
-
       console.error('Login failed', error);
-
-
-
       setAuthError('No se pudo iniciar Sesión');
-
-
-
     } finally {
-
-
-
       setLoginLoading(false);
-
-
-
     }
-
-
-
   };
-
-
 
   const handleDemoLogin = async () => {
-
-
-
     setAuthError(null);
-
-
-
     setDemoLoading(true);
-
-
-
     try {
-
-
-
       const session = await loginDemo();
-
-
-
       setAuthToken(session.token);
-
-
-
       setAuthTokenState(session.token);
-
-
-
       setSessionRole('member');
-
-
-
       showNotification('success', 'Acceso demo listo');
-
-
-
     } catch (error) {
-
-
-
       console.error('Demo login failed', error);
-
-
-
       setAuthError('No se pudo iniciar el acceso demo');
-
-
-
     } finally {
-
-
-
       setDemoLoading(false);
-
-
-
     }
-
-
-
   };
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   const handleOwnerLogin = async (event: FormEvent) => {
-
-
-
     event.preventDefault();
-
-
-
     setAuthError(null);
-
-
-
     setOwnerLoading(true);
-
-
-
-
-
-
-
     try {
-
-
-
       const session = await loginOwner({
-
-
-
         email: ownerForm.email.trim(),
-
-
-
         password: ownerForm.password,
-
-
-
       });
-
-
-
       setAuthToken(session.token);
-
-
-
       setAuthTokenState(session.token);
-
-
-
       setSessionRole('owner');
-
-
-
       showNotification('success', 'Sesión de owner iniciada');
-
-
-
     } catch (error) {
-
-
-
       console.error('Owner login failed', error);
-
-
-
       setAuthError('No se pudo iniciar Sesión como owner');
-
-
-
     } finally {
-
-
-
       setOwnerLoading(false);
-
-
-
     }
-
-
-
   };
-
-
-
-
-
-
 
   const handleLogout = () => {
-
-
-
     clearAuthToken();
-
-
-
     setAuthTokenState(null);
-
-
-
     setSessionRole(null);
-
-
-
     setSupportMode(false);
-
-
-
   };
-
-
-
-
-
-
 
   const loadCompanies = async () => {
-
-
-
     try {
-
-
-
       const data = await adminGetCompanies();
-
-
-
       setCompanies(data);
-
-
-
       if (!adminInvite.companyId && data.length > 0) {
-
-
-
         setAdminInvite((prev) => ({ ...prev, companyId: data[0].id }));
-
-
-
       }
-
-
-
       const sessions = await adminGetSupportSessions();
-
-
-
       setSupportSessions(sessions);
-
-
-
     } catch (error) {
-
-
-
       console.error('Load companies failed', error);
-
-
-
       showNotification('error', 'No se pudo cargar las empresas');
-
-
-
     }
-
-
-
   };
-
-
-
-
-
-
 
   const handleAdminCreateCompany = async (event: FormEvent) => {
-
     event.preventDefault();
-
-    if (
-
-      !adminCompanyName.trim() ||
-
-      !adminCompanyEmail.trim() ||
-
-      !adminCompanyPassword.trim()
-
-    ) {
-
+    if (!adminCompanyName.trim() || !adminCompanyEmail.trim() || !adminCompanyPassword.trim()) {
       return;
-
     }
-
-
-
     setAdminLoading(true);
-
-
-
     try {
-
       const company = await adminCreateCompany(adminCompanyName.trim());
-
       const user = await adminCreateUser({
-
         full_name: adminCompanyName.trim(),
-
         email: adminCompanyEmail.trim(),
-
         password: adminCompanyPassword,
-
       });
-
       await adminAddCompanyMember(company.id, { user_id: user.id, role: 'admin' });
-
       setAdminCompanyName('');
-
       setAdminCompanyEmail('');
-
       setAdminCompanyPassword('');
-
       await loadCompanies();
-
       showNotification('success', 'Empresa y usuario admin creados');
-
     } catch (error) {
-
       console.error('Admin create company failed', error);
-
       if (error instanceof Error && error.message === 'email_exists') {
-
         showNotification('error', 'El correo de empresa ya estï¿½ registrado');
-
       } else {
-
         showNotification('error', 'No se pudo crear la empresa');
-
       }
-
     } finally {
-
       setAdminLoading(false);
-
     }
-
   };
-
-
-
-
-
-
-
+  
   const handleAdminInviteChange = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-
-
-
     const { name, value } = event.target;
-
-
-
     setAdminInvite((prev) => ({ ...prev, [name]: value }));
-
-
-
   };
-
-
-
-
-
-
 
   const handleAdminCreateInvite = async (event: FormEvent) => {
-
-
-
     event.preventDefault();
-
-
-
     setAdminLoading(true);
-
-
-
     setAdminInviteResult(null);
-
-
-
     try {
-
-
-
       const result = await adminCreateInvitation({
-
-
-
         company_id: adminInvite.companyId,
-
-
-
         email: adminInvite.email.trim(),
-
-
-
         role: adminInvite.role,
-
-
-
       });
-
-
-
       setAdminInviteResult(result.invite_url);
-
-
-
       showNotification('success', 'Invitación creada');
-
-
-
     } catch (error) {
-
-
-
       console.error('Admin invite failed', error);
-
-
-
       showNotification('error', 'No se pudo crear la Invitación');
-
-
-
     } finally {
-
-
-
       setAdminLoading(false);
-
-
-
     }
-
-
-
   };
-
-
-
-
-
-
 
   const handleInventoryChange = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-
-
-
     const { name, value } = event.target;
-
-
-
     setInventoryForm((prev) => ({
-
-
-
       ...prev,
-
-
-
       [name]:
-
-
-
-        name === 'stock' || name === 'minStock' || name === 'cost'
-
-
-
-          ó parseInt(value) || 0
-
-
-
-          : value,
-
-
-
+        name === 'stock' || name === 'minStock' || name === 'cost' ? parseInt(value) || 0 : value,
     }));
-
-
-
   };
-
-
-
-
-
-
 
   const handleInventorySubmit = (event: FormEvent) => {
-
-
-
     event.preventDefault();
-
-
-
     const now = new Date().toISOString();
-
-
-
     const item = {
-
-
-
       id: crypto.randomUUID(),
-
-
-
       name: inventoryForm.name.trim(),
-
-
-
       category: inventoryForm.category.trim(),
-
-
-
       sku: inventoryForm.sku.trim(),
-
-
-
       barcode: inventoryForm.barcode.trim(),
-
-
-
       stock: inventoryForm.stock,
-
-
-
       minStock: inventoryForm.minStock,
-
-
-
       unit: inventoryForm.unit.trim(),
-
-
-
       location: inventoryForm.location.trim(),
-
-
-
       supplier: inventoryForm.supplier.trim(),
-
-
-
       cost: inventoryForm.cost,
-
-
-
       notes: inventoryForm.notes.trim(),
-
-
-
       updated_at: now,
-
-
-
     };
-
-
-
     setInventoryItems((prev) => [item, ...prev]);
-
-
-
     setInventoryForm({
-
-
-
       name: '',
-
-
-
       category: '',
-
-
-
       sku: '',
-
-
-
       barcode: '',
-
-
-
       stock: 0,
-
-
-
       minStock: 0,
-
-
-
       unit: 'unidad',
-
-
-
       location: '',
-
-
-
       supplier: '',
-
-
-
       cost: 0,
-
-
-
       notes: '',
-
-
-
     });
-
-
-
     showNotification('success', 'Insumo agregado');
-
-
-
   };
-
-
-
-
-
-
 
   const handleInventoryAdjust = (event: FormEvent) => {
-
-
-
     event.preventDefault();
-
-
-
     const delta = inventoryAdjust.quantity;
-
-
-
     if (!inventoryAdjust.itemId || !delta) {
-
-
-
       return;
-
-
-
     }
-
-
-
     setInventoryItems((prev) =>
-
-
-
       prev.map((item) =>
-
-
-
-        item.id === inventoryAdjust.itemId
-
-
-
-          ó {
-
-
-
+        item.id === inventoryAdjust.itemId ? {
             ...item,
-
-
-
             stock: item.stock + delta,
-
-
-
             updated_at: new Date().toISOString(),
-
-
-
-          }
-
-
-
-          : item
-
-
-
+          } : item
       )
-
-
-
     );
-
-
-
     setInventoryAdjust({ itemId: '', quantity: 0, reason: '' });
-
-
-
     showNotification('success', 'Stock actualizado');
-
-
-
   };
-
-
-
-
-
-
 
   const handleBarcodeSubmit = (event: FormEvent) => {
 
@@ -1953,7 +630,7 @@ function App() {
 
 
 
-    showNotification('success', matched ó 'Stock actualizado por código' : 'Código no encontrado');
+    showNotification('success', matched ? 'Stock actualizado por código' : 'Código no encontrado');
 
 
 
@@ -2133,7 +810,7 @@ function App() {
 
 
 
-    setVehicles((prev) => prev.map((item) => (item.id === updated.id ó updated : item)));
+    setVehicles((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
 
 
 
@@ -2181,7 +858,7 @@ function App() {
 
 
 
-      prev.some((item) => item.name === serviceName) ó prev : [...prev, { name: serviceName, price: '' }]
+      prev.some((item) => item.name === serviceName) ? prev : [...prev, { name: serviceName, price: '' }]
 
 
 
@@ -2213,7 +890,7 @@ function App() {
 
 
 
-      prev.map((item) => (item.name === serviceName ó { ...item, price: normalizedPrice } : item))
+      prev.map((item) => (item.name === serviceName ? { ...item, price: normalizedPrice } : item))
 
 
 
@@ -2241,7 +918,7 @@ function App() {
 
 
 
-  const handleSaveReview = async (statusOverrideó: Vehicle['estado']) => {
+  const handleSaveReview = async (statusOverride?: Vehicle['estado']) => {
 
 
 
@@ -2297,7 +974,7 @@ function App() {
 
 
 
-        statusOverride ó 'vehí­culo enviado a salida' : 'Servicios guardados'
+        statusOverride ? 'vehí­culo enviado a salida' : 'Servicios guardados'
 
 
 
@@ -2453,7 +1130,7 @@ function App() {
 
 
 
-    const services = vehicle.servicios && vehicle.servicios.length > 0 ó vehicle.servicios : [];
+    const services = vehicle.servicios && vehicle.servicios.length > 0 ? vehicle.servicios : [];
 
 
 
@@ -2577,7 +1254,7 @@ function App() {
 
 
 
-    <tr><th>Aí±o</th><td>${vehicle.ano}</td></tr>
+    <tr><th>Año</th><td>${vehicle.ano}</td></tr>
 
 
 
@@ -2613,7 +1290,7 @@ ${services.length === 0
 
 
 
-        ó '<p class="muted">Sin servicios registrados.</p>'
+        ? '<p class="muted">Sin servicios registrados.</p>'
 
 
 
@@ -2697,7 +1374,7 @@ ${services.length === 0
 
 
 
-    setReadyVehicleIds((prev) => (prev.includes(vehicle.id) ó prev : [...prev, vehicle.id]));
+    setReadyVehicleIds((prev) => (prev.includes(vehicle.id) ? prev : [...prev, vehicle.id]));
 
 
 
@@ -2709,7 +1386,7 @@ ${services.length === 0
 
 
 
-        prev.includes(vehicle.id) ó prev : [...prev, vehicle.id]
+        prev.includes(vehicle.id) ? prev : [...prev, vehicle.id]
 
 
 
@@ -2769,7 +1446,7 @@ ${services.length === 0
 
 
 
-        setVehicles((prev) => prev.map((v) => (v.id === updated.id ó updated : v)));
+        setVehicles((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
 
 
 
@@ -2809,11 +1486,11 @@ ${services.length === 0
 
 
 
-        (error as Error & { statusó: number }).status === 409
+        (error as Error & { status?: number }).status === 409
 
 
 
-          ó 'La patente ya está registrada'
+          ? 'La patente ya está registrada'
 
 
 
@@ -2987,7 +1664,7 @@ ${services.length === 0
 
 
 
-      ó {
+      ? {
 
 
 
@@ -3019,7 +1696,7 @@ ${services.length === 0
 
 
 
-      ó {
+      ? {
 
 
 
@@ -3051,7 +1728,7 @@ ${services.length === 0
 
 
 
-      ó {
+      ? {
 
 
 
@@ -3291,7 +1968,7 @@ ${services.length === 0
 
 
 
-              {ownerLoading ó 'Ingresando...' : 'Ingresar como owner'}
+              {ownerLoading ? 'Ingresando...' : 'Ingresar como owner'}
 
 
 
@@ -3522,7 +2199,7 @@ ${services.length === 0
 
 
 
-                {loginLoading ó 'Ingresando...' : 'Ingresar'}
+                {loginLoading ? 'Ingresando...' : 'Ingresar'}
 
 
 
@@ -3554,7 +2231,7 @@ ${services.length === 0
 
 
 
-                {demoLoading ó 'Preparando demo...' : 'Entrar con demo'}
+                {demoLoading ? 'Preparando demo...' : 'Entrar con demo'}
 
 
 
@@ -4011,7 +2688,7 @@ ${services.length === 0
 
               >
 
-                {adminLoading ó 'Creando...' : 'Crear'}
+                {adminLoading ? 'Creando...' : 'Crear'}
 
               </button>
 
@@ -4035,7 +2712,7 @@ ${services.length === 0
 
 
 
-            {companies.length === 0 ó (
+            {companies.length === 0 ? (
 
 
 
@@ -4343,7 +3020,7 @@ ${services.length === 0
 
 
 
-                {adminLoading ó 'Generando...' : 'Generar Invitación'}
+                {adminLoading ? 'Generando...' : 'Generar Invitación'}
 
 
 
@@ -4399,7 +3076,7 @@ ${services.length === 0
 
 
 
-            {supportSessions.length === 0 ó (
+            {supportSessions.length === 0 ? (
 
 
 
@@ -4579,7 +3256,7 @@ ${services.length === 0
 
 
 
-          onToggleTheme={() => setTheme((prev) => (prev === 'dark' ó 'light' : 'dark'))}
+          onToggleTheme={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
 
 
 
@@ -4615,7 +3292,7 @@ ${services.length === 0
 
 
 
-                  ó 'bg-green-50 text-green-800 border border-green-200'
+                  ? 'bg-green-50 text-green-800 border border-green-200'
 
 
 
@@ -4631,7 +3308,7 @@ ${services.length === 0
 
 
 
-              {notification.type === 'success' ó (
+              {notification.type === 'success' ? (
 
 
 
@@ -4751,7 +3428,7 @@ ${services.length === 0
 
 
 
-                          ó 'btn-primary'
+                          ? 'btn-primary'
 
 
 
@@ -4839,7 +3516,7 @@ ${services.length === 0
 
 
 
-                    {vehiclesEnTaller.length === 0 ó (
+                    {vehiclesEnTaller.length === 0 ? (
 
 
 
@@ -5036,7 +3713,7 @@ ${services.length === 0
 
 
 
-                    {vehiclesEnRevision.length === 0 ó (
+                    {vehiclesEnRevision.length === 0 ? (
 
 
 
@@ -5070,7 +3747,7 @@ ${services.length === 0
 
                             className={`w-full text-left rounded-lg border px-4 py-3 transition-colors ${
                               reviewVehicleId === vehicle.id
-                                ó 'border-blue-500 bg-blue-50'
+                                ? 'border-blue-500 bg-blue-50'
                                 : 'border-gray-200 hover:bg-gray-50'
                             }`}
 
@@ -5136,7 +3813,7 @@ ${services.length === 0
 
 
 
-                    {activeReviewVehicle ó (
+                    {activeReviewVehicle ? (
 
 
 
@@ -5192,7 +3869,7 @@ ${services.length === 0
 
 
 
-                            {servicePickerOpen ó 'Cerrar buscador' : 'Buscar servicios'}
+                            {servicePickerOpen ? 'Cerrar buscador' : 'Buscar servicios'}
 
 
 
@@ -5328,7 +4005,7 @@ ${services.length === 0
 
 
 
-                                  {filteredServiceCatalog.length === 0 ó (
+                                  {filteredServiceCatalog.length === 0 ? (
 
 
 
@@ -5420,7 +4097,7 @@ ${services.length === 0
 
 
 
-                          {reviewServices.length === 0 ó (
+                          {reviewServices.length === 0 ? (
 
 
 
@@ -5750,7 +4427,7 @@ ${services.length === 0
 
 
 
-                    .length === 0 ó (
+                    .length === 0 ? (
 
 
 
@@ -5790,7 +4467,7 @@ ${services.length === 0
 
 
 
-                          className={`bg-white rounded-xl border border-gray-200 p-6 shadow-sm fade-item ${readyVehicleIds.includes(vehicle.id) ó 'fade-out' : ''
+                          className={`bg-white rounded-xl border border-gray-200 p-6 shadow-sm fade-item ${readyVehicleIds.includes(vehicle.id) ? 'fade-out' : ''
 
 
 
@@ -5991,7 +4668,7 @@ ${services.length === 0
 
 
 
-                              {vehicle.servicios && vehicle.servicios.length > 0 ó (
+                              {vehicle.servicios && vehicle.servicios.length > 0 ? (
 
 
 
@@ -6131,7 +4808,7 @@ ${services.length === 0
 
 
 
-              {loading ó (
+              {loading ? (
 
 
 
@@ -6895,7 +5572,7 @@ ${services.length === 0
 
 
 
-                {inventoryItems.length === 0 ó (
+                {inventoryItems.length === 0 ? (
 
 
 
@@ -7071,7 +5748,7 @@ ${services.length === 0
 
 
 
-              {loading ó (
+              {loading ? (
 
 
 
@@ -7336,11 +6013,6 @@ ${services.length === 0
 
 
 export default App;
-
-
-
-
-
 
 
 
