@@ -107,6 +107,7 @@ CREATE TABLE IF NOT EXISTS invitations (
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT invitations_role_chk CHECK (role IN ('admin', 'mecanico', 'recepcionista'))
 );
+-- tabla en revision para soporte tecnico, no se si es necesario pero por si acaso 
 
 CREATE TABLE IF NOT EXISTS support_sessions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
