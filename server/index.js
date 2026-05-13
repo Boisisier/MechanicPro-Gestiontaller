@@ -69,6 +69,14 @@ const ensureVehicleColumns = async () => {
       add column if not exists codigo_vin text,
       add column if not exists codigo_motor text
   `);
+  await pool.query(`
+    alter table vehicles
+      drop constraint if exists vehicles_company_patente_unique
+  `);
+  await pool.query(`
+    create index if not exists idx_vehicles_company_patente_fecha
+      on vehicles(company_id, patente, fecha_ingreso desc)
+  `);
 };
 
 const validateVehicle = (payload) => {

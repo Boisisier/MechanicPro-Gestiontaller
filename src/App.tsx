@@ -1398,6 +1398,10 @@ ${services.length === 0
 
 
 
+      setVehicleTab('ingreso');
+
+
+
     }, 400);
 
 
@@ -3493,6 +3497,10 @@ ${services.length === 0
 
 
                       onCancelEdit={() => setEditingVehicle(null)}
+
+
+
+                      existingVehicles={vehicles}
 
 
 

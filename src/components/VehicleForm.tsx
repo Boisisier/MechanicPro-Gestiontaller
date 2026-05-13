@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Save, RotateCcw } from 'lucide-react';
 
+type PreviousVehicleData = Partial<VehicleFormData> & { patente: string };
+
 interface VehicleFormProps {
   onSubmit: (data: VehicleFormData) => Promise<void>;
   editingVehicle?: VehicleFormData & { id: string } | null;
   onCancelEdit?: () => void;
+  existingVehicles?: PreviousVehicleData[];
 }
 
 export interface VehicleFormData {
@@ -59,9 +62,36 @@ const formatPatente = (value: string) => {
   return `${normalized.slice(0, 4)}-${normalized.slice(4)}`;
 };
 
-export default function VehicleForm({ onSubmit, editingVehicle, onCancelEdit }: VehicleFormProps) {
+const isCompletePatente = (value: string) => /^(?:[A-Z]{2}-\d{4}|[A-Z]{4}-\d{2})$/.test(value);
+
+const buildFormDataFromPreviousVisit = (vehicle: PreviousVehicleData, patente: string): VehicleFormData => ({
+  patente,
+  marca: vehicle.marca || '',
+  modelo: vehicle.modelo || '',
+  ano: vehicle.ano || new Date().getFullYear(),
+  tipo_vehiculo: vehicle.tipo_vehiculo || 'Auto',
+  codigo_vin: vehicle.codigo_vin || '',
+  codigo_motor: vehicle.codigo_motor || '',
+  kilometraje: vehicle.kilometraje || 0,
+  cantidad_combustible: vehicle.cantidad_combustible || 0,
+  estado: 'En taller',
+  customer_name: vehicle.customer_name || '',
+  customer_rut: vehicle.customer_rut || '',
+  customer_phone: vehicle.customer_phone || '',
+  customer_address: vehicle.customer_address || '',
+  customer_city: vehicle.customer_city || '',
+  observaciones: vehicle.observaciones || '',
+});
+
+export default function VehicleForm({
+  onSubmit,
+  editingVehicle,
+  onCancelEdit,
+  existingVehicles = [],
+}: VehicleFormProps) {
   const [formData, setFormData] = useState<VehicleFormData>(editingVehicle || initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadedPatente, setLoadedPatente] = useState('');
 
   useEffect(() => {
     if (editingVehicle) {
@@ -70,18 +100,36 @@ export default function VehicleForm({ onSubmit, editingVehicle, onCancelEdit }: 
     } else {
       setFormData(initialFormData);
     }
+    setLoadedPatente('');
   }, [editingVehicle]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    if (name === 'patente') {
+      const patente = formatPatente(value);
+      const previousVisit = !editingVehicle && isCompletePatente(patente)
+        ? existingVehicles.find((vehicle) => vehicle.patente === patente)
+        : null;
+
+      if (previousVisit) {
+        setFormData(buildFormDataFromPreviousVisit(previousVisit, patente));
+        setLoadedPatente(patente);
+        return;
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        patente,
+      }));
+      setLoadedPatente('');
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
-      [name]:
-        name === 'patente'
-          ? formatPatente(value)
-          : ['ano', 'kilometraje', 'cantidad_combustible'].includes(name)
-            ? parseInt(value) || 0
-            : value,
+      [name]: ['ano', 'kilometraje', 'cantidad_combustible'].includes(name)
+        ? parseInt(value) || 0
+        : value,
     }));
   };
 
@@ -92,6 +140,7 @@ export default function VehicleForm({ onSubmit, editingVehicle, onCancelEdit }: 
       await onSubmit(formData);
       if (!editingVehicle) {
         setFormData(initialFormData);
+        setLoadedPatente('');
       }
     } finally {
       setIsSubmitting(false);
@@ -130,6 +179,11 @@ export default function VehicleForm({ onSubmit, editingVehicle, onCancelEdit }: 
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all uppercase"
               placeholder="AB-1234 o ABCD-12"
             />
+            {loadedPatente === formData.patente && (
+              <p className="mt-2 text-sm font-medium text-emerald-700">
+                Datos cargados desde el ultimo ingreso de esta patente.
+              </p>
+            )}
           </div>
 
           <div>
