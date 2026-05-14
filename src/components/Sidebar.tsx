@@ -1,5 +1,7 @@
 ﻿import { LayoutDashboard, Car, Package, FileText, Settings, X } from 'lucide-react';
 
+import { Calculator } from 'lucide-react';
+
 interface SidebarProps {
   activeSection: string;
   onSectionChange: (section: string) => void;
@@ -11,6 +13,7 @@ export default function Sidebar({ activeSection, onSectionChange, isOpen, onClos
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'vehiculos', label: 'Vehículos', icon: Car },
+    { id: 'presupuesto', label: 'Presupuesto', icon: Calculator },
     { id: 'inventario', label: 'Inventario', icon: Package },
     { id: 'reportes', label: 'Reportes', icon: FileText },
     { id: 'configuracion', label: 'Configuración', icon: Settings },

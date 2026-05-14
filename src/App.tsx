@@ -35,7 +35,7 @@ import VehicleTable from './components/VehicleTable';
 
 import VehicleHistoryTable from './components/VehicleHistoryTable';
 
-import { CheckCircle, AlertCircle, Search, Trash2, X } from 'lucide-react';
+import { CheckCircle, AlertCircle, Search, Trash2, X, Plus, Calculator } from 'lucide-react';
 
 
 
@@ -48,6 +48,12 @@ interface Notification {
 interface ReviewServiceItem {
   name: string;
   price: string;
+}
+
+interface BudgetServiceItem {
+  id: string;
+  name: string;
+  price: number;
 }
 
 const toSoftAccent = (hexColor: string) => {
@@ -252,6 +258,21 @@ function App() {
   const [readyVehicleIds, setReadyVehicleIds] = useState<string[]>([]);
 
   const [hiddenSalidaIds, setHiddenSalidaIds] = useState<string[]>([]);
+
+  const [budgetForm, setBudgetForm] = useState({
+    customerName: '',
+    customerPhone: '',
+    patente: '',
+    vehicle: '',
+    notes: '',
+  });
+
+  const [budgetService, setBudgetService] = useState({
+    name: '',
+    price: 0,
+  });
+
+  const [budgetItems, setBudgetItems] = useState<BudgetServiceItem[]>([]);
 
   useEffect(() => {
     if (!authToken) {
@@ -641,6 +662,55 @@ function App() {
 
 
 
+
+  const handleBudgetFormChange = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = event.target;
+    setBudgetForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleBudgetServiceChange = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = event.target;
+    setBudgetService((prev) => ({
+      ...prev,
+      [name]: name === 'price' ? parseInt(value) || 0 : value,
+    }));
+  };
+
+  const handleAddBudgetService = (event: FormEvent) => {
+    event.preventDefault();
+    const name = budgetService.name.trim();
+    if (!name || budgetService.price <= 0) {
+      showNotification('error', 'Agrega un servicio y un valor valido');
+      return;
+    }
+
+    setBudgetItems((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        name,
+        price: budgetService.price,
+      },
+    ]);
+    setBudgetService({ name: '', price: 0 });
+    showNotification('success', 'Servicio agregado al presupuesto');
+  };
+
+  const handleRemoveBudgetService = (id: string) => {
+    setBudgetItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleClearBudget = () => {
+    setBudgetForm({
+      customerName: '',
+      customerPhone: '',
+      patente: '',
+      vehicle: '',
+      notes: '',
+    });
+    setBudgetService({ name: '', price: 0 });
+    setBudgetItems([]);
+  };
 
   const handleImpersonate = async (companyId: string) => {
 
@@ -1783,6 +1853,8 @@ ${services.length === 0
 
 
 
+
+  const budgetTotal = budgetItems.reduce((sum, item) => sum + item.price, 0);
 
   if (!authToken && isOwnerRoute) {
 
@@ -5745,6 +5817,550 @@ ${services.length === 0
 
 
 
+
+
+
+          {activeSection === 'presupuesto' && (
+
+
+
+            <div className="space-y-6">
+
+
+
+              <div className="flex flex-col gap-2">
+
+
+
+                <h2 className="text-2xl font-bold text-gray-900">Presupuesto</h2>
+
+
+
+                <p className="text-sm text-gray-500">Arma un presupuesto simple de servicios mecanicos.</p>
+
+
+
+              </div>
+
+
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+
+
+                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm lg:col-span-2">
+
+
+
+                  <div className="mb-6 flex items-center gap-3">
+
+
+
+                    <div className="rounded-lg bg-accent-soft p-3 text-accent">
+
+
+
+                      <Calculator className="h-5 w-5" />
+
+
+
+                    </div>
+
+
+
+                    <div>
+
+
+
+                      <h3 className="text-lg font-semibold text-gray-900">Datos del presupuesto</h3>
+
+
+
+                      <p className="text-sm text-gray-500">Cliente, vehiculo y detalle del trabajo solicitado.</p>
+
+
+
+                    </div>
+
+
+
+                  </div>
+
+
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+
+
+                    <input
+
+
+
+                      name="customerName"
+
+
+
+                      value={budgetForm.customerName}
+
+
+
+                      onChange={handleBudgetFormChange}
+
+
+
+                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+
+
+
+                      placeholder="Nombre del cliente"
+
+
+
+                    />
+
+
+
+                    <input
+
+
+
+                      name="customerPhone"
+
+
+
+                      value={budgetForm.customerPhone}
+
+
+
+                      onChange={handleBudgetFormChange}
+
+
+
+                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+
+
+
+                      placeholder="Telefono"
+
+
+
+                    />
+
+
+
+                    <input
+
+
+
+                      name="patente"
+
+
+
+                      value={budgetForm.patente}
+
+
+
+                      onChange={handleBudgetFormChange}
+
+
+
+                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm uppercase focus:border-blue-500 focus:outline-none"
+
+
+
+                      placeholder="Patente"
+
+
+
+                    />
+
+
+
+                    <input
+
+
+
+                      name="vehicle"
+
+
+
+                      value={budgetForm.vehicle}
+
+
+
+                      onChange={handleBudgetFormChange}
+
+
+
+                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+
+
+
+                      placeholder="Vehiculo"
+
+
+
+                    />
+
+
+
+                    <textarea
+
+
+
+                      name="notes"
+
+
+
+                      value={budgetForm.notes}
+
+
+
+                      onChange={handleBudgetFormChange}
+
+
+
+                      rows={4}
+
+
+
+                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm resize-none focus:border-blue-500 focus:outline-none md:col-span-2"
+
+
+
+                      placeholder="Observaciones del presupuesto"
+
+
+
+                    />
+
+
+
+                  </div>
+
+
+
+                  <form onSubmit={handleAddBudgetService} className="mt-6 grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-3">
+
+
+
+                    <select
+
+
+
+                      name="name"
+
+
+
+                      value={budgetService.name}
+
+
+
+                      onChange={handleBudgetServiceChange}
+
+
+
+                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+
+
+
+                    >
+
+
+
+                      <option value="">Selecciona un servicio</option>
+
+
+
+                      {serviceCatalog.map((service) => (
+
+
+
+                        <option key={service} value={service}>
+
+
+
+                          {service}
+
+
+
+                        </option>
+
+
+
+                      ))}
+
+
+
+                    </select>
+
+
+
+                    <input
+
+
+
+                      type="number"
+
+
+
+                      name="price"
+
+
+
+                      value={budgetService.price}
+
+
+
+                      onChange={handleBudgetServiceChange}
+
+
+
+                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+
+
+
+                      placeholder="Valor"
+
+
+
+                      min="0"
+
+
+
+                    />
+
+
+
+                    <button type="submit" className="btn-primary rounded-lg px-4 py-2 text-sm font-semibold flex items-center justify-center gap-2">
+
+
+
+                      <Plus className="h-4 w-4" />
+
+
+
+                      Agregar
+
+
+
+                    </button>
+
+
+
+                  </form>
+
+
+
+                </div>
+
+
+
+                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+
+
+
+                  <h3 className="text-lg font-semibold text-gray-900">Resumen</h3>
+
+
+
+                  <div className="mt-4 space-y-3">
+
+
+
+                    <p className="text-sm text-gray-500">Cliente</p>
+
+
+
+                    <p className="text-sm font-semibold text-gray-900">{budgetForm.customerName || '-'}</p>
+
+
+
+                    <p className="text-sm text-gray-500">Vehiculo</p>
+
+
+
+                    <p className="text-sm font-semibold text-gray-900">
+
+
+
+                      {[budgetForm.patente, budgetForm.vehicle].filter(Boolean).join(' - ') || '-'}
+
+
+
+                    </p>
+
+
+
+                  </div>
+
+
+
+                  <div className="mt-6 border-t border-gray-200 pt-4">
+
+
+
+                    <p className="text-sm text-gray-500">Total estimado</p>
+
+
+
+                    <p className="mt-1 text-3xl font-bold text-gray-900">${budgetTotal.toLocaleString('es-CL')}</p>
+
+
+
+                  </div>
+
+
+
+                  <button
+
+
+
+                    type="button"
+
+
+
+                    onClick={handleClearBudget}
+
+
+
+                    className="mt-6 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+
+
+
+                  >
+
+
+
+                    Limpiar presupuesto
+
+
+
+                  </button>
+
+
+
+                </div>
+
+
+
+              </div>
+
+
+
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+
+
+
+                <div className="border-b border-gray-200 p-6">
+
+
+
+                  <h3 className="text-lg font-semibold text-gray-900">Servicios presupuestados</h3>
+
+
+
+                </div>
+
+
+
+                {budgetItems.length === 0 ? (
+
+
+
+                  <div className="p-6 text-sm text-gray-500">No hay servicios agregados.</div>
+
+
+
+                ) : (
+
+
+
+                  <div className="divide-y divide-gray-200">
+
+
+
+                    {budgetItems.map((item) => (
+
+
+
+                      <div key={item.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+
+
+
+                        <div>
+
+
+
+                          <p className="text-sm font-semibold text-gray-900">{item.name}</p>
+
+
+
+                          <p className="text-sm text-gray-500">${item.price.toLocaleString('es-CL')}</p>
+
+
+
+                        </div>
+
+
+
+                        <button
+
+
+
+                          type="button"
+
+
+
+                          onClick={() => handleRemoveBudgetService(item.id)}
+
+
+
+                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 sm:w-auto"
+
+
+
+                        >
+
+
+
+                          <Trash2 className="h-4 w-4" />
+
+
+
+                          Quitar
+
+
+
+                        </button>
+
+
+
+                      </div>
+
+
+
+                    ))}
+
+
+
+                  </div>
+
+
+
+                )}
+
+
+
+              </div>
+
+
+
+            </div>
+
+
+
+          )}
 
 
 
