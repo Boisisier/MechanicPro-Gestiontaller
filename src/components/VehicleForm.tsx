@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Save, RotateCcw } from 'lucide-react';
+import { History, RotateCcw, Save, Search, X } from 'lucide-react';
 
-type PreviousVehicleData = Partial<VehicleFormData> & { patente: string };
+type PreviousVehicleData = Partial<VehicleFormData> & {
+  id?: string;
+  patente: string;
+  fecha_ingreso?: string;
+  created_at?: string;
+};
+
+type LookupMode = 'patente' | 'rut';
 
 interface VehicleFormProps {
   onSubmit: (data: VehicleFormData) => Promise<void>;
@@ -27,6 +34,7 @@ export interface VehicleFormData {
   customer_address: string;
   customer_city: string;
   observaciones: string;
+  comentario_tecnico: string;
 }
 
 const initialFormData: VehicleFormData = {
@@ -46,6 +54,7 @@ const initialFormData: VehicleFormData = {
   customer_address: '',
   customer_city: '',
   observaciones: '',
+  comentario_tecnico: '',
 };
 
 const formatPatente = (value: string) => {
@@ -64,6 +73,19 @@ const formatPatente = (value: string) => {
 
 const isCompletePatente = (value: string) => /^(?:[A-Z]{2}-\d{4}|[A-Z]{4}-\d{2})$/.test(value);
 
+const normalizeRut = (value: string) => value.toUpperCase().replace(/[^0-9K]/g, '');
+
+const formatDate = (value?: string) => {
+  if (!value) {
+    return '-';
+  }
+  return new Date(value).toLocaleDateString('es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+};
+
 const buildFormDataFromPreviousVisit = (vehicle: PreviousVehicleData, patente: string): VehicleFormData => ({
   patente,
   marca: vehicle.marca || '',
@@ -81,6 +103,7 @@ const buildFormDataFromPreviousVisit = (vehicle: PreviousVehicleData, patente: s
   customer_address: vehicle.customer_address || '',
   customer_city: vehicle.customer_city || '',
   observaciones: vehicle.observaciones || '',
+  comentario_tecnico: vehicle.comentario_tecnico || '',
 });
 
 export default function VehicleForm({
@@ -92,6 +115,8 @@ export default function VehicleForm({
   const [formData, setFormData] = useState<VehicleFormData>(editingVehicle || initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadedPatente, setLoadedPatente] = useState('');
+  const [lookupMode, setLookupMode] = useState<LookupMode | null>(null);
+  const [lookupTerm, setLookupTerm] = useState('');
 
   useEffect(() => {
     if (editingVehicle) {
@@ -101,27 +126,72 @@ export default function VehicleForm({
       setFormData(initialFormData);
     }
     setLoadedPatente('');
+    setLookupMode(null);
+    setLookupTerm('');
   }, [editingVehicle]);
+
+  const lookupMatches = existingVehicles
+    .filter((vehicle) => {
+      if (lookupMode === 'patente') {
+        return vehicle.patente === lookupTerm;
+      }
+      if (lookupMode === 'rut') {
+        return normalizeRut(vehicle.customer_rut || '') === lookupTerm;
+      }
+      return false;
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.fecha_ingreso || a.created_at || 0).getTime();
+      const dateB = new Date(b.fecha_ingreso || b.created_at || 0).getTime();
+      return dateB - dateA;
+    });
+
+  const associatedPatentes = Array.from(new Set(lookupMatches.map((vehicle) => vehicle.patente)));
+
+  const openPatenteLookup = (patente = formData.patente) => {
+    if (editingVehicle || !isCompletePatente(patente)) {
+      return;
+    }
+    setLookupMode('patente');
+    setLookupTerm(patente);
+  };
+
+  const openRutLookup = (rut = formData.customer_rut) => {
+    if (editingVehicle) {
+      return;
+    }
+    const normalizedRut = normalizeRut(rut);
+    if (normalizedRut.length < 7) {
+      return;
+    }
+    setLookupMode('rut');
+    setLookupTerm(normalizedRut);
+  };
+
+  const closeLookup = () => {
+    setLookupMode(null);
+    setLookupTerm('');
+  };
+
+  const loadPreviousVisit = (vehicle: PreviousVehicleData) => {
+    setFormData(buildFormDataFromPreviousVisit(vehicle, vehicle.patente));
+    setLoadedPatente(vehicle.patente);
+    closeLookup();
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     if (name === 'patente') {
       const patente = formatPatente(value);
-      const previousVisit = !editingVehicle && isCompletePatente(patente)
-        ? existingVehicles.find((vehicle) => vehicle.patente === patente)
-        : null;
-
-      if (previousVisit) {
-        setFormData(buildFormDataFromPreviousVisit(previousVisit, patente));
-        setLoadedPatente(patente);
-        return;
-      }
 
       setFormData((prev) => ({
         ...prev,
         patente,
       }));
       setLoadedPatente('');
+      if (isCompletePatente(patente)) {
+        openPatenteLookup(patente);
+      }
       return;
     }
 
@@ -176,9 +246,18 @@ export default function VehicleForm({
               value={formData.patente}
               onChange={handleChange}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all uppercase"
+              className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all uppercase"
               placeholder="AB-1234 o ABCD-12"
             />
+            <button
+              type="button"
+              onClick={() => openPatenteLookup()}
+              disabled={!isCompletePatente(formData.patente)}
+              className="mt-2 inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Search className="h-4 w-4" />
+              Ver atenciones
+            </button>
             {loadedPatente === formData.patente && (
               <p className="mt-2 text-sm font-medium text-emerald-700">
                 Datos cargados desde el ultimo ingreso de esta patente.
@@ -327,10 +406,20 @@ export default function VehicleForm({
                 name="customer_rut"
                 value={formData.customer_rut}
                 onChange={handleChange}
+                onBlur={() => openRutLookup()}
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 placeholder="12.345.678-9"
               />
+              <button
+                type="button"
+                onClick={() => openRutLookup()}
+                disabled={normalizeRut(formData.customer_rut).length < 7}
+                className="mt-2 inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Search className="h-4 w-4" />
+                Ver vehiculos
+              </button>
             </div>
 
             <div>
@@ -385,7 +474,7 @@ export default function VehicleForm({
 
         <div>
           <label htmlFor="observaciones" className="block text-sm font-medium text-gray-700 mb-2">
-            Observaciones iniciales
+            Observaciones iniciales (Cliente)
           </label>
           <textarea
             id="observaciones"
@@ -395,6 +484,21 @@ export default function VehicleForm({
             rows={4}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
             placeholder="Detalles adicionales, reparaciones necesarias, etc."
+          />
+        </div>
+
+        <div>
+          <label htmlFor="comentario_tecnico" className="block text-sm font-medium text-gray-700 mb-2">
+            Comentario tecnico
+          </label>
+          <textarea
+            id="comentario_tecnico"
+            name="comentario_tecnico"
+            value={formData.comentario_tecnico}
+            onChange={handleChange}
+            rows={4}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+            placeholder="Comentario interno de recepcion o mecanico"
           />
         </div>
 
@@ -418,6 +522,83 @@ export default function VehicleForm({
           </button>
         </div>
       </form>
+
+      {lookupMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 px-4 py-6">
+          <div className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-xl bg-white shadow-xl">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-6 py-4">
+              <div>
+                <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+                  <History className="h-5 w-5" />
+                  {lookupMode === 'patente' ? 'Atenciones de la patente' : 'Vehiculos asociados al RUT'}
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {lookupMode === 'patente'
+                    ? `Patente ${lookupTerm}: ${lookupMatches.length} atencion(es).`
+                    : `RUT ${formData.customer_rut}: ${associatedPatentes.length} vehiculo(s), ${lookupMatches.length} atencion(es).`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeLookup}
+                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                aria-label="Cerrar historial"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
+              {lookupMatches.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500">
+                  No se encontraron registros previos.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">Patente</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">Vehiculo</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">Cliente</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">Estado</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">Ingreso</th>
+                        <th className="px-4 py-3 text-right font-semibold text-gray-700">Accion</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      {lookupMatches.map((vehicle, index) => (
+                        <tr key={vehicle.id || `${vehicle.patente}-${index}`}>
+                          <td className="px-4 py-3 font-semibold uppercase text-gray-900">{vehicle.patente}</td>
+                          <td className="px-4 py-3 text-gray-700">
+                            {[vehicle.marca, vehicle.modelo, vehicle.ano].filter(Boolean).join(' ') || '-'}
+                            <div className="text-xs text-gray-500">{vehicle.tipo_vehiculo || '-'}</div>
+                          </td>
+                          <td className="px-4 py-3 text-gray-700">
+                            {vehicle.customer_name || '-'}
+                            <div className="text-xs text-gray-500">{vehicle.customer_rut || '-'}</div>
+                          </td>
+                          <td className="px-4 py-3 text-gray-700">{vehicle.estado || '-'}</td>
+                          <td className="px-4 py-3 text-gray-700">{formatDate(vehicle.fecha_ingreso)}</td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => loadPreviousVisit(vehicle)}
+                              className="rounded-lg btn-primary px-3 py-2 text-xs font-semibold"
+                            >
+                              Cargar datos
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

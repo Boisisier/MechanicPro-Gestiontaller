@@ -19,6 +19,7 @@ export interface Vehicle {
   estado: VehicleStatus;
   servicios?: string[];
   observaciones: string;
+  comentario_tecnico?: string;
   fecha_ingreso: string;
   created_at: string;
   updated_at: string;

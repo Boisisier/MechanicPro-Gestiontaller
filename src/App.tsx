@@ -50,10 +50,25 @@ interface ReviewServiceItem {
   price: string;
 }
 
+interface ReviewPartItem {
+  inventoryItemId: string;
+  name: string;
+  sku: string;
+  quantity: number;
+  unit: string;
+  unitCost: number;
+  location: string;
+}
+
 interface BudgetServiceItem {
   id: string;
   name: string;
   price: number;
+}
+
+interface CatalogService {
+  category: string;
+  name: string;
 }
 
 const toSoftAccent = (hexColor: string) => {
@@ -69,7 +84,7 @@ const toSoftAccent = (hexColor: string) => {
   return `#${toHex(mix(r))}${toHex(mix(g))}${toHex(mix(b))}`;
 };
 
-const serviceCatalog = [
+const legacyServiceCatalog = [
   'Cambio de aceite y filtros',
   'Diagnóstico general',
   'Frenos',
@@ -84,7 +99,7 @@ const serviceCatalog = [
   'Aire acondicionado',
 ];
 
-serviceCatalog.push(
+legacyServiceCatalog.push(
   'Cambio de aceite de caja',
   'Cambio de filtro de aire',
   'Cambio de filtro de combustible',
@@ -111,8 +126,271 @@ serviceCatalog.push(
   'Revisión de luces'
 );
 
+const serviceCatalogByCategory = [
+  {
+    category: 'Diagnostico e inspeccion',
+    services: [
+      'Diagnostico general',
+      'Escaneo computarizado',
+      'Lectura y borrado de codigos de falla',
+      'Diagnostico electrico',
+      'Diagnostico de motor',
+      'Diagnostico de transmision',
+      'Diagnostico de frenos ABS',
+      'Diagnostico de suspension',
+      'Diagnostico de climatizacion',
+      'Revision precompra',
+      'Revision tecnica preventiva',
+      'Inspeccion de fugas',
+      'Prueba de ruta',
+    ],
+  },
+  {
+    category: 'Mantenimiento preventivo',
+    services: [
+      'Mantencion por kilometraje',
+      'Cambio de aceite de motor',
+      'Cambio de filtro de aceite',
+      'Cambio de filtro de aire',
+      'Cambio de filtro de combustible',
+      'Cambio de filtro de cabina',
+      'Revision y relleno de fluidos',
+      'Cambio de liquido refrigerante',
+      'Cambio de liquido de frenos',
+      'Cambio de liquido direccion hidraulica',
+      'Cambio de bujias',
+      'Cambio de correas auxiliares',
+      'Cambio de correa de distribucion',
+      'Cambio de kit de distribucion',
+      'Limpieza de cuerpo de aceleracion',
+      'Limpieza de inyectores',
+      'Afinamiento de motor',
+      'Reseteo indicador de mantencion',
+    ],
+  },
+  {
+    category: 'Lubricacion y fluidos',
+    services: [
+      'Cambio de aceite de caja manual',
+      'Cambio de aceite de caja automatica',
+      'Cambio de aceite CVT',
+      'Cambio de aceite DSG',
+      'Cambio de aceite diferencial',
+      'Cambio de aceite transfer',
+      'Cambio de aceite corona',
+      'Flush de transmision',
+      'Lavado de sistema de refrigeracion',
+      'Purgado de frenos',
+      'Purgado de embrague hidraulico',
+      'Revision de niveles y fugas',
+    ],
+  },
+  {
+    category: 'Motor',
+    services: [
+      'Reparacion de motor',
+      'Ajuste de motor',
+      'Overhaul de motor',
+      'Cambio de empaquetadura de culata',
+      'Cambio de retenes de motor',
+      'Cambio de bomba de agua',
+      'Cambio de termostato',
+      'Cambio de radiador',
+      'Cambio de mangueras de refrigeracion',
+      'Cambio de soporte de motor',
+      'Reparacion sistema de inyeccion',
+      'Reparacion sistema de encendido',
+      'Cambio de bobinas',
+      'Cambio de sensores de motor',
+      'Revision de compresion',
+      'Revision de consumo de aceite',
+      'Reparacion de turbo',
+      'Limpieza valvula EGR',
+    ],
+  },
+  {
+    category: 'Transmision y embrague',
+    services: [
+      'Revision de transmision manual',
+      'Revision de transmision automatica',
+      'Reparacion de caja manual',
+      'Reparacion de caja automatica',
+      'Reprogramacion de transmision',
+      'Cambio de kit de embrague',
+      'Cambio de prensa y disco',
+      'Cambio de rodamiento de empuje',
+      'Cambio de volante bimasa',
+      'Cambio de soporte de caja',
+      'Revision de cardan',
+      'Cambio de homocinetica',
+      'Cambio de fuelle homocinetica',
+      'Cambio de semieje',
+      'Revision de diferencial',
+    ],
+  },
+  {
+    category: 'Frenos',
+    services: [
+      'Revision sistema de frenos',
+      'Cambio de pastillas de freno',
+      'Cambio de zapatas de freno',
+      'Cambio de discos de freno',
+      'Rectificado de discos',
+      'Cambio de tambores',
+      'Rectificado de tambores',
+      'Cambio de caliper',
+      'Mantencion de caliper',
+      'Cambio de cilindro de freno',
+      'Cambio de bomba de freno',
+      'Cambio de flexible de freno',
+      'Regulacion de freno de mano',
+      'Diagnostico ABS',
+      'Reparacion ABS',
+    ],
+  },
+  {
+    category: 'Suspension y direccion',
+    services: [
+      'Revision de suspension',
+      'Cambio de amortiguadores',
+      'Cambio de cazoletas',
+      'Cambio de espirales',
+      'Cambio de bandejas',
+      'Cambio de bujes',
+      'Cambio de rotulas',
+      'Cambio de terminales de direccion',
+      'Cambio de bieletas',
+      'Cambio de barra estabilizadora',
+      'Cambio de rodamientos',
+      'Cambio de maza',
+      'Alineacion',
+      'Balanceo',
+      'Rotacion de neumaticos',
+      'Reparacion de cremallera mecanica',
+      'Reparacion de cremallera hidraulica',
+      'Cambio de bomba direccion hidraulica',
+    ],
+  },
+  {
+    category: 'Neumaticos y ruedas',
+    services: [
+      'Montaje de neumaticos',
+      'Desmontaje de neumaticos',
+      'Reparacion de pinchazo',
+      'Revision de presion de neumaticos',
+      'Cambio de valvulas',
+      'Balanceo de ruedas',
+      'Alineacion y balanceo',
+      'Revision de desgaste irregular',
+      'Calibracion TPMS',
+      'Cambio sensor TPMS',
+    ],
+  },
+  {
+    category: 'Electrico y electronico',
+    services: [
+      'Revision sistema electrico',
+      'Cambio de bateria',
+      'Prueba de bateria',
+      'Carga de bateria',
+      'Reparacion motor de arranque',
+      'Cambio motor de arranque',
+      'Reparacion alternador',
+      'Cambio alternador',
+      'Revision sistema de carga',
+      'Revision sistema de luces',
+      'Alineacion de luces',
+      'Cambio de ampolletas',
+      'Reparacion de alzavidrios',
+      'Reparacion cierre centralizado',
+      'Instalacion de alarma',
+      'Instalacion de radio',
+      'Instalacion de accesorios electricos',
+      'Programacion de modulos',
+    ],
+  },
+  {
+    category: 'Climatizacion y calefaccion',
+    services: [
+      'Mantencion aire acondicionado',
+      'Carga de gas aire acondicionado',
+      'Deteccion de fugas aire acondicionado',
+      'Cambio filtro de cabina',
+      'Limpieza de ductos',
+      'Cambio de compresor A/C',
+      'Cambio de condensador A/C',
+      'Cambio de evaporador A/C',
+      'Reparacion calefaccion',
+      'Cambio radiador calefaccion',
+      'Cambio blower o ventilador habitaculo',
+    ],
+  },
+  {
+    category: 'Escape y emisiones',
+    services: [
+      'Revision sistema de escape',
+      'Reparacion de escape',
+      'Cambio de silenciador',
+      'Cambio de catalizador',
+      'Cambio sensor de oxigeno',
+      'Limpieza filtro DPF',
+      'Regeneracion DPF',
+      'Revision de emisiones',
+      'Reparacion fugas de escape',
+    ],
+  },
+  {
+    category: 'Combustible e inyeccion',
+    services: [
+      'Diagnostico sistema de combustible',
+      'Cambio bomba de combustible',
+      'Cambio filtro de combustible',
+      'Limpieza de inyectores',
+      'Cambio de inyectores',
+      'Revision de presion de combustible',
+      'Limpieza estanque combustible',
+      'Reparacion linea de combustible',
+    ],
+  },
+  {
+    category: 'Carroceria, pintura y cristales',
+    services: [
+      'Latoneria',
+      'Pintura automotriz',
+      'Pulido y abrillantado',
+      'Reparacion de parachoques',
+      'Cambio de parabrisas',
+      'Reparacion de alzavidrios',
+      'Cambio de plumillas',
+      'Instalacion de laminas de seguridad',
+      'Detallado interior',
+      'Detallado exterior',
+    ],
+  },
+  {
+    category: 'Servicio rapido y flotas',
+    services: [
+      'Ingreso express',
+      'Mantencion de flota',
+      'Revision diaria de seguridad',
+      'Checklist operacional',
+      'Preparacion para revision tecnica',
+      'Servicio de emergencia',
+      'Inspeccion post reparacion',
+      'Lavado de motor',
+      'Lavado exterior',
+    ],
+  },
+];
+
+const serviceCatalog = Array.from(
+  new Set([...serviceCatalogByCategory.flatMap(({ services }) => services), ...legacyServiceCatalog])
+);
+
+const reviewPartPrefix = '[REPUESTO]';
+
 const parseStoredReviewServices = (services: string[] = []): ReviewServiceItem[] =>
-  services.map((service) => {
+  services.filter((service) => !service.startsWith(reviewPartPrefix)).map((service) => {
     const match = service.match(/^(.*ó)(ó:\s+\(\$\s*([^)]+)\))ó$/);
     return {
       name: match?.[1]?.trim() || service,
@@ -122,6 +400,42 @@ const parseStoredReviewServices = (services: string[] = []): ReviewServiceItem[]
 
 const serializeReviewService = ({ name, price }: ReviewServiceItem) =>
   price.trim() ? `${name} ($${price.trim()})` : name;
+
+const parseStoredReviewParts = (services: string[] = []): ReviewPartItem[] =>
+  services
+    .filter((service) => service.startsWith(reviewPartPrefix))
+    .map((service) => {
+      const [
+        inventoryItemId = '',
+        name = '',
+        sku = '',
+        quantity = '1',
+        unit = 'unidad',
+        unitCost = '0',
+        location = '',
+      ] = service.replace(reviewPartPrefix, '').trim().split('|').map((value) => value.trim());
+      return {
+        inventoryItemId,
+        name,
+        sku,
+        quantity: Math.max(1, parseInt(quantity) || 1),
+        unit,
+        unitCost: parseInt(unitCost) || 0,
+        location,
+      };
+    })
+    .filter((part) => part.inventoryItemId && part.name);
+
+const serializeReviewPart = (part: ReviewPartItem) =>
+  `${reviewPartPrefix} ${[
+    part.inventoryItemId,
+    part.name,
+    part.sku,
+    part.quantity,
+    part.unit,
+    part.unitCost,
+    part.location,
+  ].join('|')}`;
 
 
 function App() {
@@ -249,9 +563,15 @@ function App() {
 
   const [reviewServices, setReviewServices] = useState<ReviewServiceItem[]>([]);
 
+  const [reviewParts, setReviewParts] = useState<ReviewPartItem[]>([]);
+
   const [serviceSearch, setServiceSearch] = useState('');
 
   const [servicePickerOpen, setServicePickerOpen] = useState(false);
+
+  const [partSearch, setPartSearch] = useState('');
+
+  const [partPickerOpen, setPartPickerOpen] = useState(false);
 
   const [reviewNotes, setReviewNotes] = useState('');
 
@@ -364,6 +684,7 @@ function App() {
     if (reviewVehicleId && !vehicles.find((item) => item.id === reviewVehicleId)) {
       setReviewVehicleId(null);
       setReviewServices([]);
+      setReviewParts([]);
       setReviewNotes('');
     }
   }, [vehicles, reviewVehicleId]);
@@ -838,6 +1159,8 @@ function App() {
 
     observaciones: vehicle.observaciones || '',
 
+    comentario_tecnico: vehicle.comentario_tecnico || '',
+
 
 
     ...overrides,
@@ -905,6 +1228,8 @@ function App() {
 
 
     setReviewServices(parseStoredReviewServices(vehicle.servicios));
+
+    setReviewParts(parseStoredReviewParts(vehicle.servicios));
 
 
 
@@ -982,6 +1307,66 @@ function App() {
 
   };
 
+  const handleAddReviewPart = (item: (typeof inventoryItems)[number]) => {
+    if (item.stock <= 0) {
+      showNotification('error', 'Este repuesto no tiene stock disponible');
+      return;
+    }
+
+    setReviewParts((prev) => {
+      const existing = prev.find((part) => part.inventoryItemId === item.id);
+      const savedQuantity = parseStoredReviewParts(
+        vehicles.find((vehicle) => vehicle.id === reviewVehicleId)?.servicios
+      ).find((part) => part.inventoryItemId === item.id)?.quantity || 0;
+      const availableQuantity = item.stock + savedQuantity;
+      if (existing) {
+        if (existing.quantity >= availableQuantity) {
+          showNotification('error', 'No hay mas stock disponible para este repuesto');
+          return prev;
+        }
+        return prev.map((part) =>
+          part.inventoryItemId === item.id ? { ...part, quantity: part.quantity + 1 } : part
+        );
+      }
+
+      return [
+        ...prev,
+        {
+          inventoryItemId: item.id,
+          name: item.name,
+          sku: item.sku,
+          quantity: 1,
+          unit: item.unit || 'unidad',
+          unitCost: item.cost || 0,
+          location: item.location,
+        },
+      ];
+    });
+    setPartSearch('');
+    setPartPickerOpen(false);
+  };
+
+  const handleReviewPartQuantityChange = (inventoryItemId: string, quantity: number) => {
+    const inventoryItem = inventoryItems.find((item) => item.id === inventoryItemId);
+    const nextQuantity = Math.max(1, quantity || 1);
+    const savedQuantity = parseStoredReviewParts(
+      vehicles.find((vehicle) => vehicle.id === reviewVehicleId)?.servicios
+    ).find((part) => part.inventoryItemId === inventoryItemId)?.quantity || 0;
+    if (inventoryItem && nextQuantity > inventoryItem.stock + savedQuantity) {
+      showNotification('error', 'La cantidad supera el stock disponible');
+      return;
+    }
+    setReviewParts((prev) =>
+      prev.map((part) =>
+        part.inventoryItemId === inventoryItemId ? { ...part, quantity: nextQuantity } : part
+      )
+    );
+  };
+
+  const handleRemoveReviewPart = (inventoryItemId: string) => {
+    setReviewParts((prev) => prev.filter((part) => part.inventoryItemId !== inventoryItemId));
+  };
+
 
 
 
@@ -1012,6 +1397,43 @@ function App() {
 
 
 
+    const savedParts = parseStoredReviewParts(vehicle.servicios);
+    const partDeltas = reviewParts.map((part) => {
+      const previousQuantity =
+        savedParts.find((savedPart) => savedPart.inventoryItemId === part.inventoryItemId)?.quantity || 0;
+      return {
+        inventoryItemId: part.inventoryItemId,
+        delta: part.quantity - previousQuantity,
+      };
+    });
+    savedParts.forEach((savedPart) => {
+      if (!reviewParts.some((part) => part.inventoryItemId === savedPart.inventoryItemId)) {
+        partDeltas.push({
+          inventoryItemId: savedPart.inventoryItemId,
+          delta: -savedPart.quantity,
+        });
+      }
+    });
+
+    const missingStock = partDeltas.find((partDelta) => {
+      if (partDelta.delta <= 0) {
+        return false;
+      }
+      const inventoryItem = inventoryItems.find((item) => item.id === partDelta.inventoryItemId);
+      return !inventoryItem || inventoryItem.stock < partDelta.delta;
+    });
+
+    if (missingStock) {
+      const inventoryItem = inventoryItems.find((item) => item.id === missingStock.inventoryItemId);
+      showNotification(
+        'error',
+        inventoryItem
+          ? `Stock insuficiente para ${inventoryItem.name}`
+          : 'Uno de los repuestos ya no existe en inventario'
+      );
+      return;
+    }
+
     try {
 
 
@@ -1032,7 +1454,10 @@ function App() {
 
 
 
-          servicios: reviewServices.map(serializeReviewService),
+          servicios: [
+            ...reviewServices.map(serializeReviewService),
+            ...reviewParts.map(serializeReviewPart),
+          ],
 
 
 
@@ -1048,6 +1473,20 @@ function App() {
 
 
 
+      );
+
+      setInventoryItems((prev) =>
+        prev.map((item) => {
+          const partDelta = partDeltas.find((delta) => delta.inventoryItemId === item.id);
+          if (!partDelta || partDelta.delta === 0) {
+            return item;
+          }
+          return {
+            ...item,
+            stock: item.stock - partDelta.delta,
+            updated_at: new Date().toISOString(),
+          };
+        })
       );
 
 
@@ -1109,6 +1548,8 @@ function App() {
 
 
       setReviewServices(parseStoredReviewServices(vehicle.servicios));
+
+      setReviewParts(parseStoredReviewParts(vehicle.servicios));
 
 
 
@@ -1200,7 +1641,8 @@ function App() {
 
 
 
-    const services = vehicle.servicios && vehicle.servicios.length > 0 ? vehicle.servicios : [];
+    const services = parseStoredReviewServices(vehicle.servicios).map(serializeReviewService);
+    const parts = parseStoredReviewParts(vehicle.servicios);
 
 
 
@@ -1372,11 +1814,24 @@ ${services.length === 0
 
 
 
+<h2>Repuestos utilizados</h2>
+
+${parts.length === 0
+        ? '<p class="muted">Sin repuestos registrados.</p>'
+        : `<ul>${parts.map((part) => `<li>${escapeHtml(`${part.name} x${part.quantity} ${part.unit}`)}</li>`).join('')}</ul>`
+      }
+
+
+
 <h2>Detalle del trabajo</h2>
 
 
 
 <p>${escapeHtml(vehicle.observaciones || 'Sin observaciones')}</p>
+
+<h2>Comentario tecnico</h2>
+
+<p>${escapeHtml(vehicle.comentario_tecnico || 'Sin comentario tecnico')}</p>
 
 
 
@@ -1694,14 +2149,39 @@ ${services.length === 0
 
     vehicles.find((vehicle) => vehicle.id === reviewVehicleId) || vehiclesEnRevision[0] || null;
 
-  const filteredServiceCatalog = serviceCatalog.filter((service) => {
+  const filteredServiceCatalog = serviceCatalogByCategory.flatMap(({ category, services }) =>
+    services
+      .filter((service) => {
+        const normalizedSearch = serviceSearch.toLowerCase();
+        const matchesSearch =
+          service.toLowerCase().includes(normalizedSearch) ||
+          category.toLowerCase().includes(normalizedSearch);
+        const alreadySelected = reviewServices.some((item) => item.name === service);
+        return matchesSearch && !alreadySelected;
+      })
+      .map((service) => ({ category, name: service }))
+  );
 
-    const matchesSearch = service.toLowerCase().includes(serviceSearch.toLowerCase());
+  const filteredServiceCatalogByCategory = filteredServiceCatalog.reduce<
+    Array<{ category: string; services: CatalogService[] }>
+  >((groups, service) => {
+    const existingGroup = groups.find((group) => group.category === service.category);
+    if (existingGroup) {
+      existingGroup.services.push(service);
+      return groups;
+    }
+    return [...groups, { category: service.category, services: [service] }];
+  }, []);
 
-    const alreadySelected = reviewServices.some((item) => item.name === service);
-
-    return matchesSearch && !alreadySelected;
-
+  const filteredInventoryParts = inventoryItems.filter((item) => {
+    const normalizedSearch = partSearch.toLowerCase();
+    return (
+      item.name.toLowerCase().includes(normalizedSearch) ||
+      item.category.toLowerCase().includes(normalizedSearch) ||
+      item.sku.toLowerCase().includes(normalizedSearch) ||
+      item.barcode.toLowerCase().includes(normalizedSearch) ||
+      item.location.toLowerCase().includes(normalizedSearch)
+    );
   });
 
 
@@ -1968,11 +2448,77 @@ ${services.length === 0
 
 
 
-              </div>
+                        </div>
 
 
 
-              <div>
+                        <div className="mb-6 space-y-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <h4 className="text-sm font-semibold text-gray-900">Repuestos utilizados</h4>
+                            <span className="text-xs text-gray-500">{reviewParts.length} seleccionado(s)</span>
+                          </div>
+
+                          {reviewParts.length === 0 ? (
+                            <p className="rounded-lg border border-dashed border-gray-300 px-4 py-5 text-sm text-gray-500">
+                              No hay repuestos seleccionados todavia.
+                            </p>
+                          ) : (
+                            reviewParts.map((part) => {
+                              const inventoryItem = inventoryItems.find((item) => item.id === part.inventoryItemId);
+                              const savedQuantity =
+                                parseStoredReviewParts(activeReviewVehicle.servicios).find(
+                                  (savedPart) => savedPart.inventoryItemId === part.inventoryItemId
+                                )?.quantity || 0;
+                              const availableQuantity = (inventoryItem?.stock || 0) + savedQuantity;
+                              return (
+                                <div
+                                  key={part.inventoryItemId}
+                                  className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 p-4 md:grid-cols-[minmax(0,1fr)_140px_44px]"
+                                >
+                                  <div>
+                                    <p className="text-sm font-semibold text-gray-900">{part.name}</p>
+                                    <p className="text-xs text-gray-500">
+                                      SKU: {part.sku || '-'} · Bodega: {part.location || '-'} · Stock disponible:{' '}
+                                      {availableQuantity} {part.unit}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                                      Cantidad
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      max={Math.max(1, availableQuantity)}
+                                      value={part.quantity}
+                                      onChange={(event) =>
+                                        handleReviewPartQuantityChange(
+                                          part.inventoryItemId,
+                                          parseInt(event.target.value) || 1
+                                        )
+                                      }
+                                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                                    />
+                                  </div>
+                                  <div className="flex items-end">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveReviewPart(part.inventoryItemId)}
+                                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
+                                      title="Eliminar repuesto"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+
+
+
+                        <div>
 
 
 
@@ -3929,31 +4475,40 @@ ${services.length === 0
 
 
 
-                          <button
+                          <div className="flex flex-col gap-2 sm:flex-row">
+                            <button
 
 
 
-                            type="button"
+                              type="button"
 
 
 
-                            onClick={() => setServicePickerOpen((prev) => !prev)}
+                              onClick={() => setServicePickerOpen((prev) => !prev)}
 
 
 
-                            className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                              className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
 
 
 
-                          >
+                            >
 
 
 
-                            {servicePickerOpen ? 'Cerrar buscador' : 'Buscar servicios'}
+                              {servicePickerOpen ? 'Cerrar buscador' : 'Buscar servicios'}
 
 
 
-                          </button>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPartPickerOpen((prev) => !prev)}
+                              className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                            >
+                              {partPickerOpen ? 'Cerrar repuestos' : 'Buscar repuestos'}
+                            </button>
+                          </div>
 
 
 
@@ -4102,53 +4657,24 @@ ${services.length === 0
 
 
                                   ) : (
-
-
-
-                                    filteredServiceCatalog.map((service) => (
-
-
-
-                                      <button
-
-
-
-                                        key={service}
-
-
-
-                                        type="button"
-
-
-
-                                        onClick={() => handleAddReviewService(service)}
-
-
-
-                                        className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-blue-50"
-
-
-
-                                      >
-
-
-
-                                        <span>{service}</span>
-
-
-
-                                        <span className="text-xs font-semibold text-blue-600">Agregar</span>
-
-
-
-                                      </button>
-
-
-
+                                    filteredServiceCatalogByCategory.map((group) => (
+                                      <div key={group.category} className="py-1">
+                                        <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                          {group.category}
+                                        </p>
+                                        {group.services.map((service) => (
+                                          <button
+                                            key={service.name}
+                                            type="button"
+                                            onClick={() => handleAddReviewService(service.name)}
+                                            className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-blue-50"
+                                          >
+                                            <span>{service.name}</span>
+                                            <span className="text-xs font-semibold text-blue-600">Agregar</span>
+                                          </button>
+                                        ))}
+                                      </div>
                                     ))
-
-
-
                                   )}
 
 
@@ -4170,6 +4696,67 @@ ${services.length === 0
 
 
                         </div>
+
+
+
+                        {partPickerOpen && (
+                          <div className="relative mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                            <div className="relative">
+                              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                              <input
+                                value={partSearch}
+                                onChange={(event) => setPartSearch(event.target.value)}
+                                className="w-full rounded-lg border border-gray-300 bg-white py-3 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none"
+                                placeholder="Buscar repuesto por nombre, SKU, codigo o ubicacion..."
+                              />
+                            </div>
+
+                            <div className="mt-3 rounded-xl border border-gray-200 bg-white shadow-lg">
+                              <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                  Repuestos en inventario
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => setPartPickerOpen(false)}
+                                  className="rounded p-1 text-gray-500 hover:bg-gray-100"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                              <div className="max-h-72 overflow-y-auto p-2">
+                                {filteredInventoryParts.length === 0 ? (
+                                  <p className="px-3 py-2 text-sm text-gray-500">
+                                    No hay repuestos disponibles con esa busqueda.
+                                  </p>
+                                ) : (
+                                  filteredInventoryParts.map((item) => (
+                                    <button
+                                      key={item.id}
+                                      type="button"
+                                      onClick={() => handleAddReviewPart(item)}
+                                      className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-blue-50"
+                                    >
+                                      <span>
+                                        <span className="block font-semibold text-gray-900">{item.name}</span>
+                                        <span className="block text-xs text-gray-500">
+                                          {item.category} · SKU: {item.sku || '-'} · Bodega: {item.location || '-'}
+                                        </span>
+                                      </span>
+                                      <span
+                                        className={`text-xs font-semibold ${
+                                          item.stock > 0 ? 'text-emerald-700' : 'text-red-600'
+                                        }`}
+                                      >
+                                        Stock {item.stock} {item.unit || ''}
+                                      </span>
+                                    </button>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
 
 
@@ -4748,7 +5335,7 @@ ${services.length === 0
 
 
 
-                              {vehicle.servicios && vehicle.servicios.length > 0 ? (
+                              {parseStoredReviewServices(vehicle.servicios).length > 0 ? (
 
 
 
@@ -4756,11 +5343,11 @@ ${services.length === 0
 
 
 
-                                  {vehicle.servicios.map((service) => (
+                                  {parseStoredReviewServices(vehicle.servicios).map((service) => (
 
 
 
-                                    <li key={service}>{service}</li>
+                                    <li key={service.name}>{serializeReviewService(service)}</li>
 
 
 
@@ -4780,6 +5367,20 @@ ${services.length === 0
 
 
 
+                              )}
+
+                              <p className="mt-4 text-xs uppercase tracking-wide text-gray-500">Repuestos</p>
+
+                              {parseStoredReviewParts(vehicle.servicios).length > 0 ? (
+                                <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-gray-700">
+                                  {parseStoredReviewParts(vehicle.servicios).map((part) => (
+                                    <li key={part.inventoryItemId}>
+                                      {part.name} x{part.quantity} {part.unit}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="mt-2 text-xs text-gray-500">Sin repuestos registrados.</p>
                               )}
 
 

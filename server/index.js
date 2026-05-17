@@ -67,7 +67,8 @@ const ensureVehicleColumns = async () => {
   await pool.query(`
     alter table vehicles
       add column if not exists codigo_vin text,
-      add column if not exists codigo_motor text
+      add column if not exists codigo_motor text,
+      add column if not exists comentario_tecnico text default ''
   `);
   await pool.query(`
     alter table vehicles
@@ -713,14 +714,15 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
     customer_city = '',
     servicios = [],
     observaciones = '',
+    comentario_tecnico = '',
   } = req.body;
 
   try {
     const { rows } = await pool.query(
       `insert into vehicles
-        (company_id, customer_name, customer_rut, customer_phone, customer_address, customer_city, patente, marca, modelo, ano, tipo_vehiculo, codigo_vin, codigo_motor, kilometraje, cantidad_combustible, estado, servicios, observaciones)
+        (company_id, customer_name, customer_rut, customer_phone, customer_address, customer_city, patente, marca, modelo, ano, tipo_vehiculo, codigo_vin, codigo_motor, kilometraje, cantidad_combustible, estado, servicios, observaciones, comentario_tecnico)
        values
-        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
        returning *`,
       [
         companyId,
@@ -741,6 +743,7 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
         estado,
         servicios,
         observaciones,
+        comentario_tecnico,
       ]
     );
 
@@ -782,6 +785,7 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
     customer_city = '',
     servicios = [],
     observaciones = '',
+    comentario_tecnico = '',
   } = req.body;
 
   try {
@@ -804,8 +808,9 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
            estado = $15,
            servicios = $16,
            observaciones = $17,
+           comentario_tecnico = $18,
            updated_at = now()
-       where id = $18 and company_id = $19
+       where id = $19 and company_id = $20
        returning *`,
       [
         customer_name,
@@ -825,6 +830,7 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
         estado,
         servicios,
         observaciones,
+        comentario_tecnico,
         id,
         companyId,
       ]

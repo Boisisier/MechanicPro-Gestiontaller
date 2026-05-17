@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS ingreso (
   id_estado uuid NOT NULL REFERENCES estado(id) ON DELETE CASCADE,
   servicios text[] NOT NULL DEFAULT '{}',
   observaciones text DEFAULT '',
+  comentario_tecnico text DEFAULT '',
   fecha_ingreso timestamptz NOT NULL DEFAULT now(),
 )
 
