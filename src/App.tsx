@@ -128,12 +128,12 @@ legacyServiceCatalog.push(
 
 const serviceCatalogByCategory = [
   {
-    category: 'Diagnostico e inspeccion',
+    category: 'Diagnostico e inspección',
     services: [
       'Diagnostico general',
       'Escaneo computarizado',
       'Lectura y borrado de codigos de falla',
-      'Diagnostico electrico',
+      'Diagnostico eléctrico',
       'Diagnostico de motor',
       'Diagnostico de transmision',
       'Diagnostico de frenos ABS',

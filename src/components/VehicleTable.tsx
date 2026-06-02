@@ -44,7 +44,7 @@ export default function VehicleTable({
 
   showDelete = true,
 
-  title = 'veh?culos registrados',
+  title = 'vehículos registrados',
 
 }: VehicleTableProps) {
 
@@ -122,7 +122,7 @@ export default function VehicleTable({
 
             <h3 className="text-xl font-bold text-gray-900">{title}</h3>
 
-            <p className="text-sm text-gray-500 mt-1">{filteredvehicles.length} veh?culos encontrados</p>
+            <p className="text-sm text-gray-500 mt-1">{filteredvehicles.length} vehículos encontrados</p>
 
           </div>
 
@@ -160,11 +160,11 @@ export default function VehicleTable({
 
           <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
 
-          <p className="text-gray-500 text-lg font-medium">No hay veh?culos registrados</p>
+          <p className="text-gray-500 text-lg font-medium">No hay vehículos registrados</p>
 
           <p className="text-gray-400 text-sm mt-2">
 
-            {searchTerm ? 'Intenta con otro trmino de bsqueda' : 'Comienza registrando tu primer vehculo'}
+            {searchTerm ? 'Intenta con otro término de búsqueda' : 'Comienza registrando tu primer vehículo'}
 
           </p>
 
@@ -194,7 +194,7 @@ export default function VehicleTable({
 
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
 
-                  Ao
+                  Año
 
                 </th>
 
@@ -330,7 +330,7 @@ export default function VehicleTable({
 
                             }`}
 
-                            title={deleteConfirm === vehicle.id ? 'Confirmar eliminacin' : 'Eliminar'}
+                            title={deleteConfirm === vehicle.id ? 'Confirmar eliminación' : 'Eliminar'}
 
                           >
 

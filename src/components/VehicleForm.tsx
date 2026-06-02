@@ -27,7 +27,7 @@ export interface VehicleFormData {
   codigo_motor: string;
   kilometraje: number;
   cantidad_combustible: number;
-  estado: 'En taller' | 'Entregado' | 'En revision';
+  estado: 'En taller' | 'Entregado' | 'En revisión';
   customer_name: string;
   customer_rut: string;
   customer_phone: string;
@@ -228,9 +228,9 @@ export default function VehicleForm({
     <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
       <div className="mb-6">
         <h3 className="text-xl font-bold text-gray-900">
-          {editingVehicle ? 'Editar vehiculo' : 'Registro de vehiculo'}
+          {editingVehicle ? 'Editar vehículo' : 'Registro de vehículo'}
         </h3>
-        <p className="text-sm text-gray-500 mt-1">Complete los datos del vehiculo</p>
+        <p className="text-sm text-gray-500 mt-1">Complete los datos del vehículo</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -260,7 +260,7 @@ export default function VehicleForm({
             </button>
             {loadedPatente === formData.patente && (
               <p className="mt-2 text-sm font-medium text-emerald-700">
-                Datos cargados desde el ultimo ingreso de esta patente.
+                Datos cargados desde el último ingreso de esta patente.
               </p>
             )}
           </div>
@@ -299,7 +299,7 @@ export default function VehicleForm({
 
           <div>
             <label htmlFor="ano" className="block text-sm font-medium text-gray-700 mb-2">
-              Ano *
+              Año *
             </label>
             <input
               type="number"
@@ -316,7 +316,7 @@ export default function VehicleForm({
 
           <div>
             <label htmlFor="codigo_vin" className="block text-sm font-medium text-gray-700 mb-2">
-              Codigo VIN
+              Código VIN
             </label>
             <input
               type="text"
@@ -331,7 +331,7 @@ export default function VehicleForm({
 
           <div>
             <label htmlFor="codigo_motor" className="block text-sm font-medium text-gray-700 mb-2">
-              Codigo de motor
+              Código de motor
             </label>
             <input
               type="text"
@@ -340,7 +340,7 @@ export default function VehicleForm({
               value={formData.codigo_motor}
               onChange={handleChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all uppercase"
-              placeholder="Codigo de motor"
+              placeholder="Código de motor"
             />
           </div>
 
@@ -418,13 +418,13 @@ export default function VehicleForm({
                 className="mt-2 inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Search className="h-4 w-4" />
-                Ver vehiculos
+                Ver Vehículos
               </button>
             </div>
 
             <div>
               <label htmlFor="customer_phone" className="block text-sm font-medium text-gray-700 mb-2">
-                Telefono *
+                Teléfono *
               </label>
               <input
                 type="text"
@@ -440,7 +440,7 @@ export default function VehicleForm({
 
             <div>
               <label htmlFor="customer_address" className="block text-sm font-medium text-gray-700 mb-2">
-                Direccion *
+                Dirección *
               </label>
               <input
                 type="text"
@@ -489,7 +489,7 @@ export default function VehicleForm({
 
         <div>
           <label htmlFor="comentario_tecnico" className="block text-sm font-medium text-gray-700 mb-2">
-            Comentario tecnico
+            Comentario técnico
           </label>
           <textarea
             id="comentario_tecnico"
@@ -530,7 +530,7 @@ export default function VehicleForm({
               <div>
                 <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-900">
                   <History className="h-5 w-5" />
-                  {lookupMode === 'patente' ? 'Atenciones de la patente' : 'Vehiculos asociados al RUT'}
+                  {lookupMode === 'patente' ? 'Atenciones de la patente' : 'Vehículos asociados al RUT'}
                 </h3>
                 <p className="mt-1 text-sm text-gray-500">
                   {lookupMode === 'patente'
@@ -559,11 +559,11 @@ export default function VehicleForm({
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-4 py-3 text-left font-semibold text-gray-700">Patente</th>
-                        <th className="px-4 py-3 text-left font-semibold text-gray-700">Vehiculo</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">Vehículo</th>
                         <th className="px-4 py-3 text-left font-semibold text-gray-700">Cliente</th>
                         <th className="px-4 py-3 text-left font-semibold text-gray-700">Estado</th>
                         <th className="px-4 py-3 text-left font-semibold text-gray-700">Ingreso</th>
-                        <th className="px-4 py-3 text-right font-semibold text-gray-700">Accion</th>
+                        <th className="px-4 py-3 text-right font-semibold text-gray-700">Acción</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white">
