@@ -59,6 +59,8 @@ const ensureVehicleColumns = async () => {
     alter table vehicles
       add column if not exists codigo_vin text,
       add column if not exists codigo_motor text,
+      add column if not exists color text default '',
+      add column if not exists fallas_detectadas text[] default '{}',
       add column if not exists comentario_tecnico text default ''
   `);
   await pool.query(`
@@ -302,6 +304,9 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
   if (!Array.isArray(req.body.servicios)) {
     req.body.servicios = [];
   }
+  if (!Array.isArray(req.body.fallas_detectadas)) {
+    req.body.fallas_detectadas = [];
+  }
   req.body.patente = normalizePatente(req.body.patente);
 
   const errorMessage = validateVehicle(req.body);
@@ -317,6 +322,7 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
     tipo_vehiculo = 'Auto',
     codigo_vin = '',
     codigo_motor = '',
+    color = '',
     kilometraje = 0,
     cantidad_combustible = 0,
     estado = 'En taller',
@@ -326,6 +332,7 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
     customer_address = '',
     customer_city = '',
     servicios = [],
+    fallas_detectadas = [],
     observaciones = '',
     comentario_tecnico = '',
   } = req.body;
@@ -333,9 +340,9 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
   try {
     const { rows } = await pool.query(
       `insert into vehicles
-        (company_id, customer_name, customer_rut, customer_phone, customer_address, customer_city, patente, marca, modelo, ano, tipo_vehiculo, codigo_vin, codigo_motor, kilometraje, cantidad_combustible, estado, servicios, observaciones, comentario_tecnico)
+        (company_id, customer_name, customer_rut, customer_phone, customer_address, customer_city, patente, marca, modelo, ano, tipo_vehiculo, codigo_vin, codigo_motor, color, kilometraje, cantidad_combustible, estado, servicios, fallas_detectadas, observaciones, comentario_tecnico)
        values
-        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
        returning *`,
       [
         companyId,
@@ -351,10 +358,12 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
         tipo_vehiculo,
         codigo_vin,
         codigo_motor,
+        color,
         kilometraje,
         cantidad_combustible,
         estado,
         servicios,
+        fallas_detectadas,
         observaciones,
         comentario_tecnico,
       ]
@@ -373,6 +382,9 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
 app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   req.body.patente = normalizePatente(req.body.patente);
+  if (!Array.isArray(req.body.fallas_detectadas)) {
+    req.body.fallas_detectadas = [];
+  }
 
   const errorMessage = validateVehicle(req.body);
   if (errorMessage) {
@@ -388,6 +400,7 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
     tipo_vehiculo = 'Auto',
     codigo_vin = '',
     codigo_motor = '',
+    color = '',
     kilometraje = 0,
     cantidad_combustible = 0,
     estado,
@@ -397,6 +410,7 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
     customer_address = '',
     customer_city = '',
     servicios = [],
+    fallas_detectadas = [],
     observaciones = '',
     comentario_tecnico = '',
   } = req.body;
@@ -416,14 +430,16 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
            tipo_vehiculo = $10,
            codigo_vin = $11,
            codigo_motor = $12,
-           kilometraje = $13,
-           cantidad_combustible = $14,
-           estado = $15,
-           servicios = $16,
-           observaciones = $17,
-           comentario_tecnico = $18,
+           color = $13,
+           kilometraje = $14,
+           cantidad_combustible = $15,
+           estado = $16,
+           servicios = $17,
+           fallas_detectadas = $18,
+           observaciones = $19,
+           comentario_tecnico = $20,
            updated_at = now()
-       where id = $19 and company_id = $20
+       where id = $21 and company_id = $22
        returning *`,
       [
         customer_name,
@@ -438,10 +454,12 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
         tipo_vehiculo,
         codigo_vin,
         codigo_motor,
+        color,
         kilometraje,
         cantidad_combustible,
         estado,
         servicios,
+        fallas_detectadas,
         observaciones,
         comentario_tecnico,
         id,

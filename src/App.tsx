@@ -25,7 +25,7 @@ import VehicleTable from './components/VehicleTable';
 
 import VehicleHistoryTable from './components/VehicleHistoryTable';
 
-import { CheckCircle, AlertCircle, Search, Trash2, X, Plus, Calculator } from 'lucide-react';
+import { CheckCircle, AlertCircle, Search, Trash2, X, Plus, Calculator, RotateCcw, Send } from 'lucide-react';
 
 
 
@@ -60,6 +60,42 @@ interface CatalogService {
   category: string;
   name: string;
 }
+
+type UserRole = 'Administrador de Taller' | 'Administrativo' | 'Mecánico';
+
+interface WorkshopUser {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+}
+
+const roleModules: Record<UserRole, string[]> = {
+  'Administrador de Taller': ['Dashboard', 'Vehículos', 'Presupuesto', 'Inventario', 'Reportes', 'Configuración'],
+  Administrativo: ['Dashboard', 'Vehículos', 'Presupuesto', 'Reportes'],
+  Mecánico: ['Dashboard', 'Vehículos', 'Reportes'],
+};
+
+const defaultWorkshopUsers: WorkshopUser[] = [
+  {
+    id: 'admin-taller',
+    name: 'Administrador de Taller',
+    email: 'admin@taller.cl',
+    role: 'Administrador de Taller',
+  },
+  {
+    id: 'administrativo',
+    name: 'Administrativo',
+    email: 'administrativo@taller.cl',
+    role: 'Administrativo',
+  },
+  {
+    id: 'mecanico',
+    name: 'Mecánico',
+    email: 'mecanico@taller.cl',
+    role: 'Mecánico',
+  },
+];
 
 const toSoftAccent = (hexColor: string) => {
   const cleaned = hexColor.replace('#', '');
@@ -145,9 +181,9 @@ const serviceCatalogByCategory = [
       'Cambio de filtro de combustible',
       'Cambio de filtro de cabina',
       'Revision y relleno de fluidos',
-      'Cambio de liquido refrigerante',
-      'Cambio de liquido de frenos',
-      'Cambio de liquido direccion hidraulica',
+      'Cambio de líquido refrigerante',
+      'Cambio de líquido de frenos',
+      'Cambio de líquido dirección hidráulica',
       'Cambio de bujias',
       'Cambio de correas auxiliares',
       'Cambio de correa de distribucion',
@@ -199,7 +235,7 @@ const serviceCatalogByCategory = [
     ],
   },
   {
-    category: 'Transmision y embrague',
+    category: 'Transmisión y embrague',
     services: [
       'Revision de transmision manual',
       'Revision de transmision automatica',
@@ -233,13 +269,13 @@ const serviceCatalogByCategory = [
       'Cambio de cilindro de freno',
       'Cambio de bomba de freno',
       'Cambio de flexible de freno',
-      'Regulacion de freno de mano',
+      'Regulación de freno de mano',
       'Diagnostico ABS',
       'Reparacion ABS',
     ],
   },
   {
-    category: 'Suspension y direccion',
+    category: 'Suspensión y dirección',
     services: [
       'Revision de suspension',
       'Cambio de amortiguadores',
@@ -364,7 +400,7 @@ const serviceCatalogByCategory = [
       'Mantencion de flota',
       'Revision diaria de seguridad',
       'Checklist operacional',
-      'Preparacion para revision tecnica',
+      'Preparación para revisión técnica',
       'Servicio de emergencia',
       'Inspeccion post reparacion',
       'Lavado de motor',
@@ -456,6 +492,17 @@ function App() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   const [demoLoading, setDemoLoading] = useState(false);
+
+  const [workshopUsers, setWorkshopUsers] = useState<WorkshopUser[]>(() => {
+    const raw = localStorage.getItem('workshopUsers');
+    return raw ? JSON.parse(raw) : defaultWorkshopUsers;
+  });
+
+  const [userForm, setUserForm] = useState<{ name: string; email: string; role: UserRole }>({
+    name: '',
+    email: '',
+    role: 'Administrativo',
+  });
 
   const [inventoryItems, setInventoryItems] = useState<
     Array<{
@@ -571,6 +618,10 @@ function App() {
   }, [inventoryItems]);
 
   useEffect(() => {
+    localStorage.setItem('workshopUsers', JSON.stringify(workshopUsers));
+  }, [workshopUsers]);
+
+  useEffect(() => {
     if (!authToken || sessionRole !== 'member') {
       setVehicles([]);
       setLoading(false);
@@ -633,6 +684,48 @@ function App() {
     clearAuthToken();
     setAuthTokenState(null);
     setSessionRole(null);
+  };
+
+  const handleUserFormChange = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = event.target;
+    setUserForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleUserSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    const name = userForm.name.trim();
+    const email = userForm.email.trim();
+
+    if (!name || !email) {
+      showNotification('error', 'Completa el nombre y correo del usuario');
+      return;
+    }
+
+    const exists = workshopUsers.some((user) => user.email.toLowerCase() === email.toLowerCase());
+    if (exists) {
+      showNotification('error', 'Ya existe un usuario con ese correo');
+      return;
+    }
+
+    setWorkshopUsers((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        name,
+        email,
+        role: userForm.role,
+      },
+    ]);
+    setUserForm({ name: '', email: '', role: 'Administrativo' });
+    showNotification('success', 'Usuario creado correctamente');
+  };
+
+  const handleDeleteUser = (id: string) => {
+    setWorkshopUsers((prev) => prev.filter((user) => user.id !== id));
+    showNotification('success', 'Usuario eliminado');
   };
 
   const handleInventoryChange = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -856,6 +949,8 @@ function App() {
 
     codigo_motor: vehicle.codigo_motor || '',
 
+    color: vehicle.color || '',
+
 
 
     kilometraje: vehicle.kilometraje,
@@ -891,6 +986,8 @@ function App() {
 
 
     servicios: vehicle.servicios || [],
+
+    fallas_detectadas: vehicle.fallas_detectadas || [],
 
 
 
@@ -1380,6 +1477,7 @@ function App() {
 
     const services = parseStoredReviewServices(vehicle.servicios).map(serializeReviewService);
     const parts = parseStoredReviewParts(vehicle.servicios);
+    const failures = vehicle.fallas_detectadas || [];
 
 
 
@@ -1519,6 +1617,10 @@ function App() {
 
 
 
+    <tr><th>Color ingreso</th><td>${escapeHtml(vehicle.color || '-')}</td></tr>
+
+
+
     <tr><th>Estado</th><td>${escapeHtml(vehicle.estado)}</td></tr>
 
 
@@ -1547,6 +1649,15 @@ ${services.length === 0
 
 
 
+      }
+
+
+
+<h2>Fallas declaradas al ingreso</h2>
+
+${failures.length === 0
+        ? '<p class="muted">Sin fallas seleccionadas.</p>'
+        : `<ul>${failures.map((failure) => `<li>${escapeHtml(failure)}</li>`).join('')}</ul>`
       }
 
 
@@ -1779,36 +1890,12 @@ ${parts.length === 0
   };
 
 
-
-
-
-
-
   // const handleEdit = (vehicle: Vehicle) => {
-
-
 
   //   setEditingVehicle(vehicle);
 
-
-
   //   window.scrollTo({ top: 0, behavior: 'smooth' });
-
-
-
   // };
-
-
-
-
-
-
-
-
-
-
-
-
 
 
   const metrics = {
@@ -2226,11 +2313,11 @@ ${parts.length === 0
 
 
 
-              <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+              <div className="sticky top-4 z-20 mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
 
 
 
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
 
 
 
@@ -2296,6 +2383,27 @@ ${parts.length === 0
 
                   ))}
 
+                  {vehicleTab === 'ingreso' && (
+                    <div className="flex flex-wrap gap-3 lg:ml-auto">
+                      <button
+                        type="button"
+                        onClick={() => window.dispatchEvent(new Event('vehicle-form-clear'))}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-red-700 focus:ring-4 focus:ring-red-200"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Limpiar formulario
+                      </button>
+                      <button
+                        type="submit"
+                        form="vehicle-entry-form"
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-green-700 focus:ring-4 focus:ring-green-200"
+                      >
+                        <Send className="h-4 w-4" />
+                        Ingresar Vehículo
+                      </button>
+                    </div>
+                  )}
+
 
 
                 </div>
@@ -2354,7 +2462,7 @@ ${parts.length === 0
 
 
 
-                  <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                  <div className="hidden">
 
 
 
@@ -3603,6 +3711,12 @@ ${parts.length === 0
 
                               </p>
 
+                              <p className="text-xs text-gray-500">Color ingreso: {vehicle.color || '-'}</p>
+
+                              <p className="text-xs text-gray-500">
+                                Fallas: {vehicle.fallas_detectadas?.length || 0}
+                              </p>
+
 
 
                               <p className="text-xs text-gray-500">Estado: {vehicle.estado}</p>
@@ -3653,6 +3767,18 @@ ${parts.length === 0
 
 
 
+                              )}
+
+                              <p className="mt-4 text-xs uppercase tracking-wide text-gray-500">Fallas ingreso</p>
+
+                              {vehicle.fallas_detectadas && vehicle.fallas_detectadas.length > 0 ? (
+                                <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-gray-700">
+                                  {vehicle.fallas_detectadas.map((failure) => (
+                                    <li key={failure}>{failure}</li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="mt-2 text-xs text-gray-500">Sin fallas seleccionadas.</p>
                               )}
 
                               <p className="mt-4 text-xs uppercase tracking-wide text-gray-500">Repuestos</p>
@@ -4031,7 +4157,7 @@ ${parts.length === 0
 
 
 
-                      placeholder="Codigo de barras"
+                      placeholder="Código de barras"
 
 
 
@@ -4627,7 +4753,7 @@ ${parts.length === 0
 
 
 
-                              <p className="text-xs text-gray-500">Codigo: {item.barcode || '-'}</p>
+                              <p className="text-xs text-gray-500">Código: {item.barcode || '-'}</p>
 
 
 
@@ -4723,7 +4849,7 @@ ${parts.length === 0
 
 
 
-                <p className="text-sm text-gray-500">Arma un presupuesto simple de servicios mecanicos.</p>
+                <p className="text-sm text-gray-500">Arma un presupuesto simple de servicios mecánicos.</p>
 
 
 
@@ -4763,7 +4889,7 @@ ${parts.length === 0
 
 
 
-                      <p className="text-sm text-gray-500">Cliente, vehiculo y detalle del trabajo solicitado.</p>
+                      <p className="text-sm text-gray-500">Cliente, vehículo y detalle del trabajo solicitado.</p>
 
 
 
@@ -4827,7 +4953,7 @@ ${parts.length === 0
 
 
 
-                      placeholder="Telefono"
+                      placeholder="Teléfono"
 
 
 
@@ -4883,7 +5009,7 @@ ${parts.length === 0
 
 
 
-                      placeholder="Vehiculo"
+                      placeholder="Vehículo"
 
 
 
@@ -5063,7 +5189,7 @@ ${parts.length === 0
 
 
 
-                    <p className="text-sm text-gray-500">Vehiculo</p>
+                    <p className="text-sm text-gray-500">Vehículo</p>
 
 
 
@@ -5337,6 +5463,111 @@ ${parts.length === 0
 
             <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-6">
 
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Mantenedor de usuarios</h3>
+                <p className="text-sm text-gray-500">
+                  Crea usuarios y asigna perfiles de acceso por rol.
+                </p>
+              </div>
+
+              <form onSubmit={handleUserSubmit} className="grid grid-cols-1 gap-4 rounded-lg border border-gray-200 p-4 lg:grid-cols-4">
+                <div>
+                  <label htmlFor="user-name" className="mb-2 block text-sm font-medium text-gray-700">
+                    Nombre
+                  </label>
+                  <input
+                    id="user-name"
+                    name="name"
+                    type="text"
+                    value={userForm.name}
+                    onChange={handleUserFormChange}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    placeholder="Nombre del usuario"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="user-email" className="mb-2 block text-sm font-medium text-gray-700">
+                    Correo
+                  </label>
+                  <input
+                    id="user-email"
+                    name="email"
+                    type="email"
+                    value={userForm.email}
+                    onChange={handleUserFormChange}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    placeholder="usuario@taller.cl"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="user-role" className="mb-2 block text-sm font-medium text-gray-700">
+                    Perfil
+                  </label>
+                  <select
+                    id="user-role"
+                    name="role"
+                    value={userForm.role}
+                    onChange={handleUserFormChange}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  >
+                    {Object.keys(roleModules).map((role) => (
+                      <option key={role} value={role}>
+                        {role}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-end">
+                  <button
+                    type="submit"
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Crear usuario
+                  </button>
+                </div>
+              </form>
+
+              <div className="overflow-hidden rounded-lg border border-gray-200">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Usuario</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Perfil</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Accesos</th>
+                      <th className="px-4 py-3 text-right font-semibold text-gray-700">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {workshopUsers.map((user) => (
+                      <tr key={user.id}>
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-gray-900">{user.name}</p>
+                          <p className="text-xs text-gray-500">{user.email}</p>
+                        </td>
+                        <td className="px-4 py-3 font-medium text-gray-900">{user.role}</td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {roleModules[user.role].join(', ')}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUser(user.id)}
+                            className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Eliminar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
 
 
               <div>
@@ -5463,7 +5694,7 @@ ${parts.length === 0
 
 
 
-                    Boton principal
+                    Botón principal
 
 
 
@@ -5475,7 +5706,7 @@ ${parts.length === 0
 
 
 
-                    Boton secundario
+                    Botón secundario
 
 
 

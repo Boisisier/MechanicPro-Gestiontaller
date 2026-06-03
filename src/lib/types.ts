@@ -14,10 +14,12 @@ export interface Vehicle {
   tipo_vehiculo: string;
   codigo_vin?: string;
   codigo_motor?: string;
+  color?: string;
   kilometraje: number;
   cantidad_combustible: number;
   estado: VehicleStatus;
   servicios?: string[];
+  fallas_detectadas?: string[];
   observaciones: string;
   comentario_tecnico?: string;
   fecha_ingreso: string;

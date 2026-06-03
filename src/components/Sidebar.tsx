@@ -10,13 +10,28 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activeSection, onSectionChange, isOpen, onClose }: SidebarProps) {
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'vehiculos', label: 'Vehículos', icon: Car },
-    { id: 'presupuesto', label: 'Presupuesto', icon: Calculator },
-    { id: 'inventario', label: 'Inventario', icon: Package },
-    { id: 'reportes', label: 'Reportes', icon: FileText },
-    { id: 'configuracion', label: 'Configuración', icon: Settings },
+  const menuSections = [
+    {
+      title: 'Principal',
+      items: [
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      ],
+    },
+    {
+      title: 'Taller',
+      items: [
+        { id: 'vehiculos', label: 'Vehículos', icon: Car },
+        { id: 'presupuesto', label: 'Presupuesto', icon: Calculator },
+        { id: 'inventario', label: 'Inventario', icon: Package },
+        { id: 'reportes', label: 'Reportes', icon: FileText },
+      ],
+    },
+    {
+      title: 'Sistema',
+      items: [
+        { id: 'configuracion', label: 'Configuración', icon: Settings },
+      ],
+    },
   ];
 
   const handleSectionChange = (section: string) => {
@@ -31,59 +46,67 @@ export default function Sidebar({ activeSection, onSectionChange, isOpen, onClos
       )}
 
       <aside
-        className={`w-64 bg-white border-r border-gray-200 h-screen fixed left-0 top-0 flex flex-col z-50 transition-transform duration-300 ${
+        className={`w-64 bg-[#0f3a63] border-r border-blue-900/30 h-screen fixed left-0 top-0 flex flex-col z-50 transition-transform duration-300 ${
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-6 border-b border-white/15">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div
-                className="w-10 h-10 rounded-lg flex items-center justify-center shadow-sm"
-                style={{ backgroundColor: 'var(--accent)' }}
+                className="w-10 h-10 rounded-lg flex items-center justify-center bg-white/15 shadow-sm"
               >
                 <Car className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">MechanicPro</h1>
-                <p className="text-xs text-gray-500">Gestión de taller</p>
+                <h1 className="text-xl font-bold text-white">MechanicPro</h1>
+                <p className="text-xs text-white">Gestión de taller</p>
               </div>
             </div>
-            <button onClick={onClose} className="lg:hidden text-gray-500 hover:text-gray-700">
+            <button onClick={onClose} className="lg:hidden text-white/80 hover:text-white">
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
         <nav className="flex-1 p-4 overflow-y-auto">
-          <ul className="space-y-2">
-            {menuItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeSection === item.id;
+          <div className="space-y-6">
+            {menuSections.map((section) => (
+              <div key={section.title}>
+                <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-wide text-white">
+                  {section.title}
+                </p>
+                <ul className="space-y-2">
+                  {section.items.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeSection === item.id;
 
-              return (
-                <li key={item.id}>
-                  <button
-                    onClick={() => handleSectionChange(item.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                      isActive
-                        ? 'bg-accent-soft text-accent font-medium'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    }`}
-                  >
-                    <Icon className="w-5 h-5" />
-                    <span>{item.label}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+                    return (
+                      <li key={item.id}>
+                        <button
+                          onClick={() => handleSectionChange(item.id)}
+                          className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-white transition-colors ${
+                            isActive
+                              ? 'bg-white/20 font-semibold shadow-sm'
+                              : 'hover:bg-white/10'
+                          }`}
+                        >
+                          <Icon className="w-5 h-5 text-white" />
+                          <span>{item.label}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
         </nav>
 
-        <div className="p-4 border-t border-gray-200">
-          <div className="px-4 py-3 bg-gray-50 rounded-lg">
-            <p className="text-xs text-gray-500 mb-1">Sistema activo</p>
-            <p className="text-sm font-medium text-gray-900">Versión 1.0</p>
+        <div className="p-4 border-t border-white/15">
+          <div className="px-4 py-3 bg-white/10 rounded-lg">
+            <p className="text-xs text-white mb-1">Sistema activo</p>
+            <p className="text-sm font-medium text-white">Versión 1.0</p>
           </div>
         </div>
       </aside>
