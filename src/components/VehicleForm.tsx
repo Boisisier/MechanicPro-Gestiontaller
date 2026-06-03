@@ -27,7 +27,7 @@ export interface VehicleFormData {
   codigo_motor: string;
   kilometraje: number;
   cantidad_combustible: number;
-  estado: 'En taller' | 'Entregado' | 'En revisión';
+  estado: 'En taller' | 'Entregado' | 'En revision';
   customer_name: string;
   customer_rut: string;
   customer_phone: string;

@@ -97,29 +97,6 @@ CREATE TABLE IF NOT EXISTS ingreso (
   fecha_ingreso timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS invitations (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  id_empresa uuid NOT NULL REFERENCES empresa(id) ON DELETE CASCADE,
-  email text NOT NULL,
-  role text NOT NULL,
-  token text UNIQUE NOT NULL,
-  expires_at timestamptz NOT NULL,
-  used_at timestamptz,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT invitations_role_chk CHECK (role IN ('admin', 'mecanico', 'recepcionista'))
-);
-
-CREATE TABLE IF NOT EXISTS support_sessions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  id_empresa uuid NOT NULL REFERENCES empresa(id) ON DELETE CASCADE,
-  owner_email text NOT NULL,
-  token text UNIQUE NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  expires_at timestamptz NOT NULL,
-  ended_at timestamptz
-);
-
-CREATE OR REPLACE FUNCTION set_updated_at()
 RETURNS trigger AS $$
 BEGIN
   NEW.updated_at = now();
@@ -149,9 +126,3 @@ CREATE INDEX IF NOT EXISTS idx_vehiculo_patente ON vehiculo(patente);
 CREATE INDEX IF NOT EXISTS idx_vehiculo_empresa_patente ON vehiculo(id_empresa, patente);
 --CREATE INDEX IF NOT EXISTS idx_vehiculo_estado ON vehiculo(estado);
 --CREATE INDEX IF NOT EXISTS idx_vehiculo_fecha_ingreso ON vehiculo(fecha_ingreso DESC);
-CREATE INDEX IF NOT EXISTS idx_invitations_empresa_id ON invitations(id_empresa);
-CREATE INDEX IF NOT EXISTS idx_invitations_email ON invitations(email);
-CREATE INDEX IF NOT EXISTS idx_invitations_token ON invitations(token);
-CREATE INDEX IF NOT EXISTS idx_support_sessions_empresa_id ON support_sessions(id_empresa);
-CREATE INDEX IF NOT EXISTS idx_support_sessions_owner_email ON support_sessions(owner_email);
-CREATE INDEX IF NOT EXISTS idx_support_sessions_token ON support_sessions(token);

@@ -1,22 +1,12 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 
 import {
-  adminAddCompanyMember,
-  adminCreateCompany,
-  adminCreateUser,
-  adminCreateInvitation,
-  adminGetCompanies,
-  adminGetSupportSessions,
-  adminImpersonate,
   clearAuthToken,
   createVehicle,
-  deleteVehicle,
   getAuthToken,
   getSession,
   getVehicles,
-  login,
   loginDemo,
-  loginOwner,
   setAuthToken,
   updateVehicle,
 } from './lib/api';
@@ -439,7 +429,6 @@ const serializeReviewPart = (part: ReviewPartItem) =>
 
 
 function App() {
-  const isOwnerRoute = window.location.pathname.startsWith('/owner');
   const [theme, setTheme] = useState<'light' | 'dark'>(() =>
     localStorage.getItem('theme') === 'dark' ? 'dark' : 'light'
   );
@@ -462,43 +451,11 @@ function App() {
 
   const [authToken, setAuthTokenState] = useState<string | null>(() => getAuthToken());
 
-  const [sessionRole, setSessionRole] = useState<'owner' | 'member' | null>(null);
+  const [sessionRole, setSessionRole] = useState<'member' | null>(null);
 
   const [authError, setAuthError] = useState<string | null>(null);
 
-  const [loginForm, setLoginForm] = useState({
-    email: '',
-    password: '',
-  });
-
-  const [loginLoading, setLoginLoading] = useState(false);
-
   const [demoLoading, setDemoLoading] = useState(false);
-
-  const [ownerForm, setOwnerForm] = useState({
-    email: '',
-    password: '',
-  });
-
-  const [ownerLoading, setOwnerLoading] = useState(false);
-
-  const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([]);
-
-  const [adminCompanyName, setAdminCompanyName] = useState('');
-
-  const [adminCompanyEmail, setAdminCompanyEmail] = useState('');
-
-  const [adminCompanyPassword, setAdminCompanyPassword] = useState('');
-
-  const [adminInvite, setAdminInvite] = useState({
-    companyId: '',
-    email: '',
-    role: 'admin',
-  });
-
-  const [adminLoading, setAdminLoading] = useState(false);
-
-  const [adminInviteResult, setAdminInviteResult] = useState<string | null>(null);
 
   const [inventoryItems, setInventoryItems] = useState<
     Array<{
@@ -542,20 +499,6 @@ function App() {
   });
 
   const [barcodeInput, setBarcodeInput] = useState('');
-
-  const [supportSessions, setSupportSessions] = useState<
-    Array<{
-      id: string;
-      company_id: string;
-      company_name: string;
-      owner_email: string;
-      created_at: string;
-      expires_at: string;
-      ended_at: string | null;
-    }>
-  >([]);
-
-  const [supportMode, setSupportMode] = useState(false);
 
   const [vehicleTab, setVehicleTab] = useState<'ingreso' | 'revision' | 'salida'>('ingreso');
 
@@ -601,18 +544,12 @@ function App() {
     }
     const loadSession = async () => {
       try {
-        const session = await getSession();
-        if (session.role === 'owner') {
-          setSessionRole('owner');
-        } else {
-          setSessionRole('member');
-        }
-        setSupportMode(!!session.support);
+        await getSession();
+        setSessionRole('member');
       } catch (error) {
         clearAuthToken();
         setAuthTokenState(null);
         setSessionRole(null);
-        setSupportMode(false);
       }
     };
     loadSession();
@@ -662,25 +599,6 @@ function App() {
   }, [authToken, sessionRole]);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const supportToken = params.get('support');
-    if (supportToken) {
-      setAuthToken(supportToken);
-      setAuthTokenState(supportToken);
-      params.delete('support');
-      const cleanUrl =
-        window.location.pathname + (params.toString() ? `ó${params.toString()}` : '');
-      window.history.replaceState({}, '', cleanUrl);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (authToken && sessionRole === 'owner') {
-      loadCompanies();
-    }
-  }, [authToken, sessionRole]);
-
-  useEffect(() => {
     if (reviewVehicleId && !vehicles.find((item) => item.id === reviewVehicleId)) {
       setReviewVehicleId(null);
       setReviewServices([]);
@@ -694,39 +612,7 @@ function App() {
     setTimeout(() => setNotification(null), 4000);
   };
 
-  const handleLoginChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = event.target;
-    setLoginForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleOwnerChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = event.target;
-    setOwnerForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleLogin = async (event: FormEvent) => {
-    event.preventDefault();
-    setAuthError(null);
-    setLoginLoading(true);
-    try {
-      const session = await login({
-        email: loginForm.email.trim(),
-        password: loginForm.password,
-      });
-      setAuthToken(session.token);
-      setAuthTokenState(session.token);
-      setSessionRole('member');
-      showNotification('success', 'Sesión iniciada correctamente');
-    } catch (error) {
-      console.error('Login failed', error);
-      setAuthError('No se pudo iniciar Sesión');
-    } finally {
-      setLoginLoading(false);
-    }
-  };
-
   const handleDemoLogin = async () => {
-    setAuthError(null);
     setDemoLoading(true);
     try {
       const session = await loginDemo();
@@ -742,103 +628,11 @@ function App() {
     }
   };
 
-  const handleOwnerLogin = async (event: FormEvent) => {
-    event.preventDefault();
-    setAuthError(null);
-    setOwnerLoading(true);
-    try {
-      const session = await loginOwner({
-        email: ownerForm.email.trim(),
-        password: ownerForm.password,
-      });
-      setAuthToken(session.token);
-      setAuthTokenState(session.token);
-      setSessionRole('owner');
-      showNotification('success', 'Sesión de owner iniciada');
-    } catch (error) {
-      console.error('Owner login failed', error);
-      setAuthError('No se pudo iniciar Sesión como owner');
-    } finally {
-      setOwnerLoading(false);
-    }
-  };
 
   const handleLogout = () => {
     clearAuthToken();
     setAuthTokenState(null);
     setSessionRole(null);
-    setSupportMode(false);
-  };
-
-  const loadCompanies = async () => {
-    try {
-      const data = await adminGetCompanies();
-      setCompanies(data);
-      if (!adminInvite.companyId && data.length > 0) {
-        setAdminInvite((prev) => ({ ...prev, companyId: data[0].id }));
-      }
-      const sessions = await adminGetSupportSessions();
-      setSupportSessions(sessions);
-    } catch (error) {
-      console.error('Load companies failed', error);
-      showNotification('error', 'No se pudo cargar las empresas');
-    }
-  };
-
-  const handleAdminCreateCompany = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!adminCompanyName.trim() || !adminCompanyEmail.trim() || !adminCompanyPassword.trim()) {
-      return;
-    }
-    setAdminLoading(true);
-    try {
-      const company = await adminCreateCompany(adminCompanyName.trim());
-      const user = await adminCreateUser({
-        full_name: adminCompanyName.trim(),
-        email: adminCompanyEmail.trim(),
-        password: adminCompanyPassword,
-      });
-      await adminAddCompanyMember(company.id, { user_id: user.id, role: 'admin' });
-      setAdminCompanyName('');
-      setAdminCompanyEmail('');
-      setAdminCompanyPassword('');
-      await loadCompanies();
-      showNotification('success', 'Empresa y usuario admin creados');
-    } catch (error) {
-      console.error('Admin create company failed', error);
-      if (error instanceof Error && error.message === 'email_exists') {
-        showNotification('error', 'El correo de empresa ya estï¿½ registrado');
-      } else {
-        showNotification('error', 'No se pudo crear la empresa');
-      }
-    } finally {
-      setAdminLoading(false);
-    }
-  };
-  
-  const handleAdminInviteChange = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = event.target;
-    setAdminInvite((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleAdminCreateInvite = async (event: FormEvent) => {
-    event.preventDefault();
-    setAdminLoading(true);
-    setAdminInviteResult(null);
-    try {
-      const result = await adminCreateInvitation({
-        company_id: adminInvite.companyId,
-        email: adminInvite.email.trim(),
-        role: adminInvite.role,
-      });
-      setAdminInviteResult(result.invite_url);
-      showNotification('success', 'Invitación creada');
-    } catch (error) {
-      console.error('Admin invite failed', error);
-      showNotification('error', 'No se pudo crear la Invitación');
-    } finally {
-      setAdminLoading(false);
-    }
   };
 
   const handleInventoryChange = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -1032,63 +826,6 @@ function App() {
     setBudgetService({ name: '', price: 0 });
     setBudgetItems([]);
   };
-
-  const handleImpersonate = async (companyId: string) => {
-
-
-
-    try {
-
-
-
-      const result = await adminImpersonate(companyId);
-
-
-
-      const url = `${window.location.origin}/ósupport=${result.token}`;
-
-
-
-      window.open(url, '_blank');
-
-
-
-      showNotification('success', 'Sesión de soporte abierta');
-
-
-
-      const sessions = await adminGetSupportSessions();
-
-
-
-      setSupportSessions(sessions);
-
-
-
-    } catch (error) {
-
-
-
-      console.error('Impersonate failed', error);
-
-
-
-      showNotification('error', 'No se pudo iniciar soporte');
-
-
-
-    }
-
-
-
-  };
-
-
-
-
-
-
-
   const buildVehiclePayload = (vehicle: Vehicle, overrides: Partial<Vehicle>) => ({
 
 
@@ -2067,43 +1804,6 @@ ${parts.length === 0
 
 
 
-  const handleDelete = async (id: string) => {
-
-
-
-    try {
-
-
-
-      await deleteVehicle(id);
-
-
-
-      setVehicles((prev) => prev.filter((vehicle) => vehicle.id !== id));
-
-
-
-      showNotification('success', 'vehí­culo eliminado correctamente');
-
-
-
-    } catch (error) {
-
-
-
-      showNotification('error', 'Error al eliminar el vehí­culo');
-
-
-
-      console.error('Error:', error);
-
-
-
-    }
-
-
-
-  };
 
 
 
@@ -2212,40 +1912,6 @@ ${parts.length === 0
 
   const notifications = [
 
-
-
-    supportMode
-
-
-
-      ? {
-
-
-
-        id: 'support',
-
-
-
-        title: 'Modo soporte activo',
-
-
-
-        body: 'Estas en solo lectura dentro de la cuenta del cliente.',
-
-
-
-        time: 'Ahora',
-
-
-
-      }
-
-
-
-      : null,
-
-
-
     lowStockItems.length > 0
 
 
@@ -2336,613 +2002,33 @@ ${parts.length === 0
 
   const budgetTotal = budgetItems.reduce((sum, item) => sum + item.price, 0);
 
-  if (!authToken && isOwnerRoute) {
-
-
-
-    return (
-
-
-
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-10">
-
-
-
-        <div className="w-full max-w-xl bg-white border border-gray-200 rounded-2xl shadow-sm p-8">
-
-
-
-          <h1 className="text-2xl font-bold text-gray-900">Acceso owner</h1>
-
-
-
-          <p className="text-sm text-gray-500 mt-2">
-
-
-
-            Ingresa con tus credenciales de owner para administrar empresas.
-
-
-
-          </p>
-
-
-
-
-
-
-
-          {authError && (
-
-
-
-            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-
-
-
-              {authError}
-
-
-
-            </div>
-
-
-
-          )}
-
-
-
-
-
-
-
-          <form className="mt-6 space-y-4" onSubmit={handleOwnerLogin}>
-
-
-
-            <div className="grid grid-cols-1 gap-4">
-
-
-
-              <div>
-
-
-
-                <label className="text-sm font-medium text-gray-700">Email owner</label>
-
-
-
-                <input
-
-
-
-                  type="email"
-
-
-
-                  name="email"
-
-
-
-                  value={ownerForm.email}
-
-
-
-                  onChange={handleOwnerChange}
-
-
-
-                  className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-
-
-
-                  placeholder="owner@local"
-
-
-
-                  required
-
-
-
-                />
-
-
-
-                        </div>
-
-
-
-                        <div className="mb-6 space-y-3">
-                          <div className="flex items-center justify-between gap-3">
-                            <h4 className="text-sm font-semibold text-gray-900">Repuestos utilizados</h4>
-                            <span className="text-xs text-gray-500">{reviewParts.length} seleccionado(s)</span>
-                          </div>
-
-                          {reviewParts.length === 0 ? (
-                            <p className="rounded-lg border border-dashed border-gray-300 px-4 py-5 text-sm text-gray-500">
-                              No hay repuestos seleccionados todavia.
-                            </p>
-                          ) : (
-                            reviewParts.map((part) => {
-                              const inventoryItem = inventoryItems.find((item) => item.id === part.inventoryItemId);
-                              const savedQuantity =
-                                parseStoredReviewParts(activeReviewVehicle.servicios).find(
-                                  (savedPart) => savedPart.inventoryItemId === part.inventoryItemId
-                                )?.quantity || 0;
-                              const availableQuantity = (inventoryItem?.stock || 0) + savedQuantity;
-                              return (
-                                <div
-                                  key={part.inventoryItemId}
-                                  className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 p-4 md:grid-cols-[minmax(0,1fr)_140px_44px]"
-                                >
-                                  <div>
-                                    <p className="text-sm font-semibold text-gray-900">{part.name}</p>
-                                    <p className="text-xs text-gray-500">
-                                      SKU: {part.sku || '-'} · Bodega: {part.location || '-'} · Stock disponible:{' '}
-                                      {availableQuantity} {part.unit}
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                                      Cantidad
-                                    </label>
-                                    <input
-                                      type="number"
-                                      min="1"
-                                      max={Math.max(1, availableQuantity)}
-                                      value={part.quantity}
-                                      onChange={(event) =>
-                                        handleReviewPartQuantityChange(
-                                          part.inventoryItemId,
-                                          parseInt(event.target.value) || 1
-                                        )
-                                      }
-                                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                                    />
-                                  </div>
-                                  <div className="flex items-end">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleRemoveReviewPart(part.inventoryItemId)}
-                                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
-                                      title="Eliminar repuesto"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
-
-
-
-                        <div>
-
-
-
-                <label className="text-sm font-medium text-gray-700">Password</label>
-
-
-
-                <input
-
-
-
-                  type="password"
-
-
-
-                  name="password"
-
-
-
-                  value={ownerForm.password}
-
-
-
-                  onChange={handleOwnerChange}
-
-
-
-                  className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-
-
-
-                  placeholder="Password owner"
-
-
-
-                  required
-
-
-
-                />
-
-
-
-              </div>
-
-
-
-            </div>
-
-
-
-            <button
-
-
-
-              type="submit"
-
-
-
-              disabled={ownerLoading}
-
-
-
-              className="w-full rounded-lg btn-primary px-4 py-2 text-sm font-semibold disabled:opacity-60"
-
-
-
-            >
-
-
-
-              {ownerLoading ? 'Ingresando...' : 'Ingresar como owner'}
-
-
-
-            </button>
-
-
-
-          </form>
-
-
-
-        </div>
-
-
-
-      </div>
-
-
-
-    );
-
-
-
-  }
-
-
-
-
-
-
-
   if (!authToken) {
-
-
-
     return (
-
-
-
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-10">
-
-
-
-        <div className="w-full max-w-3xl bg-white border border-gray-200 rounded-2xl shadow-sm p-8">
-
-
-
+        <div className="w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-sm p-8">
           <h1 className="text-2xl font-bold text-gray-900">Acceso al sistema</h1>
-
-
-
           <p className="text-sm text-gray-500 mt-2">
-
-
-
-            Ingresa con tu cuenta o usa el acceso demo para cargar datos reales.
-
-
-
+            Ingresa con el acceso general para trabajar con una empresa persistente.
           </p>
 
-
-
-
-
-
-
           {authError && (
-
-
-
             <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-
-
-
               {authError}
-
-
-
             </div>
-
-
-
           )}
 
-
-
-
-
-
-
-          <form className="mt-6 space-y-4" onSubmit={handleLogin}>
-
-
-
-            <h2 className="text-sm font-medium text-gray-700">Ingresar</h2>
-
-
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-
-
-
-              <div>
-
-
-
-                <label className="text-sm font-medium text-gray-700">Email</label>
-
-
-
-                <input
-
-
-
-                  type="email"
-
-
-
-                  name="email"
-
-
-
-                  value={loginForm.email}
-
-
-
-                  onChange={handleLoginChange}
-
-
-
-                  className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-
-
-
-                  placeholder="correo@empresa.com"
-
-
-
-                  required
-
-
-
-                />
-
-
-
-              </div>
-
-
-
-              <div>
-
-
-
-                <label className="text-sm font-medium text-gray-700">Password</label>
-
-
-
-                <input
-
-
-
-                  type="password"
-
-
-
-                  name="password"
-
-
-
-                  value={loginForm.password}
-
-
-
-                  onChange={handleLoginChange}
-
-
-
-                  className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-
-
-
-                  placeholder="Tu password"
-
-
-
-                  required
-
-
-
-                />
-
-
-
-              </div>
-
-
-
-
-
-
-            </div>
-
-
-
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-
-
-
-              <button
-
-
-
-                type="submit"
-
-
-
-                disabled={loginLoading || demoLoading}
-
-
-
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-
-
-
-              >
-
-
-
-                {loginLoading ? 'Ingresando...' : 'Ingresar'}
-
-
-
-              </button>
-
-
-
-              <button
-
-
-
-                type="button"
-
-
-
-                onClick={handleDemoLogin}
-
-
-
-                disabled={loginLoading || demoLoading}
-
-
-
-                className="w-full rounded-lg btn-primary px-4 py-2 text-sm font-semibold disabled:opacity-60"
-
-
-
-              >
-
-
-
-                {demoLoading ? 'Preparando demo...' : 'Entrar con demo'}
-
-
-
-              </button>
-
-
-
-            </div>
-
-
-
-            <p className="text-xs text-gray-500">
-
-
-
-              El acceso demo crea o reutiliza una empresa persistente para que puedas guardar datos y mostrar un preview real.
-
-
-
-            </p>
-
-
-
-          </form>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          <div className="my-6 border-t border-gray-200" />
-
-
-
-
-
-
-
-          <a
-
-
-
-            href="/owner"
-
-
-
-            className="block w-full rounded-lg border border-gray-300 px-4 py-2 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
-
-
-
+          <button
+            type="button"
+            onClick={handleDemoLogin}
+            disabled={demoLoading}
+            className="mt-6 w-full rounded-lg btn-primary px-4 py-3 text-sm font-semibold disabled:opacity-60"
           >
-
-
-
-            Acceso owner
-
-
-
-          </a>
-
-
-
+            {demoLoading ? 'Preparando acceso...' : 'Entrar al sistema'}
+          </button>
         </div>
-
-
-
       </div>
-
-
-
     );
-
-
-
   }
-
-
-
-
-
-
 
   if (!sessionRole) {
 
@@ -2961,848 +2047,6 @@ ${parts.length === 0
 
 
           <p className="text-gray-500">Cargando Sesión...</p>
-
-
-
-        </div>
-
-
-
-      </div>
-
-
-
-    );
-
-
-
-  }
-
-
-
-
-
-
-
-  if (isOwnerRoute && sessionRole !== 'owner') {
-
-
-
-    return (
-
-
-
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-10">
-
-
-
-        <div className="w-full max-w-xl bg-white border border-gray-200 rounded-2xl shadow-sm p-8">
-
-
-
-          <h1 className="text-2xl font-bold text-gray-900">Acceso restringido</h1>
-
-
-
-          <p className="text-sm text-gray-500 mt-2">
-
-
-
-            Este panel es solo para owner.
-
-
-
-          </p>
-
-
-
-          <button
-
-
-
-            onClick={handleLogout}
-
-
-
-            className="mt-6 rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-
-
-
-          >
-
-
-
-            Cerrar Sesión
-
-
-
-          </button>
-
-
-
-        </div>
-
-
-
-      </div>
-
-
-
-    );
-
-
-
-  }
-
-
-
-
-
-
-
-  if (sessionRole === 'owner' && !isOwnerRoute) {
-
-
-
-    return (
-
-
-
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-10">
-
-
-
-        <div className="w-full max-w-xl bg-white border border-gray-200 rounded-2xl shadow-sm p-8">
-
-
-
-          <h1 className="text-2xl font-bold text-gray-900">Panel owner separado</h1>
-
-
-
-          <p className="text-sm text-gray-500 mt-2">
-
-
-
-            Accede al panel owner en /owner.
-
-
-
-          </p>
-
-
-
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-
-
-
-            <a
-
-
-
-              href="/owner"
-
-
-
-              className="rounded-lg btn-primary px-4 py-2 text-sm font-semibold text-center"
-
-
-
-            >
-
-
-
-              Ir a /owner
-
-
-
-            </a>
-
-
-
-            <button
-
-
-
-              onClick={handleLogout}
-
-
-
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-
-
-
-            >
-
-
-
-              Cerrar Sesión
-
-
-
-            </button>
-
-
-
-          </div>
-
-
-
-        </div>
-
-
-
-      </div>
-
-
-
-    );
-
-
-
-  }
-
-
-
-
-
-
-
-  if (sessionRole === 'owner' && isOwnerRoute) {
-
-
-
-    return (
-
-
-
-      <div className="min-h-screen bg-gray-50 px-4 py-10">
-
-
-
-        <div className="max-w-4xl mx-auto space-y-6">
-
-
-
-          <div className="flex items-center justify-between">
-
-
-
-            <div>
-
-
-
-              <h1 className="text-2xl font-bold text-gray-900">Panel owner</h1>
-
-
-
-              <p className="text-sm text-gray-500">
-
-
-
-                Crea empresas y genera invitaciones para clientes.
-
-
-
-              </p>
-
-
-
-            </div>
-
-
-
-            <button
-
-
-
-              onClick={handleLogout}
-
-
-
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-
-
-
-            >
-
-
-
-              Salir
-
-
-
-            </button>
-
-
-
-          </div>
-
-
-
-
-
-
-
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-
-
-
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Crear empresa</h2>
-
-
-
-            <form onSubmit={handleAdminCreateCompany} className="grid grid-cols-1 gap-4 md:grid-cols-3">
-
-              <input
-
-                value={adminCompanyName}
-
-                onChange={(event) => setAdminCompanyName(event.target.value)}
-
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-
-                placeholder="Nombre de la empresa"
-
-                required
-
-              />
-
-              <input
-
-                type="email"
-
-                value={adminCompanyEmail}
-
-                onChange={(event) => setAdminCompanyEmail(event.target.value)}
-
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-
-                placeholder="Correo de la empresa"
-
-                required
-
-              />
-
-              <input
-
-                type="password"
-
-                value={adminCompanyPassword}
-
-                onChange={(event) => setAdminCompanyPassword(event.target.value)}
-
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-
-                placeholder="Contraseï¿½a de empresa"
-
-                required
-
-              />
-
-              <button
-
-                type="submit"
-
-                disabled={adminLoading}
-
-                className="rounded-lg btn-primary px-4 py-2 text-sm font-semibold disabled:opacity-60 md:col-span-3"
-
-              >
-
-                {adminLoading ? 'Creando...' : 'Crear'}
-
-              </button>
-
-            </form>
-
-
-
-          </div>
-
-
-
-
-
-
-
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-
-
-
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Empresas</h2>
-
-
-
-            {companies.length === 0 ? (
-
-
-
-              <p className="text-sm text-gray-500">No hay empresas registradas.</p>
-
-
-
-            ) : (
-
-
-
-              <div className="space-y-3">
-
-
-
-                {companies.map((company) => (
-
-
-
-                  <div
-
-
-
-                    key={company.id}
-
-
-
-                    className="flex flex-col gap-1 rounded-lg border border-gray-200 px-4 py-3"
-
-
-
-                  >
-
-
-
-                    <span className="text-sm font-semibold text-gray-900">{company.name}</span>
-
-
-
-                    <span className="text-xs text-gray-500">{company.id}</span>
-
-
-
-                    <button
-
-
-
-                      onClick={() => handleImpersonate(company.id)}
-
-
-
-                      className="mt-2 w-fit rounded-lg border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-
-
-
-                    >
-
-
-
-                      Entrar como cliente
-
-
-
-                    </button>
-
-
-
-                  </div>
-
-
-
-                ))}
-
-
-
-              </div>
-
-
-
-            )}
-
-
-
-          </div>
-
-
-
-
-
-
-
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-
-
-
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Invitar usuarios</h2>
-
-
-
-            <form onSubmit={handleAdminCreateInvite} className="space-y-4">
-
-
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-
-
-
-                <div>
-
-
-
-                  <label className="text-sm font-medium text-gray-700">Empresa</label>
-
-
-
-                  <select
-
-
-
-                    name="companyId"
-
-
-
-                    value={adminInvite.companyId}
-
-
-
-                    onChange={handleAdminInviteChange}
-
-
-
-                    className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-
-
-
-                    required
-
-
-
-                  >
-
-
-
-                    <option value="" disabled>
-
-
-
-                      Selecciona una empresa
-
-
-
-                    </option>
-
-
-
-                    {companies.map((company) => (
-
-
-
-                      <option key={company.id} value={company.id}>
-
-
-
-                        {company.name}
-
-
-
-                      </option>
-
-
-
-                    ))}
-
-
-
-                  </select>
-
-
-
-                </div>
-
-
-
-                <div>
-
-
-
-                  <label className="text-sm font-medium text-gray-700">Email</label>
-
-
-
-                  <input
-
-
-
-                    name="email"
-
-
-
-                    value={adminInvite.email}
-
-
-
-                    onChange={handleAdminInviteChange}
-
-
-
-                    className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-
-
-
-                    placeholder="cliente@empresa.com"
-
-
-
-                    required
-
-
-
-                  />
-
-
-
-                </div>
-
-
-
-                <div>
-
-
-
-                  <label className="text-sm font-medium text-gray-700">Rol</label>
-
-
-
-                  <select
-
-
-
-                    name="role"
-
-
-
-                    value={adminInvite.role}
-
-
-
-                    onChange={handleAdminInviteChange}
-
-
-
-                    className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-
-
-
-                    required
-
-
-
-                  >
-
-
-
-                    <option value="admin">Admin</option>
-
-
-
-                    <option value="mecanico">Mecanico</option>
-
-
-
-                    <option value="recepcionista">Recepcionista</option>
-
-
-
-                  </select>
-
-
-
-                </div>
-
-
-
-              </div>
-
-
-
-              <button
-
-
-
-                type="submit"
-
-
-
-                disabled={adminLoading}
-
-
-
-                className="w-full rounded-lg btn-primary px-4 py-2 text-sm font-semibold disabled:opacity-60"
-
-
-
-              >
-
-
-
-                {adminLoading ? 'Generando...' : 'Generar Invitación'}
-
-
-
-              </button>
-
-
-
-            </form>
-
-
-
-
-
-
-
-            {adminInviteResult && (
-
-
-
-              <div className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-
-
-
-                Link de Invitación:
-
-
-
-                <div className="mt-2 break-all text-xs">{adminInviteResult}</div>
-
-
-
-              </div>
-
-
-
-            )}
-
-
-
-          </div>
-
-
-
-
-
-
-
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-
-
-
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Sesiones de soporte</h2>
-
-
-
-            {supportSessions.length === 0 ? (
-
-
-
-              <p className="text-sm text-gray-500">No hay sesiones recientes.</p>
-
-
-
-            ) : (
-
-
-
-              <div className="space-y-3">
-
-
-
-                {supportSessions.map((session) => (
-
-
-
-                  <div
-
-
-
-                    key={session.id}
-
-
-
-                    className="rounded-lg border border-gray-200 px-4 py-3 text-sm"
-
-
-
-                  >
-
-
-
-                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-
-
-
-                      <div>
-
-
-
-                        <p className="font-semibold text-gray-900">{session.company_name}</p>
-
-
-
-                        <p className="text-xs text-gray-500">{session.company_id}</p>
-
-
-
-                      </div>
-
-
-
-                      <div className="text-xs text-gray-500">
-
-
-
-                        {new Date(session.created_at).toLocaleString('es-ES')}
-
-
-
-                      </div>
-
-
-
-                    </div>
-
-
-
-                    <p className="text-xs text-gray-500 mt-2">
-
-
-
-                      Owner: {session.owner_email} Â· Expira:{' '}
-
-
-
-                      {new Date(session.expires_at).toLocaleString('es-ES')}
-
-
-
-                    </p>
-
-
-
-                  </div>
-
-
-
-                ))}
-
-
-
-              </div>
-
-
-
-            )}
-
-
-
-          </div>
 
 
 
@@ -3955,30 +2199,6 @@ ${parts.length === 0
 
 
             </div>
-
-
-
-          </div>
-
-
-
-        )}
-
-
-
-
-
-
-
-        {supportMode && (
-
-
-
-          <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-3 text-sm text-yellow-800">
-
-
-
-            Modo soporte activo: solo lectura.
 
 
 
@@ -4824,11 +3044,77 @@ ${parts.length === 0
 
 
 
+                        </div>
+
+
+
+                        <div className="mb-6 space-y-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <h4 className="text-sm font-semibold text-gray-900">Repuestos utilizados</h4>
+                            <span className="text-xs text-gray-500">{reviewParts.length} seleccionado(s)</span>
+                          </div>
+
+                          {reviewParts.length === 0 ? (
+                            <p className="rounded-lg border border-dashed border-gray-300 px-4 py-5 text-sm text-gray-500">
+                              No hay repuestos seleccionados todavia.
+                            </p>
+                          ) : (
+                            reviewParts.map((part) => {
+                              const inventoryItem = inventoryItems.find((item) => item.id === part.inventoryItemId);
+                              const savedQuantity =
+                                parseStoredReviewParts(activeReviewVehicle.servicios).find(
+                                  (savedPart) => savedPart.inventoryItemId === part.inventoryItemId
+                                )?.quantity || 0;
+                              const availableQuantity = (inventoryItem?.stock || 0) + savedQuantity;
+                              return (
+                                <div
+                                  key={part.inventoryItemId}
+                                  className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 p-4 md:grid-cols-[minmax(0,1fr)_140px_44px]"
+                                >
+                                  <div>
+                                    <p className="text-sm font-semibold text-gray-900">{part.name}</p>
+                                    <p className="text-xs text-gray-500">
+                                      SKU: {part.sku || '-'} · Bodega: {part.location || '-'} · Stock disponible:{' '}
+                                      {availableQuantity} {part.unit}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                                      Cantidad
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      max={Math.max(1, availableQuantity)}
+                                      value={part.quantity}
+                                      onChange={(event) =>
+                                        handleReviewPartQuantityChange(
+                                          part.inventoryItemId,
+                                          parseInt(event.target.value) || 1
+                                        )
+                                      }
+                                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                                    />
+                                  </div>
+                                  <div className="flex items-end">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveReviewPart(part.inventoryItemId)}
+                                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
+                                      title="Eliminar repuesto"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </div>
                                 </div>
+                              );
+                            })
+                          )}
+                        </div>
 
 
 
-                                <div>
+                        <div>
 
 
 

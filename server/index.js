@@ -1,4 +1,4 @@
-﻿import express from 'express';
+import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -24,17 +24,10 @@ if (!jwtSecret) {
   console.warn('JWT_SECRET is not set.');
 }
 
-const ownerEmail = process.env.OWNER_EMAIL;
-const ownerPassword = process.env.OWNER_PASSWORD;
-if (!ownerEmail || !ownerPassword) {
-  console.warn('OWNER_EMAIL or OWNER_PASSWORD is not set.');
-}
 const demoCompanyName = process.env.DEMO_COMPANY_NAME || 'Demo Taller';
 const demoUserName = process.env.DEMO_USER_NAME || 'Demo Cliente';
 const demoUserEmail = process.env.DEMO_USER_EMAIL || 'demo@local';
 const demoUserPassword = process.env.DEMO_USER_PASSWORD || 'demo1234';
-
-const appUrl = process.env.APP_URL || 'http://localhost:5173';
 
 const pool = new Pool({
   connectionString: supabaseUrl,
@@ -45,8 +38,6 @@ app.use(express.json());
 
 const allowedStatuses = new Set(['En taller', 'En revision', 'Entregado']);
 const allowedTipos = new Set(['Auto', 'Camioneta', 'SUV', 'Moto', 'Camion', 'Furgon']);
-const allowedRoles = new Set(['admin', 'mecanico', 'recepcionista']);
-const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const patenteRegex = /^(?:[A-Z]{2}-\d{4}|[A-Z]{4}-\d{2})$/;
 
 const normalizePatente = (value = '') => {
@@ -123,18 +114,6 @@ const verifyPassword = (password, storedHash) => {
   return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(derived, 'hex'));
 };
 
-const safeCompare = (a, b) => {
-  if (typeof a !== 'string' || typeof b !== 'string') {
-    return false;
-  }
-  const aBuf = Buffer.from(a);
-  const bBuf = Buffer.from(b);
-  if (aBuf.length != bBuf.length) {
-    return false;
-  }
-  return crypto.timingSafeEqual(aBuf, bBuf);
-};
-
 const ensureJwtSecret = (res) => {
   if (!jwtSecret) {
     res.status(500).json({ error: 'jwt_not_configured' });
@@ -173,24 +152,7 @@ const authRequired = (req, res, next) => {
   return next();
 };
 
-const ownerRequired = (req, res, next) => {
-  const payload = getTokenPayload(req, res);
-  if (!payload) {
-    return;
-  }
-  if (!payload.owner) {
-    return res.status(403).json({ error: 'owner_required' });
-  }
-  req.user = payload;
-  return next();
-};
-
-const ensureWritable = (req, res, next) => {
-  if (req.user?.support) {
-    return res.status(403).json({ error: 'read_only_support' });
-  }
-  return next();
-};
+const ensureWritable = (req, res, next) => next();
 
 app.get('/health', async (req, res) => {
   try {
@@ -198,94 +160,6 @@ app.get('/health', async (req, res) => {
     res.json({ status: 'ok' });
   } catch (error) {
     res.status(500).json({ status: 'error', message: 'Database unavailable' });
-  }
-});
-
-app.post('/auth/owner/login', async (req, res) => {
-  if (!ensureJwtSecret(res)) {
-    return;
-  }
-  if (!ownerEmail || !ownerPassword) {
-    return res.status(500).json({ error: 'owner_not_configured' });
-  }
-
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: 'missing_fields' });
-  }
-
-  if (!safeCompare(email, ownerEmail) || !safeCompare(password, ownerPassword)) {
-    return res.status(401).json({ error: 'invalid_credentials' });
-  }
-
-  const token = jwt.sign({ owner: true, role: 'owner', owner_email: email }, jwtSecret, {
-    expiresIn: '12h',
-  });
-  res.json({ token, role: 'owner' });
-});
-
-app.post('/auth/login', async (req, res) => {
-  if (!ensureJwtSecret(res)) {
-    return;
-  }
-
-  const { email, password, company_id } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: 'missing_fields' });
-  }
-  if (company_id && !uuidRegex.test(company_id)) {
-    return res.status(400).json({ error: 'invalid_company_id' });
-  }
-
-  try {
-    const userResult = await pool.query(
-      'select id, full_name, email, password_hash from users where email = $1',
-      [email]
-    );
-    const user = userResult.rows[0];
-    if (!user || !verifyPassword(password, user.password_hash)) {
-      return res.status(401).json({ error: 'invalid_credentials' });
-    }
-
-    let membershipQuery =
-      'select cm.company_id, cm.role, c.name as company_name from company_members cm join companies c on c.id = cm.company_id where cm.user_id = $1';
-    const params = [user.id];
-    if (company_id) {
-      membershipQuery += ' and cm.company_id = $2';
-      params.push(company_id);
-    }
-
-    const membershipResult = await pool.query(membershipQuery, params);
-    if (membershipResult.rows.length === 0) {
-      return res.status(403).json({ error: 'no_company' });
-    }
-    if (!company_id && membershipResult.rows.length > 1) {
-      return res.status(409).json({
-        error: 'multiple_companies',
-        companies: membershipResult.rows.map((row) => ({
-          id: row.company_id,
-          name: row.company_name,
-          role: row.role,
-        })),
-      });
-    }
-
-    const membership = membershipResult.rows[0];
-    const token = jwt.sign(
-      { user_id: user.id, company_id: membership.company_id, role: membership.role },
-      jwtSecret,
-      { expiresIn: '8h' }
-    );
-
-    res.json({
-      token,
-      user: { id: user.id, full_name: user.full_name, email: user.email },
-      company: { id: membership.company_id, name: membership.company_name },
-      role: membership.role,
-    });
-  } catch (error) {
-    console.error('POST /auth/login failed', error);
-    res.status(500).json({ error: 'internal_error' });
   }
 });
 
@@ -371,79 +245,10 @@ app.post('/auth/demo-login', async (req, res) => {
   }
 });
 
-app.post('/auth/invitations/accept', async (req, res) => {
-  if (!ensureJwtSecret(res)) {
-    return;
-  }
-
-  const { token, full_name, password } = req.body;
-  if (!token || !full_name || !password) {
-    return res.status(400).json({ error: 'missing_fields' });
-  }
-
-  try {
-    const { rows: inviteRows } = await pool.query(
-      'select * from invitations where token = $1 and used_at is null and expires_at > now()',
-      [token]
-    );
-    if (inviteRows.length === 0) {
-      return res.status(400).json({ error: 'invalid_invite' });
-    }
-
-    const invite = inviteRows[0];
-    const existingUser = await pool.query('select id from users where email = $1', [invite.email]);
-    if (existingUser.rows.length > 0) {
-      return res.status(409).json({ error: 'user_exists' });
-    }
-
-    const passwordHash = hashPassword(password);
-
-    await pool.query('begin');
-    const userResult = await pool.query(
-      'insert into users (full_name, email, password_hash) values ($1, $2, $3) returning id, full_name, email',
-      [full_name, invite.email, passwordHash]
-    );
-
-    const user = userResult.rows[0];
-    await pool.query(
-      'insert into company_members (company_id, user_id, role) values ($1, $2, $3)',
-      [invite.company_id, user.id, invite.role]
-    );
-
-    await pool.query('update invitations set used_at = now() where id = $1', [invite.id]);
-    await pool.query('commit');
-
-    const tokenValue = jwt.sign(
-      { user_id: user.id, company_id: invite.company_id, role: invite.role },
-      jwtSecret,
-      { expiresIn: '8h' }
-    );
-
-    res.json({
-      token: tokenValue,
-      user: { id: user.id, full_name: user.full_name, email: user.email },
-      company: { id: invite.company_id },
-      role: invite.role,
-    });
-  } catch (error) {
-    try {
-      await pool.query('rollback');
-    } catch {
-      // ignore rollback errors
-    }
-    console.error('POST /auth/invitations/accept failed', error);
-    res.status(500).json({ error: 'internal_error' });
-  }
-});
-
 app.get('/auth/me', (req, res) => {
   const payload = getTokenPayload(req, res);
   if (!payload) {
     return;
-  }
-
-  if (payload.owner) {
-    return res.json({ role: payload.support ? 'support' : 'owner', support: !!payload.support, company_id: payload.company_id });
   }
 
   const { user_id, company_id } = payload;
@@ -465,204 +270,12 @@ app.get('/auth/me', (req, res) => {
         user: { id: row.id, full_name: row.full_name, email: row.email },
         company: { id: row.company_id, name: row.company_name },
         role: row.role,
-        support: !!payload.support,
       });
     })
     .catch((error) => {
       console.error('GET /auth/me failed', error);
       res.status(500).json({ error: 'internal_error' });
     });
-});
-
-app.get('/admin/companies', ownerRequired, async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      'select id, name, created_at from companies order by created_at desc'
-    );
-    res.json(rows);
-  } catch (error) {
-    console.error('GET /admin/companies failed', error);
-    res.status(500).json({ error: 'internal_error' });
-  }
-});
-
-app.post('/admin/companies', ownerRequired, async (req, res) => {
-  const { name } = req.body;
-  if (!name) {
-    return res.status(400).json({ error: 'missing_name' });
-  }
-
-  try {
-    const { rows } = await pool.query(
-      'insert into companies (name) values ($1) returning *',
-      [name]
-    );
-    res.status(201).json(rows[0]);
-  } catch (error) {
-    console.error('POST /admin/companies failed', error);
-    res.status(500).json({ error: 'internal_error' });
-  }
-});
-
-app.post('/admin/invitations', ownerRequired, async (req, res) => {
-  const { company_id, email, role } = req.body;
-  if (!company_id || !email || !role) {
-    return res.status(400).json({ error: 'missing_fields' });
-  }
-  if (!uuidRegex.test(company_id)) {
-    return res.status(400).json({ error: 'invalid_company_id' });
-  }
-  if (!allowedRoles.has(role)) {
-    return res.status(400).json({ error: 'invalid_role' });
-  }
-
-  try {
-    const token = crypto.randomBytes(32).toString('hex');
-    const { rows } = await pool.query(
-      `insert into invitations (company_id, email, role, token, expires_at)
-       values ($1, $2, $3, $4, now() + interval '7 days')
-       returning id, token`,
-      [company_id, email, role, token]
-    );
-    const inviteUrl = `${appUrl}/?invite=${rows[0].token}`;
-    res.status(201).json({ token: rows[0].token, invite_url: inviteUrl });
-  } catch (error) {
-    console.error('POST /admin/invitations failed', error);
-    res.status(500).json({ error: 'internal_error' });
-  }
-});
-
-app.post('/admin/impersonate', ownerRequired, async (req, res) => {
-  const { company_id } = req.body;
-  if (!company_id || !uuidRegex.test(company_id)) {
-    return res.status(400).json({ error: 'invalid_company_id' });
-  }
-
-  try {
-    const { rows } = await pool.query('select id, name from companies where id = $1', [
-      company_id,
-    ]);
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'company_not_found' });
-    }
-
-    const tokenValue = jwt.sign(
-      {
-        owner: true,
-        support: true,
-        role: 'support',
-        company_id,
-        owner_email: req.user.owner_email || 'owner',
-      },
-      jwtSecret,
-      { expiresIn: '1h' }
-    );
-
-    await pool.query(
-      `insert into support_sessions (company_id, owner_email, token, expires_at)
-       values ($1, $2, $3, now() + interval '1 hour')`,
-      [company_id, req.user.owner_email || 'owner', tokenValue]
-    );
-
-    res.json({ token: tokenValue, company: rows[0] });
-  } catch (error) {
-    console.error('POST /admin/impersonate failed', error);
-    res.status(500).json({ error: 'internal_error' });
-  }
-});
-
-app.get('/admin/support-sessions', ownerRequired, async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      `select ss.id, ss.company_id, c.name as company_name, ss.owner_email, ss.created_at, ss.expires_at, ss.ended_at
-       from support_sessions ss
-       join companies c on c.id = ss.company_id
-       order by ss.created_at desc
-       limit 50`
-    );
-    res.json(rows);
-  } catch (error) {
-    console.error('GET /admin/support-sessions failed', error);
-    res.status(500).json({ error: 'internal_error' });
-  }
-});
-
-app.post('/companies', ownerRequired, async (req, res) => {
-  const { name } = req.body;
-  if (!name) {
-    return res.status(400).json({ error: 'missing_name' });
-  }
-
-  try {
-    const { rows } = await pool.query(
-      'insert into companies (name) values ($1) returning *',
-      [name]
-    );
-    res.status(201).json(rows[0]);
-  } catch (error) {
-    console.error('POST /companies failed', error);
-    res.status(500).json({ error: 'internal_error' });
-  }
-});
-
-app.post('/users', ownerRequired, async (req, res) => {
-  const { full_name, email, password } = req.body;
-  if (!full_name || !email || !password) {
-    return res.status(400).json({ error: 'missing_fields' });
-  }
-
-  try {
-    const passwordHash = hashPassword(password);
-    const { rows } = await pool.query(
-      'insert into users (full_name, email, password_hash) values ($1, $2, $3) returning id, full_name, email, created_at',
-      [full_name, email, passwordHash]
-    );
-    res.status(201).json(rows[0]);
-  } catch (error) {
-    if (error.code === '23505') {
-      return res.status(409).json({ error: 'email_exists' });
-    }
-    console.error('POST /users failed', error);
-    res.status(500).json({ error: 'internal_error' });
-  }
-});
-
-app.post('/companies/:companyId/members', ownerRequired, async (req, res) => {
-  const { companyId } = req.params;
-  if (!uuidRegex.test(companyId)) {
-    return res.status(400).json({ error: 'invalid_company_id' });
-  }
-
-  let { user_id, role } = req.body;
-  if (!user_id || !role) {
-    return res.status(400).json({ error: 'missing_fields' });
-  }
-
-  if (role === 'recpcionista') {
-    role = 'recepcionista';
-  }
-
-  if (!allowedRoles.has(role)) {
-    return res.status(400).json({ error: 'invalid_role' });
-  }
-
-  if (!uuidRegex.test(user_id)) {
-    return res.status(400).json({ error: 'invalid_user_id' });
-  }
-
-  try {
-    const { rows } = await pool.query(
-      'insert into company_members (company_id, user_id, role) values ($1, $2, $3) returning *',
-      [companyId, user_id, role]
-    );
-    res.status(201).json(rows[0]);
-  } catch (error) {
-    if (error.code === '23505') {
-      return res.status(409).json({ error: 'member_exists' });
-    }
-    console.error('POST /companies/:companyId/members failed', error);
-    res.status(500).json({ error: 'internal_error' });
-  }
 });
 
 app.get('/vehicles', authRequired, async (req, res) => {

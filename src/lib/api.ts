@@ -17,7 +17,6 @@ const handleResponse = async (response: Response) => {
     (error as Error & { status?: number }).status = response.status;
     throw error;
   }
-  console.log(response);
   return response.json();
 };
 
@@ -28,6 +27,21 @@ const withAuthHeader = (headers: HeadersInit = {}) => {
   }
   return { ...headers, Authorization: `Bearer ${token}` };
 };
+
+export const loginDemo = async () =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/auth/demo-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
+  );
+
+export const getSession = async () =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/auth/me`, {
+      headers: withAuthHeader(),
+    })
+  );
 
 export const getVehicles = async () =>
   handleResponse(
@@ -61,112 +75,3 @@ export const deleteVehicle = async (id: string) =>
       headers: withAuthHeader(),
     })
   );
-
-export const login = async (payload: {
-  email: string;
-  password: string;
-  company_id?: string;
-}) =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-  );
-
-export const loginOwner = async (payload: { email: string; password: string }) =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/auth/owner/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-  );
-
-export const loginDemo = async () =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/auth/demo-login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    })
-  );
-
-export const getSession = async () =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/auth/me`, {
-      headers: withAuthHeader(),
-    })
-  );
-
-export const adminGetCompanies = async () =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/admin/companies`, {
-      headers: withAuthHeader(),
-    })
-  );
-
-export const adminCreateCompany = async (name: string) =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/admin/companies`, {
-      method: 'POST',
-      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ name }),
-    })
-  );
-
-export const adminCreateUser = async (payload: {
-  full_name: string;
-  email: string;
-  password: string;
-}) =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/users`, {
-      method: 'POST',
-      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(payload),
-    })
-  );
-
-export const adminAddCompanyMember = async (
-  companyId: string,
-  payload: { user_id: string; role: string }
-) =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/companies/${companyId}/members`, {
-      method: 'POST',
-      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(payload),
-    })
-  );
-
-export const adminCreateInvitation = async (payload: {
-  company_id: string;
-  email: string;
-  role: string;
-}) =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/admin/invitations`, {
-      method: 'POST',
-      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(payload),
-    })
-  );
-
-export const adminImpersonate = async (company_id: string) =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/admin/impersonate`, {
-      method: 'POST',
-      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ company_id }),
-    })
-  );
-
-export const adminGetSupportSessions = async () =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/admin/support-sessions`, {
-      headers: withAuthHeader(),
-    })
-  );
-
-

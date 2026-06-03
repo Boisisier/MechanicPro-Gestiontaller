@@ -77,8 +77,8 @@ export default function Header({ onMenuClick, theme, onToggleTheme, notification
 
           <div className="hidden md:flex items-center gap-3 pl-4 border-l border-gray-200">
             <div className="text-right">
-              <p className="text-sm font-medium text-gray-900">Admin Usuario</p>
-              <p className="text-xs text-gray-500">admin@mechanicpro.com</p>
+              <p className="text-sm font-medium text-gray-900">Usuario general</p>
+              <p className="text-xs text-gray-500">acceso general</p>
             </div>
             <div className="relative">
               <button
