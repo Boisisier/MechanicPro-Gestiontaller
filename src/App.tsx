@@ -2848,6 +2848,49 @@ ${parts.length === 0
 
 
 
+                        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                            <h4 className="text-sm font-semibold text-amber-900">Fallas declaradas al ingreso</h4>
+                            <span className="text-xs font-semibold text-amber-800">
+                              {activeReviewVehicle.fallas_detectadas?.length || 0} registrada(s)
+                            </span>
+                          </div>
+
+                          {activeReviewVehicle.fallas_detectadas && activeReviewVehicle.fallas_detectadas.length > 0 ? (
+                            <ul className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                              {activeReviewVehicle.fallas_detectadas.map((failure) => (
+                                <li
+                                  key={failure}
+                                  className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-gray-800"
+                                >
+                                  {failure}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="mt-3 text-sm text-amber-800">No se registraron fallas al ingreso.</p>
+                          )}
+
+                          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+                                Observación inicial
+                              </p>
+                              <p className="mt-1 text-sm text-gray-800">
+                                {activeReviewVehicle.observaciones || 'Sin observaciones.'}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+                                Comentario técnico
+                              </p>
+                              <p className="mt-1 text-sm text-gray-800">
+                                {activeReviewVehicle.comentario_tecnico || 'Sin comentario técnico.'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
                         <div className="relative mb-6">
 
 

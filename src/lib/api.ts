@@ -75,3 +75,109 @@ export const deleteVehicle = async (id: string) =>
       headers: withAuthHeader(),
     })
   );
+
+export const getRoles = async () =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/roles`, {
+      headers: withAuthHeader(),
+    })
+  );
+
+export const getWorkshopUsers = async () =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/workshop-users`, {
+      headers: withAuthHeader(),
+    })
+  );
+
+export const createWorkshopUser = async (body: unknown) =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/workshop-users`, {
+      method: 'POST',
+      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(body),
+    })
+  );
+
+export const updateWorkshopUser = async (id: string, body: unknown) =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/workshop-users/${id}`, {
+      method: 'PUT',
+      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(body),
+    })
+  );
+
+export const deleteWorkshopUser = async (id: string) =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/workshop-users/${id}`, {
+      method: 'DELETE',
+      headers: withAuthHeader(),
+    })
+  );
+
+export const getInventoryItems = async () =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/inventory-items`, {
+      headers: withAuthHeader(),
+    })
+  );
+
+export const createInventoryItem = async (body: unknown) =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/inventory-items`, {
+      method: 'POST',
+      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(body),
+    })
+  );
+
+export const updateInventoryItem = async (id: string, body: unknown) =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/inventory-items/${id}`, {
+      method: 'PUT',
+      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(body),
+    })
+  );
+
+export const deleteInventoryItem = async (id: string) =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/inventory-items/${id}`, {
+      method: 'DELETE',
+      headers: withAuthHeader(),
+    })
+  );
+
+export const getBudgets = async () =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/budgets`, {
+      headers: withAuthHeader(),
+    })
+  );
+
+export const createBudget = async (body: unknown) =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/budgets`, {
+      method: 'POST',
+      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(body),
+    })
+  );
+
+export const updateBudget = async (id: string, body: unknown) =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/budgets/${id}`, {
+      method: 'PUT',
+      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(body),
+    })
+  );
+
+export const deleteBudget = async (id: string) =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/budgets/${id}`, {
+      method: 'DELETE',
+      headers: withAuthHeader(),
+    })
+  );

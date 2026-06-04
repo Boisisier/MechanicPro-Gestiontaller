@@ -39,6 +39,20 @@ app.use(express.json());
 const allowedStatuses = new Set(['En taller', 'En revision', 'Entregado']);
 const allowedTipos = new Set(['Auto', 'Camioneta', 'SUV', 'Moto', 'Camion', 'Furgon']);
 const patenteRegex = /^(?:[A-Z]{2}-\d{4}|[A-Z]{4}-\d{2})$/;
+const defaultRoles = [
+  {
+    name: 'Administrador de Taller',
+    modules: ['Dashboard', 'Vehículos', 'Presupuesto', 'Inventario', 'Reportes', 'Configuración'],
+  },
+  {
+    name: 'Administrativo',
+    modules: ['Dashboard', 'Vehículos', 'Presupuesto', 'Reportes'],
+  },
+  {
+    name: 'Mecánico',
+    modules: ['Dashboard', 'Vehículos', 'Reportes'],
+  },
+];
 
 const normalizePatente = (value = '') => {
   const normalized = String(value).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
@@ -55,6 +69,132 @@ const normalizePatente = (value = '') => {
 };
 
 const ensureVehicleColumns = async () => {
+  await pool.query('create extension if not exists "pgcrypto"');
+  await pool.query(`
+    create table if not exists companies (
+      id uuid primary key default gen_random_uuid(),
+      name text not null unique,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `);
+  await pool.query(`
+    create table if not exists users (
+      id uuid primary key default gen_random_uuid(),
+      full_name text not null,
+      email text not null unique,
+      password_hash text not null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `);
+  await pool.query(`
+    create table if not exists company_members (
+      id uuid primary key default gen_random_uuid(),
+      company_id uuid not null references companies(id) on delete cascade,
+      user_id uuid not null references users(id) on delete cascade,
+      role text not null default 'admin',
+      created_at timestamptz not null default now(),
+      unique (company_id, user_id)
+    )
+  `);
+  await pool.query(`
+    create table if not exists vehicles (
+      id uuid primary key default gen_random_uuid(),
+      company_id uuid not null references companies(id) on delete cascade,
+      customer_name text not null,
+      customer_rut text not null,
+      customer_phone text not null,
+      customer_address text not null,
+      customer_city text not null,
+      patente text not null,
+      marca text not null,
+      modelo text not null,
+      ano integer not null,
+      tipo_vehiculo text not null default 'Auto',
+      codigo_vin text default '',
+      codigo_motor text default '',
+      color text default '',
+      kilometraje integer not null default 0,
+      cantidad_combustible integer not null default 0,
+      estado text not null default 'En taller',
+      servicios text[] not null default '{}',
+      fallas_detectadas text[] not null default '{}',
+      observaciones text default '',
+      comentario_tecnico text default '',
+      fecha_ingreso timestamptz not null default now(),
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `);
+  await pool.query(`
+    create table if not exists roles (
+      id uuid primary key default gen_random_uuid(),
+      company_id uuid references companies(id) on delete cascade,
+      name text not null,
+      modules text[] not null default '{}',
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      unique (company_id, name)
+    )
+  `);
+  await pool.query(`
+    create table if not exists workshop_users (
+      id uuid primary key default gen_random_uuid(),
+      company_id uuid not null references companies(id) on delete cascade,
+      name text not null,
+      email text not null,
+      role_id uuid references roles(id) on delete set null,
+      role_name text not null,
+      active boolean not null default true,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      unique (company_id, email)
+    )
+  `);
+  await pool.query(`
+    create table if not exists inventory_items (
+      id uuid primary key default gen_random_uuid(),
+      company_id uuid not null references companies(id) on delete cascade,
+      name text not null,
+      category text default '',
+      sku text default '',
+      barcode text default '',
+      stock integer not null default 0,
+      min_stock integer not null default 0,
+      unit text not null default 'unidad',
+      location text default '',
+      supplier text default '',
+      cost numeric(12,2) not null default 0,
+      notes text default '',
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `);
+  await pool.query(`
+    create table if not exists budget_quotes (
+      id uuid primary key default gen_random_uuid(),
+      company_id uuid not null references companies(id) on delete cascade,
+      customer_name text not null,
+      customer_phone text default '',
+      patente text default '',
+      vehicle text default '',
+      notes text default '',
+      total numeric(12,2) not null default 0,
+      status text not null default 'borrador',
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `);
+  await pool.query(`
+    create table if not exists budget_quote_items (
+      id uuid primary key default gen_random_uuid(),
+      budget_quote_id uuid not null references budget_quotes(id) on delete cascade,
+      name text not null,
+      price numeric(12,2) not null default 0,
+      created_at timestamptz not null default now()
+    )
+  `);
   await pool.query(`
     alter table vehicles
       add column if not exists codigo_vin text,
@@ -63,6 +203,9 @@ const ensureVehicleColumns = async () => {
       add column if not exists fallas_detectadas text[] default '{}',
       add column if not exists comentario_tecnico text default ''
   `);
+  await pool.query("update vehicles set fallas_detectadas = '{}' where fallas_detectadas is null");
+  await pool.query("alter table vehicles alter column fallas_detectadas set default '{}'");
+  await pool.query('alter table vehicles alter column fallas_detectadas set not null');
   await pool.query(`
     alter table vehicles
       drop constraint if exists vehicles_company_patente_unique
@@ -71,6 +214,31 @@ const ensureVehicleColumns = async () => {
     create index if not exists idx_vehicles_company_patente_fecha
       on vehicles(company_id, patente, fecha_ingreso desc)
   `);
+  await pool.query('create index if not exists idx_roles_company_id on roles(company_id)');
+  await pool.query('create index if not exists idx_workshop_users_company_id on workshop_users(company_id)');
+  await pool.query('create index if not exists idx_inventory_items_company_id on inventory_items(company_id)');
+  await pool.query(`
+    create unique index if not exists idx_inventory_items_company_sku_unique
+      on inventory_items(company_id, sku)
+      where sku is not null and sku <> ''
+  `);
+  await pool.query(`
+    create unique index if not exists idx_inventory_items_company_barcode_unique
+      on inventory_items(company_id, barcode)
+      where barcode is not null and barcode <> ''
+  `);
+  await pool.query('create index if not exists idx_budget_quotes_company_id on budget_quotes(company_id)');
+};
+
+const seedDefaultRoles = async (client, companyId) => {
+  for (const role of defaultRoles) {
+    await client.query(
+      `insert into roles (company_id, name, modules)
+       values ($1, $2, $3)
+       on conflict (company_id, name) do update set modules = excluded.modules, updated_at = now()`,
+      [companyId, role.name, role.modules]
+    );
+  }
 };
 
 const validateVehicle = (payload) => {
@@ -184,6 +352,7 @@ app.post('/auth/demo-login', async (req, res) => {
       );
     }
     const company = companyResult.rows[0];
+    await seedDefaultRoles(client, company.id);
 
     let userResult = await client.query(
       'select id, full_name, email, password_hash from users where email = $1 limit 1',
@@ -278,6 +447,380 @@ app.get('/auth/me', (req, res) => {
       console.error('GET /auth/me failed', error);
       res.status(500).json({ error: 'internal_error' });
     });
+});
+
+app.get('/roles', authRequired, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  try {
+    const { rows } = await pool.query(
+      'select id, name, modules, created_at, updated_at from roles where company_id = $1 order by name',
+      [companyId]
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error('GET /roles failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.get('/workshop-users', authRequired, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  try {
+    const { rows } = await pool.query(
+      `select wu.id, wu.name, wu.email, wu.role_id, wu.role_name, wu.active, wu.created_at, wu.updated_at,
+              coalesce(r.modules, '{}') as modules
+       from workshop_users wu
+       left join roles r on r.id = wu.role_id
+       where wu.company_id = $1
+       order by wu.created_at desc`,
+      [companyId]
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error('GET /workshop-users failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.post('/workshop-users', authRequired, ensureWritable, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  const name = String(req.body.name || '').trim();
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const roleName = String(req.body.role || req.body.role_name || '').trim();
+
+  if (!name || !email || !roleName) {
+    return res.status(400).json({ error: 'missing_fields' });
+  }
+
+  try {
+    const roleResult = await pool.query(
+      'select id, name from roles where company_id = $1 and name = $2 limit 1',
+      [companyId, roleName]
+    );
+    if (roleResult.rows.length === 0) {
+      return res.status(400).json({ error: 'invalid_role' });
+    }
+    const role = roleResult.rows[0];
+    const { rows } = await pool.query(
+      `insert into workshop_users (company_id, name, email, role_id, role_name)
+       values ($1, $2, $3, $4, $5)
+       returning *`,
+      [companyId, name, email, role.id, role.name]
+    );
+    res.status(201).json(rows[0]);
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'email_exists' });
+    }
+    console.error('POST /workshop-users failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.put('/workshop-users/:id', authRequired, ensureWritable, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  const name = String(req.body.name || '').trim();
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const roleName = String(req.body.role || req.body.role_name || '').trim();
+  const active = req.body.active !== false;
+
+  if (!name || !email || !roleName) {
+    return res.status(400).json({ error: 'missing_fields' });
+  }
+
+  try {
+    const roleResult = await pool.query(
+      'select id, name from roles where company_id = $1 and name = $2 limit 1',
+      [companyId, roleName]
+    );
+    if (roleResult.rows.length === 0) {
+      return res.status(400).json({ error: 'invalid_role' });
+    }
+    const role = roleResult.rows[0];
+    const { rows } = await pool.query(
+      `update workshop_users
+       set name = $1, email = $2, role_id = $3, role_name = $4, active = $5, updated_at = now()
+       where id = $6 and company_id = $7
+       returning *`,
+      [name, email, role.id, role.name, active, req.params.id, companyId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+    res.json(rows[0]);
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'email_exists' });
+    }
+    console.error('PUT /workshop-users/:id failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.delete('/workshop-users/:id', authRequired, ensureWritable, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  try {
+    const { rows } = await pool.query(
+      'delete from workshop_users where id = $1 and company_id = $2 returning id',
+      [req.params.id, companyId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('DELETE /workshop-users/:id failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.get('/inventory-items', authRequired, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  try {
+    const { rows } = await pool.query(
+      `select id, name, category, sku, barcode, stock, min_stock as "minStock", unit, location, supplier,
+              cost::float as cost, notes, created_at, updated_at
+       from inventory_items
+       where company_id = $1
+       order by name`,
+      [companyId]
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error('GET /inventory-items failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.post('/inventory-items', authRequired, ensureWritable, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  const name = String(req.body.name || '').trim();
+  if (!name) {
+    return res.status(400).json({ error: 'missing_name' });
+  }
+  try {
+    const { rows } = await pool.query(
+      `insert into inventory_items
+        (company_id, name, category, sku, barcode, stock, min_stock, unit, location, supplier, cost, notes)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       returning id, name, category, sku, barcode, stock, min_stock as "minStock", unit, location, supplier,
+                 cost::float as cost, notes, created_at, updated_at`,
+      [
+        companyId,
+        name,
+        req.body.category || '',
+        req.body.sku || '',
+        req.body.barcode || '',
+        Number(req.body.stock) || 0,
+        Number(req.body.minStock ?? req.body.min_stock) || 0,
+        req.body.unit || 'unidad',
+        req.body.location || '',
+        req.body.supplier || '',
+        Number(req.body.cost) || 0,
+        req.body.notes || '',
+      ]
+    );
+    res.status(201).json(rows[0]);
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'inventory_code_exists' });
+    }
+    console.error('POST /inventory-items failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.put('/inventory-items/:id', authRequired, ensureWritable, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  const name = String(req.body.name || '').trim();
+  if (!name) {
+    return res.status(400).json({ error: 'missing_name' });
+  }
+  try {
+    const { rows } = await pool.query(
+      `update inventory_items
+       set name = $1, category = $2, sku = $3, barcode = $4, stock = $5, min_stock = $6,
+           unit = $7, location = $8, supplier = $9, cost = $10, notes = $11, updated_at = now()
+       where id = $12 and company_id = $13
+       returning id, name, category, sku, barcode, stock, min_stock as "minStock", unit, location, supplier,
+                 cost::float as cost, notes, created_at, updated_at`,
+      [
+        name,
+        req.body.category || '',
+        req.body.sku || '',
+        req.body.barcode || '',
+        Number(req.body.stock) || 0,
+        Number(req.body.minStock ?? req.body.min_stock) || 0,
+        req.body.unit || 'unidad',
+        req.body.location || '',
+        req.body.supplier || '',
+        Number(req.body.cost) || 0,
+        req.body.notes || '',
+        req.params.id,
+        companyId,
+      ]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+    res.json(rows[0]);
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'inventory_code_exists' });
+    }
+    console.error('PUT /inventory-items/:id failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.delete('/inventory-items/:id', authRequired, ensureWritable, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  try {
+    const { rows } = await pool.query(
+      'delete from inventory_items where id = $1 and company_id = $2 returning id',
+      [req.params.id, companyId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('DELETE /inventory-items/:id failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.get('/budgets', authRequired, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  try {
+    const { rows } = await pool.query(
+      `select b.*,
+              coalesce(json_agg(json_build_object('id', bi.id, 'name', bi.name, 'price', bi.price::float)
+                order by bi.created_at) filter (where bi.id is not null), '[]') as items
+       from budget_quotes b
+       left join budget_quote_items bi on bi.budget_quote_id = b.id
+       where b.company_id = $1
+       group by b.id
+       order by b.created_at desc`,
+      [companyId]
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error('GET /budgets failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.post('/budgets', authRequired, ensureWritable, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  const items = Array.isArray(req.body.items) ? req.body.items : [];
+  const total = items.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const budgetResult = await client.query(
+      `insert into budget_quotes (company_id, customer_name, customer_phone, patente, vehicle, notes, total, status)
+       values ($1, $2, $3, $4, $5, $6, $7, $8)
+       returning *`,
+      [
+        companyId,
+        req.body.customerName || req.body.customer_name || '',
+        req.body.customerPhone || req.body.customer_phone || '',
+        req.body.patente || '',
+        req.body.vehicle || '',
+        req.body.notes || '',
+        total,
+        req.body.status || 'borrador',
+      ]
+    );
+    const budget = budgetResult.rows[0];
+    for (const item of items) {
+      await client.query(
+        'insert into budget_quote_items (budget_quote_id, name, price) values ($1, $2, $3)',
+        [budget.id, item.name || '', Number(item.price) || 0]
+      );
+    }
+    await client.query('commit');
+    res.status(201).json({ ...budget, items });
+  } catch (error) {
+    try {
+      await client.query('rollback');
+    } catch {
+      // ignore rollback errors
+    }
+    console.error('POST /budgets failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  } finally {
+    client.release();
+  }
+});
+
+app.put('/budgets/:id', authRequired, ensureWritable, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  const items = Array.isArray(req.body.items) ? req.body.items : [];
+  const total = items.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const budgetResult = await client.query(
+      `update budget_quotes
+       set customer_name = $1, customer_phone = $2, patente = $3, vehicle = $4,
+           notes = $5, total = $6, status = $7, updated_at = now()
+       where id = $8 and company_id = $9
+       returning *`,
+      [
+        req.body.customerName || req.body.customer_name || '',
+        req.body.customerPhone || req.body.customer_phone || '',
+        req.body.patente || '',
+        req.body.vehicle || '',
+        req.body.notes || '',
+        total,
+        req.body.status || 'borrador',
+        req.params.id,
+        companyId,
+      ]
+    );
+    if (budgetResult.rows.length === 0) {
+      await client.query('rollback');
+      return res.status(404).json({ error: 'not_found' });
+    }
+    await client.query('delete from budget_quote_items where budget_quote_id = $1', [req.params.id]);
+    for (const item of items) {
+      await client.query(
+        'insert into budget_quote_items (budget_quote_id, name, price) values ($1, $2, $3)',
+        [req.params.id, item.name || '', Number(item.price) || 0]
+      );
+    }
+    await client.query('commit');
+    res.json({ ...budgetResult.rows[0], items });
+  } catch (error) {
+    try {
+      await client.query('rollback');
+    } catch {
+      // ignore rollback errors
+    }
+    console.error('PUT /budgets/:id failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  } finally {
+    client.release();
+  }
+});
+
+app.delete('/budgets/:id', authRequired, ensureWritable, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  try {
+    const { rows } = await pool.query(
+      'delete from budget_quotes where id = $1 and company_id = $2 returning id',
+      [req.params.id, companyId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('DELETE /budgets/:id failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
 });
 
 app.get('/vehicles', authRequired, async (req, res) => {
