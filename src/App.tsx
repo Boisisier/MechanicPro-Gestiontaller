@@ -445,6 +445,12 @@ function App() {
 
     customer_city: vehicle.customer_city || "",
 
+    customer_email: vehicle.customer_email || "",
+
+    assigned_mechanic_id: vehicle.assigned_mechanic_id || "",
+
+    assigned_mechanic_name: vehicle.assigned_mechanic_name || "",
+
     servicios: vehicle.servicios || [],
 
     fallas_detectadas: vehicle.fallas_detectadas || [],
@@ -589,6 +595,16 @@ function App() {
     setReviewParts((prev) =>
       prev.filter((part) => part.inventoryItemId !== inventoryItemId),
     );
+  };
+
+  const handleClearReviewRecord = () => {
+    setReviewServices([]);
+    setReviewParts([]);
+    setReviewNotes("");
+    setServiceSearch("");
+    setPartSearch("");
+    setServicePickerOpen(false);
+    setPartPickerOpen(false);
   };
 
   const handleSaveReview = async (statusOverride?: Vehicle["estado"]) => {
@@ -767,6 +783,10 @@ function App() {
       console.error("Error:", error);
     }
   };
+
+  const mechanicOptions = workshopUsers
+    .filter((user) => user.role === "Mecánico" || user.role_name === "Mecánico")
+    .map((user) => ({ id: user.id, name: user.name }));
 
   // const handleEdit = (vehicle: Vehicle) => {
 
@@ -979,8 +999,8 @@ function App() {
                       onClick={() => setVehicleTab(tab.id as typeof vehicleTab)}
                       className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
                         vehicleTab === tab.id
-                          ? "btn-primary"
-                          : "border border-gray-300 text-gray-700 hover:bg-gray-50"
+                          ? "bg-[#0f3a63] text-white shadow-sm hover:bg-[#0b2d4d]"
+                          : "border border-[#0f3a63]/30 text-[#0f3a63] hover:bg-[#0f3a63]/10"
                       }`}
                     >
                       {tab.label}
@@ -1009,6 +1029,18 @@ function App() {
                       </button>
                     </div>
                   )}
+                  {vehicleTab === "revision" && (
+                    <div className="flex flex-wrap gap-3 lg:ml-auto">
+                      <button
+                        type="button"
+                        onClick={handleClearReviewRecord}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-red-700 focus:ring-4 focus:ring-red-200"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Limpiar registro
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1020,6 +1052,7 @@ function App() {
                       editingVehicle={editingVehicle}
                       onCancelEdit={() => setEditingVehicle(null)}
                       existingVehicles={vehicles}
+                      mechanics={mechanicOptions}
                     />
                   </div>
 
@@ -1081,6 +1114,9 @@ function App() {
                           {activeReviewVehicle.marca}{" "}
                           {activeReviewVehicle.modelo} ·{" "}
                           {activeReviewVehicle.customer_name || "Sin cliente"}
+                        </p>
+                        <p className="mt-1 text-xs font-semibold text-blue-800">
+                          Mecánico: {activeReviewVehicle.assigned_mechanic_name || "Sin asignar"}
                         </p>
                       </div>
                     )}
@@ -1150,7 +1186,7 @@ function App() {
                               onClick={() =>
                                 setServicePickerOpen((prev) => !prev)
                               }
-                              className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                              className="rounded-lg bg-[#0f3a63] px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#0b2d4d]"
                             >
                               {servicePickerOpen
                                 ? "Cerrar buscador"
@@ -1159,7 +1195,7 @@ function App() {
                             <button
                               type="button"
                               onClick={() => setPartPickerOpen((prev) => !prev)}
-                              className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                              className="rounded-lg bg-[#0f3a63] px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#0b2d4d]"
                             >
                               {partPickerOpen
                                 ? "Cerrar repuestos"
@@ -1483,7 +1519,7 @@ function App() {
                           />
                         </div>
 
-                        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end mt-6">
+                        <div className="sticky bottom-4 z-10 mt-6 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-lg backdrop-blur sm:flex-row sm:justify-end">
                           <button
                             onClick={() => handleSaveReview()}
                             className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
@@ -1493,7 +1529,7 @@ function App() {
 
                           <button
                             onClick={() => handleSaveReview("Entregado")}
-                            className="rounded-lg btn-primary px-4 py-2 text-sm font-semibold"
+                            className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-green-700 focus:ring-4 focus:ring-green-200"
                           >
                             Enviar a salida
                           </button>

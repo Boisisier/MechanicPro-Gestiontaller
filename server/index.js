@@ -107,6 +107,9 @@ const ensureVehicleColumns = async () => {
       customer_phone text not null,
       customer_address text not null,
       customer_city text not null,
+      customer_email text default '',
+      assigned_mechanic_id uuid,
+      assigned_mechanic_name text default '',
       patente text not null,
       marca text not null,
       modelo text not null,
@@ -200,6 +203,9 @@ const ensureVehicleColumns = async () => {
       add column if not exists codigo_vin text,
       add column if not exists codigo_motor text,
       add column if not exists color text default '',
+      add column if not exists customer_email text default '',
+      add column if not exists assigned_mechanic_id uuid,
+      add column if not exists assigned_mechanic_name text default '',
       add column if not exists fallas_detectadas text[] default '{}',
       add column if not exists comentario_tecnico text default ''
   `);
@@ -874,6 +880,9 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
     customer_phone = '',
     customer_address = '',
     customer_city = '',
+    customer_email = '',
+    assigned_mechanic_id = null,
+    assigned_mechanic_name = '',
     servicios = [],
     fallas_detectadas = [],
     observaciones = '',
@@ -883,9 +892,9 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
   try {
     const { rows } = await pool.query(
       `insert into vehicles
-        (company_id, customer_name, customer_rut, customer_phone, customer_address, customer_city, patente, marca, modelo, ano, tipo_vehiculo, codigo_vin, codigo_motor, color, kilometraje, cantidad_combustible, estado, servicios, fallas_detectadas, observaciones, comentario_tecnico)
+        (company_id, customer_name, customer_rut, customer_phone, customer_address, customer_city, customer_email, assigned_mechanic_id, assigned_mechanic_name, patente, marca, modelo, ano, tipo_vehiculo, codigo_vin, codigo_motor, color, kilometraje, cantidad_combustible, estado, servicios, fallas_detectadas, observaciones, comentario_tecnico)
        values
-        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
        returning *`,
       [
         companyId,
@@ -894,6 +903,9 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
         customer_phone,
         customer_address,
         customer_city,
+        customer_email,
+        assigned_mechanic_id || null,
+        assigned_mechanic_name,
         patente,
         marca,
         modelo,
@@ -952,6 +964,9 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
     customer_phone = '',
     customer_address = '',
     customer_city = '',
+    customer_email = '',
+    assigned_mechanic_id = null,
+    assigned_mechanic_name = '',
     servicios = [],
     fallas_detectadas = [],
     observaciones = '',
@@ -966,23 +981,26 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
            customer_phone = $3,
            customer_address = $4,
            customer_city = $5,
-           patente = $6,
-           marca = $7,
-           modelo = $8,
-           ano = $9,
-           tipo_vehiculo = $10,
-           codigo_vin = $11,
-           codigo_motor = $12,
-           color = $13,
-           kilometraje = $14,
-           cantidad_combustible = $15,
-           estado = $16,
-           servicios = $17,
-           fallas_detectadas = $18,
-           observaciones = $19,
-           comentario_tecnico = $20,
+           customer_email = $6,
+           assigned_mechanic_id = $7,
+           assigned_mechanic_name = $8,
+           patente = $9,
+           marca = $10,
+           modelo = $11,
+           ano = $12,
+           tipo_vehiculo = $13,
+           codigo_vin = $14,
+           codigo_motor = $15,
+           color = $16,
+           kilometraje = $17,
+           cantidad_combustible = $18,
+           estado = $19,
+           servicios = $20,
+           fallas_detectadas = $21,
+           observaciones = $22,
+           comentario_tecnico = $23,
            updated_at = now()
-       where id = $21 and company_id = $22
+       where id = $24 and company_id = $25
        returning *`,
       [
         customer_name,
@@ -990,6 +1008,9 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
         customer_phone,
         customer_address,
         customer_city,
+        customer_email,
+        assigned_mechanic_id || null,
+        assigned_mechanic_name,
         patente,
         marca,
         modelo,

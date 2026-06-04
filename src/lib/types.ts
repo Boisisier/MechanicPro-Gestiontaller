@@ -7,6 +7,9 @@ export interface Vehicle {
   customer_phone?: string;
   customer_address?: string;
   customer_city?: string;
+  customer_email?: string;
+  assigned_mechanic_id?: string;
+  assigned_mechanic_name?: string;
   patente: string;
   marca: string;
   modelo: string;

@@ -67,6 +67,9 @@ ALTER TABLE IF EXISTS vehicles
   ADD COLUMN IF NOT EXISTS codigo_vin text DEFAULT '',
   ADD COLUMN IF NOT EXISTS codigo_motor text DEFAULT '',
   ADD COLUMN IF NOT EXISTS color text DEFAULT '',
+  ADD COLUMN IF NOT EXISTS customer_email text DEFAULT '',
+  ADD COLUMN IF NOT EXISTS assigned_mechanic_id uuid,
+  ADD COLUMN IF NOT EXISTS assigned_mechanic_name text DEFAULT '',
   ADD COLUMN IF NOT EXISTS fallas_detectadas text[] NOT NULL DEFAULT '{}',
   ADD COLUMN IF NOT EXISTS comentario_tecnico text DEFAULT '';
 

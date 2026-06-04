@@ -15,6 +15,7 @@ interface VehicleFormProps {
   editingVehicle?: VehicleFormData & { id: string } | null;
   onCancelEdit?: () => void;
   existingVehicles?: PreviousVehicleData[];
+  mechanics?: Array<{ id: string; name: string }>;
 }
 
 export interface VehicleFormData {
@@ -34,6 +35,9 @@ export interface VehicleFormData {
   customer_phone: string;
   customer_address: string;
   customer_city: string;
+  customer_email: string;
+  assigned_mechanic_id: string;
+  assigned_mechanic_name: string;
   observaciones: string;
   comentario_tecnico: string;
   fallas_detectadas: string[];
@@ -56,6 +60,9 @@ const initialFormData: VehicleFormData = {
   customer_phone: '',
   customer_address: '',
   customer_city: '',
+  customer_email: '',
+  assigned_mechanic_id: '',
+  assigned_mechanic_name: '',
   observaciones: '',
   comentario_tecnico: '',
   fallas_detectadas: [],
@@ -169,6 +176,9 @@ const buildFormDataFromPreviousVisit = (vehicle: PreviousVehicleData, patente: s
   customer_phone: vehicle.customer_phone || '',
   customer_address: vehicle.customer_address || '',
   customer_city: vehicle.customer_city || '',
+  customer_email: vehicle.customer_email || '',
+  assigned_mechanic_id: '',
+  assigned_mechanic_name: '',
   observaciones: '',
   comentario_tecnico: '',
   fallas_detectadas: [],
@@ -179,6 +189,7 @@ export default function VehicleForm({
   editingVehicle,
   onCancelEdit,
   existingVehicles = [],
+  mechanics = [],
 }: VehicleFormProps) {
   const [formData, setFormData] = useState<VehicleFormData>(editingVehicle || initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -260,6 +271,16 @@ export default function VehicleForm({
       if (isCompletePatente(patente)) {
         openPatenteLookup(patente);
       }
+      return;
+    }
+
+    if (name === 'assigned_mechanic_id') {
+      const mechanic = mechanics.find((item) => item.id === value);
+      setFormData((prev) => ({
+        ...prev,
+        assigned_mechanic_id: value,
+        assigned_mechanic_name: mechanic?.name || '',
+      }));
       return;
     }
 
@@ -371,7 +392,7 @@ export default function VehicleForm({
       </div>
 
       <form id="vehicle-entry-form" onSubmit={handleSubmit} className="space-y-6">
-        <div className="border-t border-gray-200 pt-6">
+        <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-5 shadow-sm">
           <h4 className="mb-4 inline-flex rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm">Datos del Vehículo</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
@@ -486,7 +507,7 @@ export default function VehicleForm({
           </div>
         </div>
 
-        <div className="border-t border-gray-200 pt-6">
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-5 shadow-sm">
           <h4 className="mb-4 inline-flex rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm">Datos del ingreso actual</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
@@ -545,29 +566,29 @@ export default function VehicleForm({
               </span>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-4">
               {failureChecklist.map((section) => (
-                <div key={section.category} className="rounded-lg border border-gray-200 p-4">
+                <div key={section.category} className="rounded-lg border border-gray-200 bg-white p-3">
                   <p className="text-sm font-semibold text-gray-900">{section.category}</p>
-                  <div className="mt-3 space-y-3">
+                  <div className="mt-2 space-y-2">
                     {section.groups.map((group) => (
                       <div key={`${section.category}-${group.label}`}>
-                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                           {group.label}
                         </p>
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div className="flex flex-wrap gap-2">
                           {group.items.map((item) => {
                             const value = `${section.category} > ${group.label} > ${item}`;
                             return (
                               <label
                                 key={value}
-                                className="flex min-h-10 items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                className="flex min-h-9 items-center gap-2 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
                               >
                                 <input
                                   type="checkbox"
                                   checked={formData.fallas_detectadas.includes(value)}
                                   onChange={() => handleFailureToggle(value)}
-                                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                 />
                                 <span>{item}</span>
                               </label>
@@ -616,7 +637,7 @@ export default function VehicleForm({
 
         </div>
 
-        <div className="border-t border-gray-200 pt-6">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
           <h4 className="mb-4 inline-flex rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm">Datos del cliente</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -695,19 +716,64 @@ export default function VehicleForm({
 
             <div>
               <label htmlFor="customer_city" className="block text-sm font-medium text-gray-700 mb-2">
-                Correo *
+                Ciudad *
               </label>
               <input
-                type="email"
+                type="text"
                 id="customer_city"
                 name="customer_city"
                 value={formData.customer_city}
                 onChange={handleChange}
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                placeholder="Ciudad"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="customer_email" className="block text-sm font-medium text-gray-700 mb-2">
+                Correo
+              </label>
+              <input
+                type="email"
+                id="customer_email"
+                name="customer_email"
+                value={formData.customer_email}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 placeholder="cliente@correo.com"
               />
             </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-violet-100 bg-violet-50/40 p-5 shadow-sm">
+          <h4 className="mb-4 inline-flex rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm">Asignación de reparación</h4>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div>
+              <label htmlFor="assigned_mechanic_id" className="block text-sm font-medium text-gray-700 mb-2">
+                Mecánico asignado
+              </label>
+              <select
+                id="assigned_mechanic_id"
+                name="assigned_mechanic_id"
+                value={formData.assigned_mechanic_id}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              >
+                <option value="">Sin asignar</option>
+                {mechanics.map((mechanic) => (
+                  <option key={mechanic.id} value={mechanic.id}>
+                    {mechanic.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {formData.assigned_mechanic_name && (
+              <div className="rounded-lg border border-violet-100 bg-white px-4 py-3 text-sm text-gray-600">
+                Responsable: {formData.assigned_mechanic_name}
+              </div>
+            )}
           </div>
         </div>
 
