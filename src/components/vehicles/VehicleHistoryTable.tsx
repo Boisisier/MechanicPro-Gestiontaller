@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 
 import { Search } from 'lucide-react';
 
-import type { Vehicle } from '../lib/types';
+import type { Vehicle } from '../../lib/types';
 
 
 

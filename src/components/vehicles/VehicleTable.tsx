@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { Edit2, Trash2, Search, AlertCircle, Send, FileDown } from 'lucide-react';
 
-import type { Vehicle } from '../lib/types';
+import type { Vehicle } from '../../lib/types';
 
 
 

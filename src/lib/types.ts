@@ -1,4 +1,4 @@
-export type VehicleStatus = 'En taller' | 'Entregado' | 'En revision';
+export type VehicleStatus = "En taller" | "Entregado" | "En revision";
 
 export interface Vehicle {
   id: string;
@@ -27,7 +27,43 @@ export interface Vehicle {
   updated_at: string;
 }
 
-export type WorkshopRoleName = 'Administrador de Taller' | 'Administrativo' | 'Mecánico';
+export interface Notificacion {
+  type: "success" | "error";
+  message: string;
+}
+
+export interface ReviewServiceItem {
+  name: string;
+  price: string;
+}
+
+export interface ReviewPartItem {
+  inventoryItemId: string;
+  name: string;
+  sku: string;
+  quantity: number;
+  unit: string;
+  unitCost: number;
+  location: string;
+}
+
+export interface BudgetServiceItem {
+  id: string;
+  name: string;
+  price: number;
+}
+
+export interface CatalogService {
+  category: string;
+  name: string;
+}
+
+export type UserRole =
+  | "Administrador de Taller"
+  | "Administrativo"
+  | "Mecánico";
+
+export type WorkshopRoleName = UserRole;
 
 export interface WorkshopRole {
   id: string;
@@ -41,12 +77,27 @@ export interface WorkshopUser {
   id: string;
   name: string;
   email: string;
+  role: UserRole;
   role_id?: string;
-  role_name: WorkshopRoleName;
+  role_name?: WorkshopRoleName;
   modules?: string[];
-  active: boolean;
-  created_at: string;
-  updated_at: string;
+  active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface InventoryFormData {
+  name: string;
+  category: string;
+  sku: string;
+  barcode: string;
+  stock: number;
+  minStock: number;
+  unit: string;
+  location: string;
+  supplier: string;
+  cost: number;
+  notes: string;
 }
 
 export interface InventoryItem {
@@ -62,7 +113,7 @@ export interface InventoryItem {
   supplier: string;
   cost: number;
   notes: string;
-  created_at: string;
+  created_at?: string;
   updated_at: string;
 }
 
@@ -85,4 +136,3 @@ export interface BudgetQuote {
   created_at: string;
   updated_at: string;
 }
-
