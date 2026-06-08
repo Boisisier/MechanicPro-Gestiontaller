@@ -3,9 +3,14 @@ import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import {
   clearAuthToken,
   createVehicle,
+  createAuditLog,
+  createParkingRelease,
   getAuthToken,
+  getAuditLogs,
+  getParkingReleases,
   getSession,
   getVehicles,
+  login,
   loginDemo,
   setAuthToken,
   updateVehicle,
@@ -19,6 +24,7 @@ import type {
   UserRole,
   Vehicle,
   WorkshopUser,
+  AuditLog,
 } from "./lib/types";
 
 import Sidebar from "./components/layout/Sidebar";
@@ -161,6 +167,13 @@ function App() {
 
   const [demoLoading, setDemoLoading] = useState(false);
 
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  const [loginForm, setLoginForm] = useState({
+    email: "demo@local",
+    password: "demo1234",
+  });
+
   const [workshopUsers, setWorkshopUsers] = useState<WorkshopUser[]>(() => {
     const raw = localStorage.getItem("workshopUsers");
     return raw ? JSON.parse(raw) : defaultWorkshopUsers;
@@ -215,6 +228,37 @@ function App() {
 
   const [budgetItems, setBudgetItems] = useState<BudgetServiceItem[]>([]);
 
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => {
+    const raw = localStorage.getItem("auditLogs");
+    return raw ? JSON.parse(raw) : [];
+  });
+
+  const [releasedParkingIds, setReleasedParkingIds] = useState<string[]>(() => {
+    const raw = localStorage.getItem("releasedParkingIds");
+    return raw ? JSON.parse(raw) : [];
+  });
+
+  const currentAuditUser =
+    workshopUsers.find((user) => user.role === "Administrador de Taller") ||
+    workshopUsers[0];
+
+  const logAction = (action: string, module: string, detail: string) => {
+    const entry: AuditLog = {
+      id: crypto.randomUUID(),
+      user_name: currentAuditUser?.name || "Usuario general",
+      module,
+      action,
+      detail,
+      created_at: new Date().toISOString(),
+    };
+    setAuditLogs((prev) => [entry, ...prev].slice(0, 500));
+    if (authToken && sessionRole === "member") {
+      createAuditLog(entry).catch((error) => {
+        console.error("Audit log sync failed", error);
+      });
+    }
+  };
+
   useEffect(() => {
     if (!authToken) {
       setSessionRole(null);
@@ -252,6 +296,14 @@ function App() {
   }, [workshopUsers]);
 
   useEffect(() => {
+    localStorage.setItem("auditLogs", JSON.stringify(auditLogs));
+  }, [auditLogs]);
+
+  useEffect(() => {
+    localStorage.setItem("releasedParkingIds", JSON.stringify(releasedParkingIds));
+  }, [releasedParkingIds]);
+
+  useEffect(() => {
     if (!authToken || sessionRole !== "member") {
       setVehicles([]);
       setLoading(false);
@@ -280,6 +332,22 @@ function App() {
   }, [authToken, sessionRole]);
 
   useEffect(() => {
+    if (!authToken || sessionRole !== "member") {
+      return;
+    }
+
+    getAuditLogs()
+      .then((rows) => setAuditLogs(rows))
+      .catch((error) => console.error("Audit logs load failed", error));
+
+    getParkingReleases()
+      .then((rows) =>
+        setReleasedParkingIds(rows.map((item: { vehicle_id: string }) => item.vehicle_id)),
+      )
+      .catch((error) => console.error("Parking releases load failed", error));
+  }, [authToken, sessionRole]);
+
+  useEffect(() => {
     if (
       reviewVehicleId &&
       !vehicles.find((item) => item.id === reviewVehicleId)
@@ -304,6 +372,28 @@ function App() {
       setAuthError("No se pudo iniciar el acceso demo");
     } finally {
       setDemoLoading(false);
+    }
+  };
+
+  const handleLogin = async (event: FormEvent) => {
+    event.preventDefault();
+    setLoginLoading(true);
+    setAuthError(null);
+
+    try {
+      const session = await login({
+        email: loginForm.email.trim(),
+        password: loginForm.password,
+      });
+      setAuthToken(session.token);
+      setAuthTokenState(session.token);
+      setSessionRole("member");
+      showNotification("success", "Sesion iniciada");
+    } catch (error) {
+      console.error("Login failed", error);
+      setAuthError("Usuario o contrasena incorrectos");
+    } finally {
+      setLoginLoading(false);
     }
   };
 
@@ -351,11 +441,22 @@ function App() {
       },
     ]);
     setUserForm({ name: "", email: "", role: "Administrativo" });
+    logAction(
+      "Usuario creado",
+      "Configuracion",
+      `${name} fue creado con perfil ${userForm.role}`,
+    );
     showNotification("success", "Usuario creado correctamente");
   };
 
   const handleDeleteUser = (id: string) => {
+    const deletedUser = workshopUsers.find((user) => user.id === id);
     setWorkshopUsers((prev) => prev.filter((user) => user.id !== id));
+    logAction(
+      "Usuario eliminado",
+      "Configuracion",
+      deletedUser ? `${deletedUser.name} fue eliminado` : `Usuario ${id} eliminado`,
+    );
     showNotification("success", "Usuario eliminado");
   };
 
@@ -699,6 +800,12 @@ function App() {
         }),
       );
 
+      logAction(
+        statusOverride === "Entregado" ? "Enviado a salida" : "Revision guardada",
+        "En revision",
+        `${vehicle.patente} - ${reviewServices.length} servicio(s), ${reviewParts.length} repuesto(s)`,
+      );
+
       if (statusOverride === "Entregado") {
         setVehicleTab("salida");
       }
@@ -726,6 +833,12 @@ function App() {
       setReviewParts(parseStoredReviewParts(vehicle.servicios));
 
       setReviewNotes(vehicle.observaciones || "");
+
+      logAction(
+        "Enviado a revision",
+        "Vehiculos",
+        `${vehicle.patente} fue enviado a revision`,
+      );
     } catch (error) {
       console.error("Send to revision failed", error);
 
@@ -747,6 +860,12 @@ function App() {
         setReviewParts([]);
         setReviewNotes("");
       }
+
+      logAction(
+        "Devuelto a ingreso",
+        "En revision",
+        `${vehicle.patente} fue devuelto a ingreso`,
+      );
     } catch (error) {
       console.error("Return from revision failed", error);
       showNotification("error", "No se pudo devolver el vehículo");
@@ -786,11 +905,23 @@ function App() {
 
         showNotification("success", "vehí­culo actualizado correctamente");
 
+        logAction(
+          "Vehiculo actualizado",
+          "Vehiculos",
+          `${formData.patente} fue actualizado`,
+        );
+
         setEditingVehicle(null);
       } else {
         const created = await createVehicle(formData);
 
         setVehicles((prev) => [created, ...prev]);
+
+        logAction(
+          "Vehiculo registrado",
+          "Vehiculos",
+          `${formData.patente} fue ingresado al taller`,
+        );
 
         showNotification("success", "vehí­culo registrado correctamente");
       }
@@ -838,6 +969,57 @@ function App() {
   const vehiclesEntregados = vehicles.filter(
     (vehicle) => vehicle.estado === "Entregado",
   );
+
+  const getVehicleExitDate = (vehicle: Vehicle) =>
+    new Date(vehicle.updated_at || vehicle.fecha_ingreso);
+
+  const getParkingDays = (vehicle: Vehicle) => {
+    const exitDate = getVehicleExitDate(vehicle);
+    return Math.max(
+      0,
+      Math.floor((Date.now() - exitDate.getTime()) / (1000 * 60 * 60 * 24)),
+    );
+  };
+
+  const parkedVehicles = vehiclesEntregados.filter(
+    (vehicle) =>
+      getParkingDays(vehicle) > 7 && !releasedParkingIds.includes(vehicle.id),
+  );
+
+  const isParkingNotificationDay = [1, 4].includes(new Date().getDay());
+
+  const getVehicleWorkTotal = (vehicle: Vehicle) => {
+    const serviceTotal = parseStoredReviewServices(vehicle.servicios).reduce(
+      (sum, service) => sum + (parseInt(service.price || "0", 10) || 0),
+      0,
+    );
+    const partTotal = parseStoredReviewParts(vehicle.servicios).reduce(
+      (sum, part) => sum + part.quantity * (part.unitCost || 0),
+      0,
+    );
+    return serviceTotal + partTotal;
+  };
+
+  const handleReleaseFromParking = (vehicle: Vehicle) => {
+    setReleasedParkingIds((prev) =>
+      prev.includes(vehicle.id) ? prev : [...prev, vehicle.id],
+    );
+    logAction(
+      "Salida de estacionamiento",
+      "Estacionamiento",
+      `${vehicle.patente} fue retirado del listado de estacionamiento`,
+    );
+    if (authToken && sessionRole === "member") {
+      createParkingRelease({
+        vehicle_id: vehicle.id,
+        released_by: currentAuditUser?.name || "Usuario general",
+        detail: `${vehicle.patente} retirado del estacionamiento`,
+      }).catch((error) => {
+        console.error("Parking release sync failed", error);
+      });
+    }
+    showNotification("success", "Vehiculo retirado del estacionamiento");
+  };
 
   const activeReviewVehicle =
     vehicles.find((vehicle) => vehicle.id === reviewVehicleId) ||
@@ -910,6 +1092,18 @@ function App() {
           title: "vehículos en revisión",
 
           body: `${vehiclesEnRevision.length} trabajos en curso.`,
+
+          time: "Hoy",
+        }
+      : null,
+
+    parkedVehicles.length > 0 && isParkingNotificationDay
+      ? {
+          id: "parking",
+
+          title: "Estacionamiento",
+
+          body: `${parkedVehicles.length} vehiculo(s) llevan mas de 1 semana.`,
 
           time: "Hoy",
         }
@@ -1001,8 +1195,7 @@ function App() {
             Acceso al sistema
           </h1>
           <p className="text-sm text-gray-500 mt-2">
-            Ingresa con el acceso general para trabajar con una empresa
-            persistente.
+            Ingresa con tu usuario administrador para trabajar con una empresa persistente.
           </p>
 
           {authError && (
@@ -1011,14 +1204,76 @@ function App() {
             </div>
           )}
 
+          <form onSubmit={handleLogin} className="mt-6 space-y-4">
+            <div>
+              <label
+                htmlFor="login-email"
+                className="mb-2 block text-sm font-medium text-gray-700"
+              >
+                Usuario
+              </label>
+              <input
+                id="login-email"
+                type="email"
+                value={loginForm.email}
+                onChange={(event) =>
+                  setLoginForm((prev) => ({
+                    ...prev,
+                    email: event.target.value,
+                  }))
+                }
+                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
+                placeholder="usuario@taller.cl"
+                autoComplete="username"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="login-password"
+                className="mb-2 block text-sm font-medium text-gray-700"
+              >
+                Contraseña
+              </label>
+              <input
+                id="login-password"
+                type="password"
+                value={loginForm.password}
+                onChange={(event) =>
+                  setLoginForm((prev) => ({
+                    ...prev,
+                    password: event.target.value,
+                  }))
+                }
+                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
+                placeholder="Contraseña"
+                autoComplete="current-password"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loginLoading}
+              className="w-full rounded-lg btn-primary px-4 py-3 text-sm font-semibold disabled:opacity-60"
+            >
+              {loginLoading ? "Ingresando..." : "Ingresar"}
+            </button>
+          </form>
+
           <button
             type="button"
             onClick={handleDemoLogin}
             disabled={demoLoading}
-            className="mt-6 w-full rounded-lg btn-primary px-4 py-3 text-sm font-semibold disabled:opacity-60"
+            className="mt-3 w-full rounded-lg border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
           >
-            {demoLoading ? "Preparando acceso..." : "Entrar al sistema"}
+            {demoLoading ? "Preparando acceso..." : "Entrar con demo"}
           </button>
+
+          <div className="mt-5 rounded-lg bg-gray-50 px-4 py-3 text-xs text-gray-600">
+            <p className="font-semibold text-gray-800">Acceso administrador</p>
+            <p>Usuario: demo@local</p>
+            <p>Contraseña: demo1234</p>
+          </div>
         </div>
       </div>
     );
@@ -2300,6 +2555,144 @@ function App() {
             </div>
           )}
 
+          {activeSection === "estacionamiento" && (
+            <div className="space-y-6">
+              <div className="flex flex-col gap-2">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Estacionamiento
+                </h2>
+                <p className="text-sm text-gray-500">
+                  Vehiculos entregados que llevan mas de una semana en el taller.
+                </p>
+              </div>
+
+              {parkedVehicles.length === 0 ? (
+                <div className="rounded-xl border border-gray-200 bg-white p-8 text-sm text-gray-500 shadow-sm">
+                  No hay vehiculos pendientes en estacionamiento.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                  {parkedVehicles.map((vehicle) => {
+                    const services = parseStoredReviewServices(vehicle.servicios);
+                    const parts = parseStoredReviewParts(vehicle.servicios);
+                    const total = getVehicleWorkTotal(vehicle);
+
+                    return (
+                      <div
+                        key={vehicle.id}
+                        className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
+                      >
+                        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-[#0f3a63]">
+                              {getParkingDays(vehicle)} dias estacionado
+                            </p>
+                            <h3 className="mt-1 text-lg font-bold uppercase text-gray-900">
+                              {vehicle.patente}
+                            </h3>
+                            <p className="text-sm text-gray-600">
+                              {vehicle.marca} {vehicle.modelo} · {vehicle.ano}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleReleaseFromParking(vehicle)}
+                            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700"
+                          >
+                            Sacar del estacionamiento
+                          </button>
+                        </div>
+
+                        <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+                          <div className="rounded-lg border border-gray-200 p-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Cliente
+                            </p>
+                            <p className="mt-2 text-sm font-semibold text-gray-900">
+                              {vehicle.customer_name || "Sin cliente"}
+                            </p>
+                            <p className="text-xs text-gray-500">{vehicle.customer_rut || "-"}</p>
+                            <p className="text-xs text-gray-500">{vehicle.customer_phone || "-"}</p>
+                            <p className="text-xs text-gray-500">{vehicle.customer_city || "-"}</p>
+                          </div>
+
+                          <div className="rounded-lg border border-gray-200 p-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Usuario
+                            </p>
+                            <p className="mt-2 text-sm font-semibold text-gray-900">
+                              {vehicle.assigned_mechanic_name || "Sin mecanico asignado"}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Salida: {getVehicleExitDate(vehicle).toLocaleDateString("es-CL")}
+                            </p>
+                          </div>
+
+                          <div className="rounded-lg border border-gray-200 p-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Valor total
+                            </p>
+                            <p className="mt-2 text-2xl font-bold text-gray-900">
+                              ${total.toLocaleString("es-CL")}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                          <div className="rounded-lg border border-gray-200 p-4">
+                            <p className="text-sm font-semibold text-gray-900">
+                              Trabajos realizados
+                            </p>
+                            {services.length === 0 ? (
+                              <p className="mt-2 text-sm text-gray-500">
+                                Sin servicios registrados.
+                              </p>
+                            ) : (
+                              <ul className="mt-2 space-y-1 text-sm text-gray-700">
+                                {services.map((service) => (
+                                  <li key={service.name} className="flex justify-between gap-3">
+                                    <span>{service.name}</span>
+                                    <span className="font-semibold">
+                                      ${(parseInt(service.price || "0", 10) || 0).toLocaleString("es-CL")}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+
+                          <div className="rounded-lg border border-gray-200 p-4">
+                            <p className="text-sm font-semibold text-gray-900">
+                              Repuestos e insumos
+                            </p>
+                            {parts.length === 0 ? (
+                              <p className="mt-2 text-sm text-gray-500">
+                                Sin repuestos registrados.
+                              </p>
+                            ) : (
+                              <ul className="mt-2 space-y-1 text-sm text-gray-700">
+                                {parts.map((part) => (
+                                  <li key={part.inventoryItemId} className="flex justify-between gap-3">
+                                    <span>
+                                      {part.name} x{part.quantity} {part.unit}
+                                    </span>
+                                    <span className="font-semibold">
+                                      ${(part.quantity * (part.unitCost || 0)).toLocaleString("es-CL")}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {activeSection === "reportes" && (
             <>
               {loading ? (
@@ -2319,6 +2712,84 @@ function App() {
                 />
               )}
             </>
+          )}
+
+          {activeSection === "registro_acciones" && (
+            <div className="space-y-6">
+              <div className="flex flex-col gap-2">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Registro de acciones
+                </h2>
+                <p className="text-sm text-gray-500">
+                  Historial de acciones realizadas por usuarios del sistema.
+                </p>
+              </div>
+
+              {currentAuditUser?.role !== "Administrador de Taller" ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm font-semibold text-red-700">
+                  Solo el Administrador de Taller puede ingresar a este modulo.
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                  <div className="border-b border-gray-200 px-5 py-4">
+                    <p className="text-sm font-semibold text-gray-900">
+                      {auditLogs.length} accion(es) registradas
+                    </p>
+                  </div>
+
+                  {auditLogs.length === 0 ? (
+                    <div className="p-8 text-sm text-gray-500">
+                      Todavia no hay acciones registradas.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">
+                              Fecha y hora
+                            </th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">
+                              Usuario
+                            </th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">
+                              Modulo
+                            </th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">
+                              Accion
+                            </th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">
+                              Detalle
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 bg-white">
+                          {auditLogs.map((entry) => (
+                            <tr key={entry.id}>
+                              <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                                {new Date(entry.created_at).toLocaleString("es-CL")}
+                              </td>
+                              <td className="px-4 py-3 font-semibold text-gray-900">
+                                {entry.user_name}
+                              </td>
+                              <td className="px-4 py-3 text-gray-700">
+                                {entry.module}
+                              </td>
+                              <td className="px-4 py-3 text-gray-700">
+                                {entry.action}
+                              </td>
+                              <td className="px-4 py-3 text-gray-600">
+                                {entry.detail || "-"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           {activeSection === "configuracion" && (

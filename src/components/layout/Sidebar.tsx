@@ -23,6 +23,7 @@ export default function Sidebar({ activeSection, onSectionChange, isOpen, onClos
         { id: 'vehiculos', label: 'Vehículos', icon: Car },
         { id: 'presupuesto', label: 'Presupuesto', icon: Calculator },
         { id: 'inventario', label: 'Inventario', icon: Package },
+        { id: 'estacionamiento', label: 'Estacionamiento', icon: Car },
         { id: 'reportes', label: 'Reportes', icon: FileText },
       ],
     },
@@ -30,6 +31,7 @@ export default function Sidebar({ activeSection, onSectionChange, isOpen, onClos
       title: 'Sistema',
       items: [
         { id: 'configuracion', label: 'Configuración', icon: Settings },
+        { id: 'registro_acciones', label: 'Registro de acciones', icon: FileText },
       ],
     },
   ];

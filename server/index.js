@@ -199,6 +199,28 @@ const ensureVehicleColumns = async () => {
     )
   `);
   await pool.query(`
+    create table if not exists audit_logs (
+      id uuid primary key default gen_random_uuid(),
+      company_id uuid not null references companies(id) on delete cascade,
+      user_name text not null,
+      module text not null,
+      action text not null,
+      detail text default '',
+      created_at timestamptz not null default now()
+    )
+  `);
+  await pool.query(`
+    create table if not exists parking_releases (
+      id uuid primary key default gen_random_uuid(),
+      company_id uuid not null references companies(id) on delete cascade,
+      vehicle_id uuid not null references vehicles(id) on delete cascade,
+      released_by text default '',
+      detail text default '',
+      created_at timestamptz not null default now(),
+      unique (company_id, vehicle_id)
+    )
+  `);
+  await pool.query(`
     alter table vehicles
       add column if not exists codigo_vin text,
       add column if not exists codigo_motor text,
@@ -234,6 +256,8 @@ const ensureVehicleColumns = async () => {
       where barcode is not null and barcode <> ''
   `);
   await pool.query('create index if not exists idx_budget_quotes_company_id on budget_quotes(company_id)');
+  await pool.query('create index if not exists idx_audit_logs_company_created_at on audit_logs(company_id, created_at desc)');
+  await pool.query('create index if not exists idx_parking_releases_company_vehicle on parking_releases(company_id, vehicle_id)');
 };
 
 const seedDefaultRoles = async (client, companyId) => {
@@ -416,6 +440,123 @@ app.post('/auth/demo-login', async (req, res) => {
       // ignore rollback errors
     }
     console.error('POST /auth/demo-login failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  } finally {
+    client.release();
+  }
+});
+
+app.post('/auth/login', async (req, res) => {
+  if (!ensureJwtSecret(res)) {
+    return;
+  }
+
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const password = String(req.body.password || '');
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'missing_credentials' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+
+    if (email === demoUserEmail.toLowerCase() && password === demoUserPassword) {
+      let companyResult = await client.query('select id, name from companies where name = $1 limit 1', [
+        demoCompanyName,
+      ]);
+      if (companyResult.rows.length === 0) {
+        companyResult = await client.query(
+          'insert into companies (name) values ($1) returning id, name',
+          [demoCompanyName]
+        );
+      }
+      const company = companyResult.rows[0];
+      await seedDefaultRoles(client, company.id);
+
+      let userResult = await client.query(
+        'select id, full_name, email, password_hash from users where email = $1 limit 1',
+        [email]
+      );
+      if (userResult.rows.length === 0) {
+        userResult = await client.query(
+          'insert into users (full_name, email, password_hash) values ($1, $2, $3) returning id, full_name, email, password_hash',
+          [demoUserName, email, hashPassword(password)]
+        );
+      } else if (!verifyPassword(password, userResult.rows[0].password_hash)) {
+        userResult = await client.query(
+          'update users set full_name = $1, password_hash = $2 where email = $3 returning id, full_name, email, password_hash',
+          [demoUserName, hashPassword(password), email]
+        );
+      }
+      const user = userResult.rows[0];
+
+      const membershipResult = await client.query(
+        'select id from company_members where company_id = $1 and user_id = $2 limit 1',
+        [company.id, user.id]
+      );
+      if (membershipResult.rows.length === 0) {
+        await client.query(
+          'insert into company_members (company_id, user_id, role) values ($1, $2, $3)',
+          [company.id, user.id, 'admin']
+        );
+      }
+
+      await client.query('commit');
+
+      const token = jwt.sign(
+        { user_id: user.id, company_id: company.id, role: 'admin' },
+        jwtSecret,
+        { expiresIn: '8h' }
+      );
+
+      return res.json({
+        token,
+        user: { id: user.id, full_name: user.full_name, email: user.email },
+        company: { id: company.id, name: company.name },
+        role: 'admin',
+      });
+    }
+
+    const { rows } = await client.query(
+      `select u.id, u.full_name, u.email, u.password_hash, c.id as company_id, c.name as company_name, cm.role
+       from users u
+       join company_members cm on cm.user_id = u.id
+       join companies c on c.id = cm.company_id
+       where lower(u.email) = $1
+       order by cm.created_at asc
+       limit 1`,
+      [email]
+    );
+
+    if (rows.length === 0 || !verifyPassword(password, rows[0].password_hash)) {
+      await client.query('rollback');
+      return res.status(401).json({ error: 'invalid_credentials' });
+    }
+
+    await client.query('commit');
+
+    const user = rows[0];
+    const token = jwt.sign(
+      { user_id: user.id, company_id: user.company_id, role: user.role },
+      jwtSecret,
+      { expiresIn: '8h' }
+    );
+
+    res.json({
+      token,
+      user: { id: user.id, full_name: user.full_name, email: user.email },
+      company: { id: user.company_id, name: user.company_name },
+      role: user.role,
+    });
+  } catch (error) {
+    try {
+      await client.query('rollback');
+    } catch {
+      // ignore rollback errors
+    }
+    console.error('POST /auth/login failed', error);
     res.status(500).json({ error: 'internal_error' });
   } finally {
     client.release();
@@ -825,6 +966,109 @@ app.delete('/budgets/:id', authRequired, ensureWritable, async (req, res) => {
     res.json({ ok: true });
   } catch (error) {
     console.error('DELETE /budgets/:id failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.get('/audit-logs', authRequired, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  try {
+    const { rows } = await pool.query(
+      `select id, user_name, module, action, detail, created_at
+       from audit_logs
+       where company_id = $1
+       order by created_at desc
+       limit 500`,
+      [companyId]
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error('GET /audit-logs failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.post('/audit-logs', authRequired, ensureWritable, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  const userName = String(req.body.user_name || req.body.user || '').trim();
+  const moduleName = String(req.body.module || '').trim();
+  const action = String(req.body.action || '').trim();
+  const detail = String(req.body.detail || '').trim();
+
+  if (!userName || !moduleName || !action) {
+    return res.status(400).json({ error: 'missing_fields' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `insert into audit_logs (company_id, user_name, module, action, detail)
+       values ($1, $2, $3, $4, $5)
+       returning id, user_name, module, action, detail, created_at`,
+      [companyId, userName, moduleName, action, detail]
+    );
+    res.status(201).json(rows[0]);
+  } catch (error) {
+    console.error('POST /audit-logs failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.get('/parking-releases', authRequired, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  try {
+    const { rows } = await pool.query(
+      `select id, vehicle_id, released_by, detail, created_at
+       from parking_releases
+       where company_id = $1
+       order by created_at desc`,
+      [companyId]
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error('GET /parking-releases failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.post('/parking-releases', authRequired, ensureWritable, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  const vehicleId = String(req.body.vehicle_id || req.body.vehicleId || '').trim();
+  const releasedBy = String(req.body.released_by || req.body.releasedBy || '').trim();
+  const detail = String(req.body.detail || '').trim();
+
+  if (!vehicleId) {
+    return res.status(400).json({ error: 'missing_vehicle_id' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `insert into parking_releases (company_id, vehicle_id, released_by, detail)
+       values ($1, $2, $3, $4)
+       on conflict (company_id, vehicle_id)
+       do update set released_by = excluded.released_by, detail = excluded.detail, created_at = now()
+       returning id, vehicle_id, released_by, detail, created_at`,
+      [companyId, vehicleId, releasedBy, detail]
+    );
+    res.status(201).json(rows[0]);
+  } catch (error) {
+    console.error('POST /parking-releases failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.delete('/parking-releases/:vehicleId', authRequired, ensureWritable, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  try {
+    const { rows } = await pool.query(
+      'delete from parking_releases where vehicle_id = $1 and company_id = $2 returning id',
+      [req.params.vehicleId, companyId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('DELETE /parking-releases/:vehicleId failed', error);
     res.status(500).json({ error: 'internal_error' });
   }
 });

@@ -38,6 +38,15 @@ export const loginDemo = async () =>
     }),
   );
 
+export const login = async (body: { email: string; password: string }) =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
+
 export const getSession = async () =>
   handleResponse(
     await fetch(`${apiBaseUrl}/auth/me`, {
@@ -179,6 +188,46 @@ export const updateBudget = async (id: string, body: unknown) =>
 export const deleteBudget = async (id: string) =>
   handleResponse(
     await fetch(`${apiBaseUrl}/budgets/${id}`, {
+      method: 'DELETE',
+      headers: withAuthHeader(),
+    })
+  );
+
+export const getAuditLogs = async () =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/audit-logs`, {
+      headers: withAuthHeader(),
+    })
+  );
+
+export const createAuditLog = async (body: unknown) =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/audit-logs`, {
+      method: 'POST',
+      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(body),
+    })
+  );
+
+export const getParkingReleases = async () =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/parking-releases`, {
+      headers: withAuthHeader(),
+    })
+  );
+
+export const createParkingRelease = async (body: unknown) =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/parking-releases`, {
+      method: 'POST',
+      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(body),
+    })
+  );
+
+export const deleteParkingRelease = async (vehicleId: string) =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/parking-releases/${vehicleId}`, {
       method: 'DELETE',
       headers: withAuthHeader(),
     })

@@ -89,6 +89,23 @@ export interface WorkshopUser {
   updated_at?: string;
 }
 
+export interface AuditLog {
+  id: string;
+  user_name: string;
+  module: string;
+  action: string;
+  detail: string;
+  created_at: string;
+}
+
+export interface ParkingRelease {
+  id: string;
+  vehicle_id: string;
+  released_by: string;
+  detail: string;
+  created_at: string;
+}
+
 export interface InventoryFormData {
   name: string;
   category: string;
