@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   detail text DEFAULT '',
   created_at timestamptz NOT NULL DEFAULT now()
 );
+-- tabla de registro de acciones para auditoria, con indices para consultas rapidas por empresa y fecha
 
 CREATE TABLE IF NOT EXISTS parking_releases (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -17,6 +18,7 @@ CREATE TABLE IF NOT EXISTS parking_releases (
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, vehicle_id)
 );
+-- tabla para registrar liberaciones de vehiculos del estacionamiento, con indices para consultas rapidas por empresa y vehiculo
 
 CREATE INDEX IF NOT EXISTS idx_audit_logs_company_created_at
   ON audit_logs(company_id, created_at DESC);

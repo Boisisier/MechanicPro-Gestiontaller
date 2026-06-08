@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS companies (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
-
+-- tablas para gestionar empresas, usuarios, roles, vehiculos, inventario y presupuestos en el taller mecanico
 CREATE TABLE IF NOT EXISTS users (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   full_name text NOT NULL,
@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
-
+-- tabla de usuarios globales, con indices para consultas rapidas por email
 CREATE TABLE IF NOT EXISTS company_members (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS company_members (
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, user_id)
 );
-
+-- tabla de miembros de empresa, con indices para consultas rapidas por empresa y usuario
 CREATE TABLE IF NOT EXISTS roles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id uuid REFERENCES companies(id) ON DELETE CASCADE,
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS roles (
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, name)
 );
-
+-- tabla de roles personalizados por empresa, con indices para consultas rapidas por empresa y nombre de rol
 CREATE TABLE IF NOT EXISTS workshop_users (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS workshop_users (
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, email)
 );
+-- tabla para gestionar usuarios del taller, con indices para consultas rapidas por empresa y email
 
 CREATE TABLE IF NOT EXISTS vehicles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -80,7 +81,7 @@ CREATE TABLE IF NOT EXISTS vehicles (
   CHECK (estado IN ('En taller', 'En revision', 'Entregado')),
   CHECK (tipo_vehiculo IN ('Auto', 'Camioneta', 'SUV', 'Moto', 'Camion', 'Furgon'))
 );
-
+-- tabla de vehiculos en taller, con indices para consultas rapidas por empresa, patente, fecha de ingreso y estado
 CREATE TABLE IF NOT EXISTS inventory_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
@@ -98,7 +99,7 @@ CREATE TABLE IF NOT EXISTS inventory_items (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
-
+-- tabla de items de inventario, con indices para consultas rapidas por empresa, sku y codigo de barras
 CREATE TABLE IF NOT EXISTS budget_quotes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
@@ -112,7 +113,7 @@ CREATE TABLE IF NOT EXISTS budget_quotes (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
-
+-- tabla de presupuestos y cotizaciones, con indices para consultas rapidas por empresa y estado
 CREATE TABLE IF NOT EXISTS budget_quote_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   budget_quote_id uuid NOT NULL REFERENCES budget_quotes(id) ON DELETE CASCADE,
@@ -120,7 +121,7 @@ CREATE TABLE IF NOT EXISTS budget_quote_items (
   price numeric(12,2) NOT NULL DEFAULT 0,
   created_at timestamptz NOT NULL DEFAULT now()
 );
-
+-- tabla de items asociados a presupuestos, con indice para consultas rapidas por presupuesto
 CREATE TABLE IF NOT EXISTS audit_logs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
@@ -130,7 +131,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   detail text DEFAULT '',
   created_at timestamptz NOT NULL DEFAULT now()
 );
-
+-- tabla de registro de acciones para auditoria, con indices para consultas rapidas por empresa y fecha
 CREATE TABLE IF NOT EXISTS parking_releases (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
@@ -140,7 +141,7 @@ CREATE TABLE IF NOT EXISTS parking_releases (
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, vehicle_id)
 );
-
+-- tabla para registrar liberaciones de vehiculos del estacionamiento, con indices para consultas rapidas por empresa y vehiculo
 CREATE OR REPLACE FUNCTION set_updated_at()
 RETURNS trigger AS $$
 BEGIN
@@ -148,42 +149,42 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
+-- triggers para actualizar el campo updated_at automaticamente en cada tabla al modificar un registro
 DROP TRIGGER IF EXISTS set_companies_updated_at ON companies;
 CREATE TRIGGER set_companies_updated_at
   BEFORE UPDATE ON companies
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
+-- triggers para actualizar el campo updated_at automaticamente en cada tabla al modificar un registro
 DROP TRIGGER IF EXISTS set_users_updated_at ON users;
 CREATE TRIGGER set_users_updated_at
   BEFORE UPDATE ON users
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
+--  triggers para actualizar el campo updated_at automaticamente en cada tabla al modificar un registro
 DROP TRIGGER IF EXISTS set_roles_updated_at ON roles;
 CREATE TRIGGER set_roles_updated_at
   BEFORE UPDATE ON roles
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
+-- triggers para actualizar el campo updated_at automaticamente en cada tabla al modificar un registro
 DROP TRIGGER IF EXISTS set_workshop_users_updated_at ON workshop_users;
 CREATE TRIGGER set_workshop_users_updated_at
   BEFORE UPDATE ON workshop_users
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
+--  triggers para actualizar el campo updated_at automaticamente en cada tabla al modificar un registro
 DROP TRIGGER IF EXISTS set_vehicles_updated_at ON vehicles;
 CREATE TRIGGER set_vehicles_updated_at
   BEFORE UPDATE ON vehicles
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
+--  triggers para actualizar el campo updated_at automaticamente en cada tabla al modificar un registro
 DROP TRIGGER IF EXISTS set_inventory_items_updated_at ON inventory_items;
 CREATE TRIGGER set_inventory_items_updated_at
   BEFORE UPDATE ON inventory_items
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
+--  triggers para actualizar el campo updated_at automaticamente en cada tabla al modificar un registro
 DROP TRIGGER IF EXISTS set_budget_quotes_updated_at ON budget_quotes;
 CREATE TRIGGER set_budget_quotes_updated_at
   BEFORE UPDATE ON budget_quotes
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
+--  triggers para actualizar el campo updated_at automaticamente en cada tabla al modificar un registro
 CREATE INDEX IF NOT EXISTS idx_company_members_company_id ON company_members(company_id);
 CREATE INDEX IF NOT EXISTS idx_company_members_user_id ON company_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_roles_company_id ON roles(company_id);
@@ -202,3 +203,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_items_company_barcode_unique
 CREATE INDEX IF NOT EXISTS idx_budget_quotes_company_id ON budget_quotes(company_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_company_created_at ON audit_logs(company_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_parking_releases_company_vehicle ON parking_releases(company_id, vehicle_id);
+-- actualizacion de roles para incluir el nuevo modulo de registro de acciones en el taller
+UPDATE roles
+SET modules = ARRAY['Dashboard', 'VehÃ­culos', 'Presupuesto', 'Inventario', 'Estacionamiento', 'Reportes', 'ConfiguraciÃ³n', 'Registro de acciones'],
+    updated_at = now()
+WHERE name = 'Administrador de Taller';     
