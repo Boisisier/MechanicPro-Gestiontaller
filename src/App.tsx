@@ -33,8 +33,6 @@ import VehicleForm, {
 
 import VehicleTable from "./components/vehicles/VehicleTable";
 
-import VehicleHistoryTable from "./components/vehicles/VehicleHistoryTable";
-
 import {
   CheckCircle,
   AlertCircle,
@@ -45,6 +43,10 @@ import {
   Calculator,
   RotateCcw,
   Send,
+  TrendingUp,
+  History,
+  Package,
+  Wrench,
 } from "lucide-react";
 
 import { toSoftAccent } from "./utils/colors";
@@ -731,6 +733,26 @@ function App() {
     }
   };
 
+  const handleReturnFromRevision = async (vehicle: Vehicle) => {
+    try {
+      await updateVehicleRecord(
+        vehicle,
+        { estado: "En taller" },
+        "Vehículo devuelto a ingreso",
+      );
+
+      if (reviewVehicleId === vehicle.id) {
+        setReviewVehicleId(null);
+        setReviewServices([]);
+        setReviewParts([]);
+        setReviewNotes("");
+      }
+    } catch (error) {
+      console.error("Return from revision failed", error);
+      showNotification("error", "No se pudo devolver el vehículo");
+    }
+  };
+
   const handleVehicleReady = (vehicle: Vehicle) => {
     setReadyVehicleIds((prev) =>
       prev.includes(vehicle.id) ? prev : [...prev, vehicle.id],
@@ -900,6 +922,76 @@ function App() {
   }>;
 
   const budgetTotal = budgetItems.reduce((sum, item) => sum + item.price, 0);
+
+  const completedServices = vehicles.flatMap((vehicle) =>
+    parseStoredReviewServices(vehicle.servicios).map((service) => ({
+      ...service,
+      vehicle,
+      priceValue: parseInt(service.price || "0", 10) || 0,
+    })),
+  );
+
+  const salesByMonth = Array.from({ length: 6 }, (_, index) => {
+    const date = new Date();
+    date.setMonth(date.getMonth() - (5 - index));
+    const month = date.getMonth();
+    const year = date.getFullYear();
+    const total = vehicles
+      .filter((vehicle) => {
+        const vehicleDate = new Date(vehicle.updated_at || vehicle.fecha_ingreso);
+        return vehicleDate.getMonth() === month && vehicleDate.getFullYear() === year;
+      })
+      .flatMap((vehicle) => parseStoredReviewServices(vehicle.servicios))
+      .reduce((sum, service) => sum + (parseInt(service.price || "0", 10) || 0), 0);
+    return {
+      label: date.toLocaleDateString("es-CL", { month: "short" }).replace(".", ""),
+      total,
+    };
+  });
+
+  const maxSales = Math.max(...salesByMonth.map((item) => item.total), 1);
+  const weeklySales = vehicles
+    .filter((vehicle) => {
+      const vehicleDate = new Date(vehicle.updated_at || vehicle.fecha_ingreso);
+      const now = new Date();
+      const diffMs = now.getTime() - vehicleDate.getTime();
+      return diffMs >= 0 && diffMs <= 7 * 24 * 60 * 60 * 1000;
+    })
+    .flatMap((vehicle) => parseStoredReviewServices(vehicle.servicios))
+    .reduce((sum, service) => sum + (parseInt(service.price || "0", 10) || 0), 0);
+
+  const mostRequestedServices = Object.entries(
+    completedServices.reduce<Record<string, number>>((acc, service) => {
+      acc[service.name] = (acc[service.name] || 0) + 1;
+      return acc;
+    }, {}),
+  )
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+  const maxRequestedServiceCount = Math.max(...mostRequestedServices.map((item) => item.count), 1);
+
+  const latestMaintenances = vehicles
+    .filter((vehicle) => parseStoredReviewServices(vehicle.servicios).length > 0)
+    .sort(
+      (a, b) =>
+        new Date(b.updated_at || b.fecha_ingreso).getTime() -
+        new Date(a.updated_at || a.fecha_ingreso).getTime(),
+    )
+    .slice(0, 5);
+
+  const inventoryMovements = vehicles
+    .flatMap((vehicle) =>
+      parseStoredReviewParts(vehicle.servicios).map((part) => ({
+        id: `${vehicle.id}-${part.inventoryItemId}`,
+        name: part.name,
+        quantity: part.quantity,
+        vehicle,
+        date: vehicle.updated_at || vehicle.fecha_ingreso,
+      })),
+    )
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 5);
 
   if (!authToken) {
     return (
@@ -1138,15 +1230,19 @@ function App() {
                     ) : (
                       <div className="space-y-3 max-h-[32rem] overflow-y-auto pr-1">
                         {vehiclesEnRevision.map((vehicle) => (
-                          <button
+                          <div
                             key={vehicle.id}
-                            onClick={() => handleReviewSelect(vehicle)}
-                            className={`w-full text-left rounded-lg border px-4 py-3 transition-colors ${
+                            className={`rounded-lg border px-4 py-3 transition-colors ${
                               reviewVehicleId === vehicle.id
                                 ? "border-blue-500 bg-blue-50"
                                 : "border-gray-200 hover:bg-gray-50"
                             }`}
                           >
+                            <button
+                              type="button"
+                              onClick={() => handleReviewSelect(vehicle)}
+                              className="w-full text-left"
+                            >
                             <p className="text-sm font-semibold text-gray-900 uppercase">
                               {vehicle.patente}
                             </p>
@@ -1160,6 +1256,17 @@ function App() {
                               Sigue en revisión hasta pasar a salida
                             </p>
                           </button>
+                            <div className="mt-3 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => handleReturnFromRevision(vehicle)}
+                                className="rounded-md border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+                                title="Devolver a ingreso"
+                              >
+                                Devolver
+                              </button>
+                            </div>
+                          </div>
                         ))}
                       </div>
                     )}
@@ -1364,7 +1471,7 @@ function App() {
                             reviewServices.map((service) => (
                               <div
                                 key={service.name}
-                                className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 p-4 md:grid-cols-[minmax(0,1fr)_180px_44px]"
+                                className="grid grid-cols-1 gap-4 rounded-lg border border-gray-200 p-4 md:grid-cols-[minmax(0,1fr)_220px_44px]"
                               >
                                 <div>
                                   <p className="text-sm font-semibold text-gray-900">
@@ -1376,7 +1483,7 @@ function App() {
                                   </p>
                                 </div>
 
-                                <div className="mb-6 space-y-3">
+                                <div className="hidden">
                                   <div className="flex items-center justify-between gap-3">
                                     <h4 className="text-sm font-semibold text-gray-900">
                                       Repuestos utilizados
@@ -1500,6 +1607,81 @@ function App() {
                                 </div>
                               </div>
                             ))
+                          )}
+                        </div>
+
+                        <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                            <h4 className="text-sm font-semibold text-gray-900">
+                              Repuestos utilizados
+                            </h4>
+                            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-600">
+                              {reviewParts.length} seleccionado(s)
+                            </span>
+                          </div>
+
+                          {reviewParts.length === 0 ? (
+                            <p className="rounded-lg border border-dashed border-gray-300 bg-white px-4 py-5 text-sm text-gray-500">
+                              No hay repuestos seleccionados todavía.
+                            </p>
+                          ) : (
+                            <div className="space-y-3">
+                              {reviewParts.map((part) => {
+                                const inventoryItem = inventoryItems.find(
+                                  (item) => item.id === part.inventoryItemId,
+                                );
+                                const savedQuantity =
+                                  parseStoredReviewParts(activeReviewVehicle.servicios).find(
+                                    (savedPart) =>
+                                      savedPart.inventoryItemId === part.inventoryItemId,
+                                  )?.quantity || 0;
+                                const availableQuantity = (inventoryItem?.stock || 0) + savedQuantity;
+
+                                return (
+                                  <div
+                                    key={part.inventoryItemId}
+                                    className="grid grid-cols-1 gap-4 rounded-lg border border-gray-200 bg-white p-4 md:grid-cols-[minmax(0,1fr)_180px_44px]"
+                                  >
+                                    <div>
+                                      <p className="text-sm font-semibold text-gray-900">
+                                        {part.name}
+                                      </p>
+                                      <p className="text-xs text-gray-500">
+                                        SKU: {part.sku || "-"} · Bodega: {part.location || "-"} · Stock disponible: {availableQuantity} {part.unit}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                                        Cantidad
+                                      </label>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        max={Math.max(1, availableQuantity)}
+                                        value={part.quantity}
+                                        onChange={(event) =>
+                                          handleReviewPartQuantityChange(
+                                            part.inventoryItemId,
+                                            parseInt(event.target.value, 10) || 1,
+                                          )
+                                        }
+                                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                                      />
+                                    </div>
+                                    <div className="flex items-end">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveReviewPart(part.inventoryItemId)}
+                                        className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
+                                        title="Eliminar repuesto"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           )}
                         </div>
 
@@ -1730,7 +1912,7 @@ function App() {
           )}
 
           {activeSection === "dashboard" && (
-            <>
+            <div className="space-y-6">
               <MetricsCards
                 totalvehicles={metrics.total}
                 enTaller={metrics.enTaller}
@@ -1738,16 +1920,181 @@ function App() {
                 enRevision={metrics.enRevision}
               />
 
-              {loading ? (
-                <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+                <div className="space-y-6 xl:col-span-2">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-gray-500">Flujo semanal</p>
+                          <p className="mt-1 text-2xl font-bold text-gray-900">
+                            ${weeklySales.toLocaleString("es-CL")}
+                          </p>
+                        </div>
+                        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#0f3a63]/10">
+                          <TrendingUp className="h-5 w-5 text-[#0f3a63]" />
+                        </div>
+                      </div>
+                    </div>
 
-                  <p className="text-gray-500 mt-4">Cargando historial...</p>
+                    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-gray-500">Mantenciones registradas</p>
+                          <p className="mt-1 text-2xl font-bold text-gray-900">
+                            {completedServices.length}
+                          </p>
+                        </div>
+                        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#0f3a63]/10">
+                          <Wrench className="h-5 w-5 text-[#0f3a63]" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                    <div className="mb-6 flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">Flujo de ventas mensual</h3>
+                        <p className="text-sm text-gray-500">Total estimado por servicios realizados</p>
+                      </div>
+                      <span className="rounded-lg bg-[#0f3a63]/10 px-3 py-1 text-xs font-semibold text-[#0f3a63]">
+                        Últimos 6 meses
+                      </span>
+                    </div>
+                    <div className="flex h-64 items-end gap-4 border-b border-gray-200 pb-4">
+                      {salesByMonth.map((item) => (
+                        <div key={item.label} className="flex flex-1 flex-col items-center gap-2">
+                          <div className="flex h-48 w-full items-end rounded-lg bg-gray-50 px-2">
+                            <div
+                              className="w-full rounded-t-lg bg-[#0f3a63]"
+                              style={{ height: `${Math.max(8, (item.total / maxSales) * 100)}%` }}
+                              title={`$${item.total.toLocaleString("es-CL")}`}
+                            />
+                          </div>
+                          <p className="text-xs font-semibold capitalize text-gray-500">{item.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                    <div className="mb-4 flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-gray-900">Historial de mantenciones</h3>
+                      <History className="h-5 w-5 text-[#0f3a63]" />
+                    </div>
+                    {latestMaintenances.length === 0 ? (
+                      <p className="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500">
+                        No hay mantenciones registradas.
+                      </p>
+                    ) : (
+                      <div className="divide-y divide-gray-100">
+                        {latestMaintenances.map((vehicle) => {
+                          const services = parseStoredReviewServices(vehicle.servicios);
+                          return (
+                            <div key={vehicle.id} className="py-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-sm font-semibold uppercase text-gray-900">{vehicle.patente}</p>
+                                  <p className="text-xs text-gray-500">
+                                    {vehicle.marca} {vehicle.modelo} · {vehicle.customer_name || "Sin cliente"}
+                                  </p>
+                                </div>
+                                <span className="text-xs text-gray-500">
+                                  {new Date(vehicle.updated_at || vehicle.fecha_ingreso).toLocaleDateString("es-CL")}
+                                </span>
+                              </div>
+                              <p className="mt-2 text-sm text-gray-700">
+                                {services.map((service) => service.name).slice(0, 3).join(", ")}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              ) : (
-                <VehicleHistoryTable vehicles={vehicles} />
-              )}
-            </>
+
+                <div className="space-y-6">
+                  <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                    <div className="mb-4 flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-gray-900">Servicios más solicitados</h3>
+                      <Wrench className="h-5 w-5 text-[#0f3a63]" />
+                    </div>
+                    {mostRequestedServices.length === 0 ? (
+                      <p className="text-sm text-gray-500">Sin servicios registrados.</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {mostRequestedServices.map((service) => (
+                          <div key={service.name}>
+                            <div className="mb-1 flex items-center justify-between gap-3">
+                              <p className="truncate text-sm font-medium text-gray-800">{service.name}</p>
+                              <span className="text-xs font-semibold text-[#0f3a63]">{service.count}</span>
+                            </div>
+                            <div className="h-2 rounded-full bg-gray-100">
+                              <div
+                                className="h-2 rounded-full bg-[#0f3a63]"
+                                style={{ width: `${(service.count / maxRequestedServiceCount) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                    <div className="mb-4 flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-gray-900">Movimientos de inventario</h3>
+                      <Package className="h-5 w-5 text-[#0f3a63]" />
+                    </div>
+                    {inventoryMovements.length === 0 ? (
+                      <p className="text-sm text-gray-500">Sin movimientos de repuestos.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {inventoryMovements.map((movement) => (
+                          <div key={movement.id} className="rounded-lg bg-gray-50 px-3 py-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-sm font-semibold text-gray-900">{movement.name}</p>
+                              <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-semibold text-red-700">
+                                -{movement.quantity}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-gray-500">
+                              {movement.vehicle.patente} · {new Date(movement.date).toLocaleDateString("es-CL")}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                    <h3 className="text-lg font-semibold text-gray-900">Estado del taller</h3>
+                    <div className="mt-4 space-y-3">
+                      {[
+                        { label: "En revisión", value: metrics.enRevision, color: "bg-[#0f3a63]" },
+                        { label: "En taller", value: metrics.enTaller, color: "bg-blue-300" },
+                        { label: "Entregados", value: metrics.entregados, color: "bg-emerald-500" },
+                      ].map((item) => (
+                        <div key={item.label}>
+                          <div className="mb-1 flex items-center justify-between">
+                            <span className="text-sm text-gray-600">{item.label}</span>
+                            <span className="text-sm font-semibold text-gray-900">{item.value}</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-gray-100">
+                            <div
+                              className={`h-2 rounded-full ${item.color}`}
+                              style={{ width: `${metrics.total ? (item.value / metrics.total) * 100 : 0}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
 
           {activeSection === "inventario" && (

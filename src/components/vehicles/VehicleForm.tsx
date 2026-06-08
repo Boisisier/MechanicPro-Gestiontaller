@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { History, RotateCcw, Save, Search, Send, X } from 'lucide-react';
+import { getModelsForBrand, vehicleBrandNames } from '../../features/vehicles/vehicleModelCatalog';
 
 type PreviousVehicleData = Partial<VehicleFormData> & {
   id?: string;
@@ -148,6 +149,13 @@ const isCompletePatente = (value: string) => /^(?:[A-Z]{2}-\d{4}|[A-Z]{4}-\d{2})
 
 const normalizeRut = (value: string) => value.toUpperCase().replace(/[^0-9K]/g, '');
 
+const normalizeSearch = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
 const formatDate = (value?: string) => {
   if (!value) {
     return '-';
@@ -196,6 +204,15 @@ export default function VehicleForm({
   const [loadedPatente, setLoadedPatente] = useState('');
   const [lookupMode, setLookupMode] = useState<LookupMode | null>(null);
   const [lookupTerm, setLookupTerm] = useState('');
+  const [brandFocused, setBrandFocused] = useState(false);
+  const [modelFocused, setModelFocused] = useState(false);
+  const availableModels = getModelsForBrand(formData.marca);
+  const brandSuggestions = vehicleBrandNames
+    .filter((brand) => normalizeSearch(brand).includes(normalizeSearch(formData.marca)))
+    .slice(0, 8);
+  const modelSuggestions = availableModels
+    .filter((model) => normalizeSearch(model).includes(normalizeSearch(formData.modelo)))
+    .slice(0, 8);
 
   useEffect(() => {
     if (editingVehicle) {
@@ -271,6 +288,16 @@ export default function VehicleForm({
       if (isCompletePatente(patente)) {
         openPatenteLookup(patente);
       }
+      return;
+    }
+
+    if (name === 'marca') {
+      const brandModels = getModelsForBrand(value);
+      setFormData((prev) => ({
+        ...prev,
+        marca: value,
+        modelo: brandModels.length > 0 && !brandModels.includes(prev.modelo) ? '' : prev.modelo,
+      }));
       return;
     }
 
@@ -425,7 +452,7 @@ export default function VehicleForm({
             )}
           </div>
 
-          <div>
+          <div className="relative">
             <label htmlFor="marca" className="block text-sm font-medium text-gray-700 mb-2">
               Marca *
             </label>
@@ -435,13 +462,38 @@ export default function VehicleForm({
               name="marca"
               value={formData.marca}
               onChange={handleChange}
+              onFocus={() => setBrandFocused(true)}
+              onBlur={() => setTimeout(() => setBrandFocused(false), 120)}
               required
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-              placeholder="Toyota, Ford, etc."
+              placeholder="Escribe o selecciona una marca"
             />
+            {brandFocused && formData.marca && brandSuggestions.length > 0 && (
+              <div className="absolute z-30 mt-2 max-h-56 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                {brandSuggestions.map((brand) => (
+                  <button
+                    key={brand}
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      const brandModels = getModelsForBrand(brand);
+                      setFormData((prev) => ({
+                        ...prev,
+                        marca: brand,
+                        modelo: brandModels.includes(prev.modelo) ? prev.modelo : '',
+                      }));
+                      setBrandFocused(false);
+                    }}
+                    className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-blue-50"
+                  >
+                    {brand}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div>
+          <div className="relative">
             <label htmlFor="modelo" className="block text-sm font-medium text-gray-700 mb-2">
               Modelo *
             </label>
@@ -451,10 +503,30 @@ export default function VehicleForm({
               name="modelo"
               value={formData.modelo}
               onChange={handleChange}
+              onFocus={() => setModelFocused(true)}
+              onBlur={() => setTimeout(() => setModelFocused(false), 120)}
               required
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-              placeholder="Corolla, Focus, etc."
+              placeholder={availableModels.length > 0 ? 'Escribe o selecciona un modelo' : 'Escribe el modelo'}
             />
+            {modelFocused && availableModels.length > 0 && modelSuggestions.length > 0 && (
+              <div className="absolute z-30 mt-2 max-h-56 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                {modelSuggestions.map((model) => (
+                  <button
+                    key={model}
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      setFormData((prev) => ({ ...prev, modelo: model }));
+                      setModelFocused(false);
+                    }}
+                    className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-blue-50"
+                  >
+                    {model}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>
