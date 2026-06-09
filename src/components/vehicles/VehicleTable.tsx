@@ -108,6 +108,26 @@ export default function VehicleTable({
 
   };
 
+  const formatDate = (dateValue?: string) => {
+
+    if (!dateValue) {
+
+      return '-';
+
+    }
+
+    return new Date(dateValue).toLocaleDateString('es-ES', {
+
+      day: '2-digit',
+
+      month: '2-digit',
+
+      year: 'numeric',
+
+    });
+
+  };
+
 
 
   return (
@@ -216,6 +236,12 @@ export default function VehicleTable({
 
                 </th>
 
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+
+                  Fecha salida
+
+                </th>
+
                 {(showEdit || showDelete || onNotify || onExportPdf) && (
 
                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -278,15 +304,13 @@ export default function VehicleTable({
 
                   <td className="px-6 py-4 text-gray-700">
 
-                    {new Date(vehicle.fecha_ingreso).toLocaleDateString('es-ES', {
+                    {formatDate(vehicle.fecha_ingreso)}
 
-                      day: '2-digit',
+                  </td>
 
-                      month: '2-digit',
+                  <td className="px-6 py-4 text-gray-700">
 
-                      year: 'numeric',
-
-                    })}
+                    {vehicle.estado === 'Entregado' ? formatDate(vehicle.updated_at) : '-'}
 
                   </td>
 

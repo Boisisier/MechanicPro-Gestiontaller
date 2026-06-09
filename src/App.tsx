@@ -5,6 +5,7 @@ import {
   createVehicle,
   createAuditLog,
   createParkingRelease,
+  createWorkshopUser,
   getAuthToken,
   getAuditLogs,
   getParkingReleases,
@@ -181,11 +182,15 @@ function App() {
 
   const [userForm, setUserForm] = useState<{
     name: string;
+    rut: string;
     email: string;
+    password: string;
     role: UserRole;
   }>({
     name: "",
+    rut: "",
     email: "",
+    password: "",
     role: "Administrativo",
   });
 
@@ -235,6 +240,11 @@ function App() {
 
   const [releasedParkingIds, setReleasedParkingIds] = useState<string[]>(() => {
     const raw = localStorage.getItem("releasedParkingIds");
+    return raw ? JSON.parse(raw) : [];
+  });
+
+  const [manualParkingIds, setManualParkingIds] = useState<string[]>(() => {
+    const raw = localStorage.getItem("manualParkingIds");
     return raw ? JSON.parse(raw) : [];
   });
 
@@ -302,6 +312,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem("releasedParkingIds", JSON.stringify(releasedParkingIds));
   }, [releasedParkingIds]);
+
+  useEffect(() => {
+    localStorage.setItem("manualParkingIds", JSON.stringify(manualParkingIds));
+  }, [manualParkingIds]);
 
   useEffect(() => {
     if (!authToken || sessionRole !== "member") {
@@ -413,13 +427,15 @@ function App() {
     }));
   };
 
-  const handleUserSubmit = (event: FormEvent) => {
+  const handleUserSubmit = async (event: FormEvent) => {
     event.preventDefault();
     const name = userForm.name.trim();
+    const rut = userForm.rut.trim();
     const email = userForm.email.trim();
+    const password = userForm.password.trim();
 
-    if (!name || !email) {
-      showNotification("error", "Completa el nombre y correo del usuario");
+    if (!name || !rut || !email || !password) {
+      showNotification("error", "Completa nombre, RUT, correo y contraseña");
       return;
     }
 
@@ -431,16 +447,49 @@ function App() {
       return;
     }
 
-    setWorkshopUsers((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        name,
-        email,
-        role: userForm.role,
-      },
-    ]);
-    setUserForm({ name: "", email: "", role: "Administrativo" });
+    const nextUser = {
+      id: crypto.randomUUID(),
+      name,
+      rut,
+      email,
+      role: userForm.role,
+    };
+
+    try {
+      if (authToken && sessionRole === "member") {
+        const savedUser = await createWorkshopUser({
+          name,
+          rut,
+          email,
+          password,
+          role: userForm.role,
+        });
+        setWorkshopUsers((prev) => [
+          ...prev,
+          {
+            id: savedUser.id,
+            name: savedUser.name,
+            rut: savedUser.rut,
+            email: savedUser.email,
+            role: savedUser.role_name || savedUser.role || userForm.role,
+          },
+        ]);
+      } else {
+        setWorkshopUsers((prev) => [...prev, nextUser]);
+      }
+    } catch (error) {
+      console.error("Create workshop user failed", error);
+      showNotification("error", "No se pudo crear el usuario");
+      return;
+    }
+
+    setUserForm({
+      name: "",
+      rut: "",
+      email: "",
+      password: "",
+      role: "Administrativo",
+    });
     logAction(
       "Usuario creado",
       "Configuracion",
@@ -983,7 +1032,8 @@ function App() {
 
   const parkedVehicles = vehiclesEntregados.filter(
     (vehicle) =>
-      getParkingDays(vehicle) > 7 && !releasedParkingIds.includes(vehicle.id),
+      (getParkingDays(vehicle) > 7 || manualParkingIds.includes(vehicle.id)) &&
+      !releasedParkingIds.includes(vehicle.id),
   );
 
   const isParkingNotificationDay = [1, 4].includes(new Date().getDay());
@@ -1019,6 +1069,22 @@ function App() {
       });
     }
     showNotification("success", "Vehiculo retirado del estacionamiento");
+  };
+
+  const handleSendToParking = (vehicle: Vehicle) => {
+    setManualParkingIds((prev) =>
+      prev.includes(vehicle.id) ? prev : [...prev, vehicle.id],
+    );
+    setHiddenSalidaIds((prev) =>
+      prev.includes(vehicle.id) ? prev : [...prev, vehicle.id],
+    );
+    setReleasedParkingIds((prev) => prev.filter((id) => id !== vehicle.id));
+    logAction(
+      "Enviado a estacionamiento",
+      "Salida",
+      `${vehicle.patente} fue enviado manualmente a estacionamiento`,
+    );
+    showNotification("success", "Vehiculo enviado a estacionamiento");
   };
 
   const activeReviewVehicle =
@@ -2026,6 +2092,13 @@ function App() {
                               </button>
 
                               <button
+                                onClick={() => handleSendToParking(vehicle)}
+                                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+                              >
+                                Pasar a estacionamiento
+                              </button>
+
+                              <button
                                 onClick={() => handleVehicleReady(vehicle)}
                                 className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
                               >
@@ -2805,7 +2878,7 @@ function App() {
 
               <form
                 onSubmit={handleUserSubmit}
-                className="grid grid-cols-1 gap-4 rounded-lg border border-gray-200 p-4 lg:grid-cols-4"
+                className="grid grid-cols-1 gap-4 rounded-lg border border-gray-200 p-4 lg:grid-cols-6"
               >
                 <div>
                   <label
@@ -2822,6 +2895,26 @@ function App() {
                     onChange={handleUserFormChange}
                     className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
                     placeholder="Nombre del usuario"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="user-rut"
+                    className="mb-2 block text-sm font-medium text-gray-700"
+                  >
+                    RUT
+                  </label>
+                  <input
+                    id="user-rut"
+                    name="rut"
+                    type="text"
+                    value={userForm.rut}
+                    onChange={handleUserFormChange}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    placeholder="12.345.678-9"
+                    required
                   />
                 </div>
 
@@ -2840,6 +2933,27 @@ function App() {
                     onChange={handleUserFormChange}
                     className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
                     placeholder="usuario@taller.cl"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="user-password"
+                    className="mb-2 block text-sm font-medium text-gray-700"
+                  >
+                    Crear contraseña
+                  </label>
+                  <input
+                    id="user-password"
+                    name="password"
+                    type="password"
+                    value={userForm.password}
+                    onChange={handleUserFormChange}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    placeholder="Contraseña"
+                    autoComplete="new-password"
+                    required
                   />
                 </div>
 
@@ -2856,6 +2970,7 @@ function App() {
                     value={userForm.role}
                     onChange={handleUserFormChange}
                     className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    required
                   >
                     {Object.keys(roleModules).map((role) => (
                       <option key={role} value={role}>
@@ -2900,6 +3015,9 @@ function App() {
                         <td className="px-4 py-3">
                           <p className="font-semibold text-gray-900">
                             {user.name}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            RUT: {user.rut || "-"}
                           </p>
                           <p className="text-xs text-gray-500">{user.email}</p>
                         </td>

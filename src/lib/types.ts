@@ -79,6 +79,7 @@ export interface WorkshopRole {
 export interface WorkshopUser {
   id: string;
   name: string;
+  rut?: string;
   email: string;
   role: UserRole;
   role_id?: string;

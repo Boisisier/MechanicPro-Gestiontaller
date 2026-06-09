@@ -146,7 +146,9 @@ const ensureVehicleColumns = async () => {
       id uuid primary key default gen_random_uuid(),
       company_id uuid not null references companies(id) on delete cascade,
       name text not null,
+      rut text not null default '',
       email text not null,
+      password_hash text not null default '',
       role_id uuid references roles(id) on delete set null,
       role_name text not null,
       active boolean not null default true,
@@ -230,6 +232,11 @@ const ensureVehicleColumns = async () => {
       add column if not exists assigned_mechanic_name text default '',
       add column if not exists fallas_detectadas text[] default '{}',
       add column if not exists comentario_tecnico text default ''
+  `);
+  await pool.query(`
+    alter table workshop_users
+      add column if not exists rut text not null default '',
+      add column if not exists password_hash text not null default ''
   `);
   await pool.query("update vehicles set fallas_detectadas = '{}' where fallas_detectadas is null");
   await pool.query("alter table vehicles alter column fallas_detectadas set default '{}'");
@@ -530,25 +537,67 @@ app.post('/auth/login', async (req, res) => {
       [email]
     );
 
-    if (rows.length === 0 || !verifyPassword(password, rows[0].password_hash)) {
+    if (rows.length > 0 && verifyPassword(password, rows[0].password_hash)) {
+      await client.query('commit');
+
+      const user = rows[0];
+      const token = jwt.sign(
+        { user_id: user.id, company_id: user.company_id, role: user.role, source: 'user' },
+        jwtSecret,
+        { expiresIn: '8h' }
+      );
+
+      return res.json({
+        token,
+        user: { id: user.id, full_name: user.full_name, email: user.email },
+        company: { id: user.company_id, name: user.company_name },
+        role: user.role,
+      });
+    }
+
+    const workshopUserResult = await client.query(
+      `select wu.id, wu.name, wu.email, wu.password_hash, wu.role_name, c.id as company_id, c.name as company_name
+       from workshop_users wu
+       join companies c on c.id = wu.company_id
+       where lower(wu.email) = $1 and wu.active = true
+       limit 1`,
+      [email]
+    );
+
+    if (
+      workshopUserResult.rows.length === 0 ||
+      !verifyPassword(password, workshopUserResult.rows[0].password_hash)
+    ) {
       await client.query('rollback');
       return res.status(401).json({ error: 'invalid_credentials' });
     }
 
     await client.query('commit');
 
-    const user = rows[0];
+    const workshopUser = workshopUserResult.rows[0];
     const token = jwt.sign(
-      { user_id: user.id, company_id: user.company_id, role: user.role },
+      {
+        user_id: workshopUser.id,
+        company_id: workshopUser.company_id,
+        role: workshopUser.role_name,
+        source: 'workshop_user',
+      },
       jwtSecret,
       { expiresIn: '8h' }
     );
 
-    res.json({
+    return res.json({
       token,
-      user: { id: user.id, full_name: user.full_name, email: user.email },
-      company: { id: user.company_id, name: user.company_name },
-      role: user.role,
+      user: {
+        id: workshopUser.id,
+        full_name: workshopUser.name,
+        email: workshopUser.email,
+      },
+      company: {
+        id: workshopUser.company_id,
+        name: workshopUser.company_name,
+      },
+      role: workshopUser.role_name,
     });
   } catch (error) {
     try {
@@ -570,6 +619,33 @@ app.get('/auth/me', (req, res) => {
   }
 
   const { user_id, company_id } = payload;
+  if (payload.source === 'workshop_user') {
+    pool
+      .query(
+        `select wu.id, wu.name, wu.email, wu.role_name, c.id as company_id, c.name as company_name
+         from workshop_users wu
+         join companies c on c.id = wu.company_id
+         where wu.id = $1 and wu.company_id = $2 and wu.active = true`,
+        [user_id, company_id]
+      )
+      .then(({ rows }) => {
+        if (rows.length === 0) {
+          return res.status(404).json({ error: 'not_found' });
+        }
+        const row = rows[0];
+        return res.json({
+          user: { id: row.id, full_name: row.name, email: row.email },
+          company: { id: row.company_id, name: row.company_name },
+          role: row.role_name,
+        });
+      })
+      .catch((error) => {
+        console.error('GET /auth/me workshop_user failed', error);
+        res.status(500).json({ error: 'internal_error' });
+      });
+    return;
+  }
+
   pool
     .query(
       `select u.id, u.full_name, u.email, c.id as company_id, c.name as company_name, cm.role
@@ -614,7 +690,7 @@ app.get('/workshop-users', authRequired, async (req, res) => {
   const { company_id: companyId } = req.user;
   try {
     const { rows } = await pool.query(
-      `select wu.id, wu.name, wu.email, wu.role_id, wu.role_name, wu.active, wu.created_at, wu.updated_at,
+      `select wu.id, wu.name, wu.rut, wu.email, wu.role_id, wu.role_name, wu.active, wu.created_at, wu.updated_at,
               coalesce(r.modules, '{}') as modules
        from workshop_users wu
        left join roles r on r.id = wu.role_id
@@ -632,10 +708,12 @@ app.get('/workshop-users', authRequired, async (req, res) => {
 app.post('/workshop-users', authRequired, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   const name = String(req.body.name || '').trim();
+  const rut = String(req.body.rut || '').trim();
   const email = String(req.body.email || '').trim().toLowerCase();
+  const password = String(req.body.password || '').trim();
   const roleName = String(req.body.role || req.body.role_name || '').trim();
 
-  if (!name || !email || !roleName) {
+  if (!name || !rut || !email || !password || !roleName) {
     return res.status(400).json({ error: 'missing_fields' });
   }
 
@@ -649,10 +727,10 @@ app.post('/workshop-users', authRequired, ensureWritable, async (req, res) => {
     }
     const role = roleResult.rows[0];
     const { rows } = await pool.query(
-      `insert into workshop_users (company_id, name, email, role_id, role_name)
-       values ($1, $2, $3, $4, $5)
-       returning *`,
-      [companyId, name, email, role.id, role.name]
+      `insert into workshop_users (company_id, name, rut, email, password_hash, role_id, role_name)
+       values ($1, $2, $3, $4, $5, $6, $7)
+       returning id, name, rut, email, role_id, role_name, active, created_at, updated_at`,
+      [companyId, name, rut, email, hashPassword(password), role.id, role.name]
     );
     res.status(201).json(rows[0]);
   } catch (error) {
@@ -667,11 +745,13 @@ app.post('/workshop-users', authRequired, ensureWritable, async (req, res) => {
 app.put('/workshop-users/:id', authRequired, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   const name = String(req.body.name || '').trim();
+  const rut = String(req.body.rut || '').trim();
   const email = String(req.body.email || '').trim().toLowerCase();
+  const password = String(req.body.password || '').trim();
   const roleName = String(req.body.role || req.body.role_name || '').trim();
   const active = req.body.active !== false;
 
-  if (!name || !email || !roleName) {
+  if (!name || !rut || !email || !roleName) {
     return res.status(400).json({ error: 'missing_fields' });
   }
 
@@ -686,10 +766,28 @@ app.put('/workshop-users/:id', authRequired, ensureWritable, async (req, res) =>
     const role = roleResult.rows[0];
     const { rows } = await pool.query(
       `update workshop_users
-       set name = $1, email = $2, role_id = $3, role_name = $4, active = $5, updated_at = now()
-       where id = $6 and company_id = $7
-       returning *`,
-      [name, email, role.id, role.name, active, req.params.id, companyId]
+       set name = $1,
+           rut = $2,
+           email = $3,
+           password_hash = case when $4 = '' then password_hash else $5 end,
+           role_id = $6,
+           role_name = $7,
+           active = $8,
+           updated_at = now()
+       where id = $9 and company_id = $10
+       returning id, name, rut, email, role_id, role_name, active, created_at, updated_at`,
+      [
+        name,
+        rut,
+        email,
+        password,
+        password ? hashPassword(password) : '',
+        role.id,
+        role.name,
+        active,
+        req.params.id,
+        companyId,
+      ]
     );
     if (rows.length === 0) {
       return res.status(404).json({ error: 'not_found' });
