@@ -12,8 +12,13 @@ export function useNotification() {
     }, 4000);
   };
 
+  const clearNotification = () => {
+    setNotification(null);
+  };
+
   return {
     notification,
     showNotification,
+    clearNotification,
   };
 }

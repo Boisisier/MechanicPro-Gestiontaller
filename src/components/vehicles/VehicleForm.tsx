@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { History, RotateCcw, Save, Search, Send, X } from 'lucide-react';
 import { getModelsForBrand, vehicleBrandNames } from '../../features/vehicles/vehicleModelCatalog';
+import ConfirmDialog from '../ui/ConfirmDialog';
 
 type PreviousVehicleData = Partial<VehicleFormData> & {
   id?: string;
@@ -202,6 +203,7 @@ export default function VehicleForm({
   const [formData, setFormData] = useState<VehicleFormData>(editingVehicle || initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadedPatente, setLoadedPatente] = useState('');
+  const [sendConfirmOpen, setSendConfirmOpen] = useState(false);
   const [lookupMode, setLookupMode] = useState<LookupMode | null>(null);
   const [lookupTerm, setLookupTerm] = useState('');
   const [brandFocused, setBrandFocused] = useState(false);
@@ -341,12 +343,26 @@ export default function VehicleForm({
     if (form && !form.reportValidity()) {
       return;
     }
+    setSendConfirmOpen(true);
+    return;
+  };
 
-    const shouldSend = window.confirm('¿Quieres enviar el vehículo a revisión?');
-    if (!shouldSend) {
+  const handleClear = () => {
+    setFormData(initialFormData);
+    setLoadedPatente('');
+    if (onCancelEdit) {
+      onCancelEdit();
+    }
+  };
+
+  const performSendToReview = async () => {
+    const form = document.getElementById('vehicle-entry-form') as HTMLFormElement | null;
+    if (form && !form.reportValidity()) {
+      setSendConfirmOpen(false);
       return;
     }
 
+    setSendConfirmOpen(false);
     setIsSubmitting(true);
     try {
       await onSubmit({ ...formData, estado: 'En revision' });
@@ -356,14 +372,6 @@ export default function VehicleForm({
       }
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleClear = () => {
-    setFormData(initialFormData);
-    setLoadedPatente('');
-    if (onCancelEdit) {
-      onCancelEdit();
     }
   };
 
@@ -382,6 +390,15 @@ export default function VehicleForm({
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
+      <ConfirmDialog
+        open={sendConfirmOpen}
+        title="Enviar a revision"
+        message="El vehiculo ingresara al submodulo En revision para que el mecanico pueda registrar trabajos, repuestos y observaciones."
+        confirmLabel="Enviar a revision"
+        variant="info"
+        onConfirm={performSendToReview}
+        onCancel={() => setSendConfirmOpen(false)}
+      />
       <div className="mb-6">
         <h3 className="text-xl font-bold text-gray-900">
           {editingVehicle ? 'Editar vehículo' : 'Registro de vehículo'}

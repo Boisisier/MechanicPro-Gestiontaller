@@ -12,6 +12,8 @@ interface HeaderProps {
     time: string;
   }>;
   onLogout: () => void;
+  userName?: string;
+  userRole?: string;
 }
 
 export default function Header({
@@ -20,6 +22,8 @@ export default function Header({
   onToggleTheme,
   notifications,
   onLogout,
+  userName = "Usuario general",
+  userRole = "acceso general",
 }: HeaderProps) {
   const [open, setOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
@@ -108,9 +112,9 @@ export default function Header({
           <div className="hidden md:flex items-center gap-3 pl-4 border-l border-gray-200">
             <div className="text-right">
               <p className="text-sm font-medium text-gray-900">
-                Usuario general
+                {userName}
               </p>
-              <p className="text-xs text-gray-500">acceso general</p>
+              <p className="text-xs text-gray-500">{userRole}</p>
             </div>
             <div className="relative">
               <button

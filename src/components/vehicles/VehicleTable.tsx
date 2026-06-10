@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Edit2, Trash2, Search, AlertCircle, Send, FileDown } from 'lucide-react';
 
 import type { Vehicle } from '../../lib/types';
+import ConfirmDialog from '../ui/ConfirmDialog';
 
 
 
@@ -50,7 +51,7 @@ export default function VehicleTable({
 
   const [searchTerm, setSearchTerm] = useState('');
 
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<Vehicle | null>(null);
 
 
 
@@ -66,7 +67,7 @@ export default function VehicleTable({
 
 
 
-  const handleDelete = (id: string) => {
+  const handleDelete = (vehicle: Vehicle) => {
 
     if (!onDelete) {
 
@@ -74,19 +75,7 @@ export default function VehicleTable({
 
     }
 
-    if (deleteConfirm === id) {
-
-      onDelete(id);
-
-      setDeleteConfirm(null);
-
-    } else {
-
-      setDeleteConfirm(id);
-
-      setTimeout(() => setDeleteConfirm(null), 3000);
-
-    }
+    setDeleteConfirm(vehicle);
 
   };
 
@@ -133,6 +122,20 @@ export default function VehicleTable({
   return (
 
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+      <ConfirmDialog
+        open={Boolean(deleteConfirm)}
+        title="Eliminar vehiculo"
+        message={`Se eliminara ${deleteConfirm?.patente || 'este vehiculo'} del registro. Esta accion no se puede deshacer desde la pantalla actual.`}
+        confirmLabel="Eliminar vehiculo"
+        variant="danger"
+        onConfirm={() => {
+          if (deleteConfirm && onDelete) {
+            onDelete(deleteConfirm.id);
+          }
+          setDeleteConfirm(null);
+        }}
+        onCancel={() => setDeleteConfirm(null)}
+      />
 
       <div className="p-6 border-b border-gray-200">
 
@@ -342,11 +345,11 @@ export default function VehicleTable({
 
                           <button
 
-                            onClick={() => handleDelete(vehicle.id)}
+                            onClick={() => handleDelete(vehicle)}
 
                             className={`p-2 rounded-lg transition-colors ${
 
-                              deleteConfirm === vehicle.id
+                              deleteConfirm?.id === vehicle.id
 
                                 ? 'bg-red-100 text-red-700'
 
@@ -354,7 +357,7 @@ export default function VehicleTable({
 
                             }`}
 
-                            title={deleteConfirm === vehicle.id ? 'Confirmar eliminación' : 'Eliminar'}
+                            title="Eliminar"
 
                           >
 

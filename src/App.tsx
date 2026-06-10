@@ -11,6 +11,7 @@ import {
   getParkingReleases,
   getSession,
   getVehicles,
+  getWorkshopUsers,
   login,
   loginDemo,
   setAuthToken,
@@ -39,10 +40,10 @@ import VehicleForm, {
 } from "./components/vehicles/VehicleForm";
 
 import VehicleTable from "./components/vehicles/VehicleTable";
+import ConfirmDialog from "./components/ui/ConfirmDialog";
+import Toast from "./components/ui/Toast";
 
 import {
-  CheckCircle,
-  AlertCircle,
   Search,
   Trash2,
   X,
@@ -136,7 +137,8 @@ function App() {
     (item) => item.minStock > 0 && item.stock <= item.minStock,
   );
 
-  const { notification, showNotification } = useNotification();
+  const { notification, showNotification, clearNotification } =
+    useNotification();
 
   const [theme, setTheme] = useState<"light" | "dark">(() =>
     localStorage.getItem("theme") === "dark" ? "dark" : "light",
@@ -164,6 +166,12 @@ function App() {
 
   const [sessionRole, setSessionRole] = useState<"member" | null>(null);
 
+  const [sessionUser, setSessionUser] = useState<{
+    name: string;
+    email: string;
+    role: string;
+  } | null>(null);
+
   const [authError, setAuthError] = useState<string | null>(null);
 
   const [demoLoading, setDemoLoading] = useState(false);
@@ -174,6 +182,15 @@ function App() {
     email: "demo@local",
     password: "demo1234",
   });
+
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    variant?: "danger" | "warning" | "info";
+    onConfirm: () => void | Promise<void>;
+  } | null>(null);
 
   const [workshopUsers, setWorkshopUsers] = useState<WorkshopUser[]>(() => {
     const raw = localStorage.getItem("workshopUsers");
@@ -249,8 +266,39 @@ function App() {
   });
 
   const currentAuditUser =
-    workshopUsers.find((user) => user.role === "Administrador de Taller") ||
-    workshopUsers[0];
+    sessionUser
+      ? {
+          id: "session-user",
+          name: sessionUser.name,
+          email: sessionUser.email,
+          role: sessionUser.role as UserRole,
+        }
+      : (workshopUsers.find((user) => user.role === "Administrador de Taller") ||
+          workshopUsers[0]);
+
+  const isSessionAdmin =
+    sessionUser?.role === "admin" ||
+    sessionUser?.role === "Administrador de Taller";
+
+  const requestConfirmation = (options: {
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    variant?: "danger" | "warning" | "info";
+    onConfirm: () => void | Promise<void>;
+  }) => {
+    setConfirmDialog(options);
+  };
+
+  const handleConfirmDialog = async () => {
+    if (!confirmDialog) {
+      return;
+    }
+    const action = confirmDialog.onConfirm;
+    setConfirmDialog(null);
+    await action();
+  };
 
   const logAction = (action: string, module: string, detail: string) => {
     const entry: AuditLog = {
@@ -272,16 +320,23 @@ function App() {
   useEffect(() => {
     if (!authToken) {
       setSessionRole(null);
+      setSessionUser(null);
       return;
     }
     const loadSession = async () => {
       try {
-        await getSession();
+        const session = await getSession();
         setSessionRole("member");
+        setSessionUser({
+          name: session.user?.full_name || "Usuario",
+          email: session.user?.email || "",
+          role: session.role || "member",
+        });
       } catch (error) {
         clearAuthToken();
         setAuthTokenState(null);
         setSessionRole(null);
+        setSessionUser(null);
       }
     };
     loadSession();
@@ -350,6 +405,17 @@ function App() {
       return;
     }
 
+    getWorkshopUsers()
+      .then((rows) =>
+        setWorkshopUsers(
+          rows.map((user: WorkshopUser) => ({
+            ...user,
+            role: (user.role_name || user.role) as UserRole,
+          })),
+        ),
+      )
+      .catch((error) => console.error("Workshop users load failed", error));
+
     getAuditLogs()
       .then((rows) => setAuditLogs(rows))
       .catch((error) => console.error("Audit logs load failed", error));
@@ -380,6 +446,11 @@ function App() {
       setAuthToken(session.token);
       setAuthTokenState(session.token);
       setSessionRole("member");
+      setSessionUser({
+        name: session.user?.full_name || "Usuario demo",
+        email: session.user?.email || "",
+        role: session.role || "admin",
+      });
       showNotification("success", "Acceso demo listo");
     } catch (error) {
       console.error("Demo login failed", error);
@@ -402,6 +473,11 @@ function App() {
       setAuthToken(session.token);
       setAuthTokenState(session.token);
       setSessionRole("member");
+      setSessionUser({
+        name: session.user?.full_name || "Usuario",
+        email: session.user?.email || "",
+        role: session.role || "member",
+      });
       showNotification("success", "Sesion iniciada");
     } catch (error) {
       console.error("Login failed", error);
@@ -411,10 +487,21 @@ function App() {
     }
   };
 
-  const handleLogout = () => {
+  const performLogout = () => {
     clearAuthToken();
     setAuthTokenState(null);
     setSessionRole(null);
+    setSessionUser(null);
+  };
+
+  const handleLogout = () => {
+    requestConfirmation({
+      title: "Cerrar sesion",
+      message: "Se cerrara la sesion actual y volveras a la pantalla de acceso.",
+      confirmLabel: "Cerrar sesion",
+      variant: "warning",
+      onConfirm: performLogout,
+    });
   };
 
   const handleUserFormChange = (
@@ -498,7 +585,7 @@ function App() {
     showNotification("success", "Usuario creado correctamente");
   };
 
-  const handleDeleteUser = (id: string) => {
+  const performDeleteUser = (id: string) => {
     const deletedUser = workshopUsers.find((user) => user.id === id);
     setWorkshopUsers((prev) => prev.filter((user) => user.id !== id));
     logAction(
@@ -507,6 +594,17 @@ function App() {
       deletedUser ? `${deletedUser.name} fue eliminado` : `Usuario ${id} eliminado`,
     );
     showNotification("success", "Usuario eliminado");
+  };
+
+  const handleDeleteUser = (id: string) => {
+    const user = workshopUsers.find((item) => item.id === id);
+    requestConfirmation({
+      title: "Eliminar usuario",
+      message: `Se eliminara ${user?.name || "este usuario"} del mantenedor. Esta accion no se puede deshacer desde la pantalla actual.`,
+      confirmLabel: "Eliminar usuario",
+      variant: "danger",
+      onConfirm: () => performDeleteUser(id),
+    });
   };
 
   const handleBudgetFormChange = (
@@ -550,7 +648,7 @@ function App() {
     setBudgetItems((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const handleClearBudget = () => {
+  const performClearBudget = () => {
     setBudgetForm({
       customerName: "",
       customerPhone: "",
@@ -560,6 +658,17 @@ function App() {
     });
     setBudgetService({ name: "", price: 0 });
     setBudgetItems([]);
+    showNotification("success", "Presupuesto limpiado");
+  };
+
+  const handleClearBudget = () => {
+    requestConfirmation({
+      title: "Limpiar presupuesto",
+      message: "Se borraran los datos ingresados y los servicios presupuestados en pantalla.",
+      confirmLabel: "Limpiar presupuesto",
+      variant: "danger",
+      onConfirm: performClearBudget,
+    });
   };
   const buildVehiclePayload = (
     vehicle: Vehicle,
@@ -749,7 +858,7 @@ function App() {
     );
   };
 
-  const handleClearReviewRecord = () => {
+  const performClearReviewRecord = () => {
     setReviewServices([]);
     setReviewParts([]);
     setReviewNotes("");
@@ -757,6 +866,17 @@ function App() {
     setPartSearch("");
     setServicePickerOpen(false);
     setPartPickerOpen(false);
+    showNotification("success", "Registro de revision limpiado");
+  };
+
+  const handleClearReviewRecord = () => {
+    requestConfirmation({
+      title: "Limpiar registro",
+      message: "Se limpiaran los servicios, repuestos y detalle del trabajo en la revision actual.",
+      confirmLabel: "Limpiar registro",
+      variant: "danger",
+      onConfirm: performClearReviewRecord,
+    });
   };
 
   const handleSaveReview = async (statusOverride?: Vehicle["estado"]) => {
@@ -895,7 +1015,7 @@ function App() {
     }
   };
 
-  const handleReturnFromRevision = async (vehicle: Vehicle) => {
+  const performReturnFromRevision = async (vehicle: Vehicle) => {
     try {
       await updateVehicleRecord(
         vehicle,
@@ -921,7 +1041,17 @@ function App() {
     }
   };
 
-  const handleVehicleReady = (vehicle: Vehicle) => {
+  const handleReturnFromRevision = (vehicle: Vehicle) => {
+    requestConfirmation({
+      title: "Devolver a ingreso",
+      message: `El vehiculo ${vehicle.patente} volvera al ingreso y saldra del listado en revision.`,
+      confirmLabel: "Devolver",
+      variant: "warning",
+      onConfirm: () => performReturnFromRevision(vehicle),
+    });
+  };
+
+  const performVehicleReady = (vehicle: Vehicle) => {
     setReadyVehicleIds((prev) =>
       prev.includes(vehicle.id) ? prev : [...prev, vehicle.id],
     );
@@ -935,6 +1065,16 @@ function App() {
 
       setVehicleTab("ingreso");
     }, 400);
+  };
+
+  const handleVehicleReady = (vehicle: Vehicle) => {
+    requestConfirmation({
+      title: "Marcar vehiculo listo",
+      message: `El vehiculo ${vehicle.patente} se ocultara de salida y quedara marcado como listo.`,
+      confirmLabel: "Marcar listo",
+      variant: "info",
+      onConfirm: () => performVehicleReady(vehicle),
+    });
   };
 
   const handleNotify = (vehicle: Vehicle) => {
@@ -1050,7 +1190,7 @@ function App() {
     return serviceTotal + partTotal;
   };
 
-  const handleReleaseFromParking = (vehicle: Vehicle) => {
+  const performReleaseFromParking = (vehicle: Vehicle) => {
     setReleasedParkingIds((prev) =>
       prev.includes(vehicle.id) ? prev : [...prev, vehicle.id],
     );
@@ -1071,7 +1211,17 @@ function App() {
     showNotification("success", "Vehiculo retirado del estacionamiento");
   };
 
-  const handleSendToParking = (vehicle: Vehicle) => {
+  const handleReleaseFromParking = (vehicle: Vehicle) => {
+    requestConfirmation({
+      title: "Sacar del estacionamiento",
+      message: `El vehiculo ${vehicle.patente} dejara de aparecer como pendiente en Estacionamiento.`,
+      confirmLabel: "Sacar",
+      variant: "danger",
+      onConfirm: () => performReleaseFromParking(vehicle),
+    });
+  };
+
+  const performSendToParking = (vehicle: Vehicle) => {
     setManualParkingIds((prev) =>
       prev.includes(vehicle.id) ? prev : [...prev, vehicle.id],
     );
@@ -1085,6 +1235,16 @@ function App() {
       `${vehicle.patente} fue enviado manualmente a estacionamiento`,
     );
     showNotification("success", "Vehiculo enviado a estacionamiento");
+  };
+
+  const handleSendToParking = (vehicle: Vehicle) => {
+    requestConfirmation({
+      title: "Pasar a estacionamiento",
+      message: `El vehiculo ${vehicle.patente} se movera desde Salida al modulo Estacionamiento.`,
+      confirmLabel: "Pasar a estacionamiento",
+      variant: "danger",
+      onConfirm: () => performSendToParking(vehicle),
+    });
   };
 
   const activeReviewVehicle =
@@ -1373,27 +1533,21 @@ function App() {
           }
           notifications={notifications}
           onLogout={handleLogout}
+          userName={sessionUser?.name || "Usuario general"}
+          userRole={sessionUser?.role || "acceso general"}
         />
 
-        {notification && (
-          <div className="fixed top-4 right-4 z-50 animate-slide-in">
-            <div
-              className={`flex items-center gap-3 px-6 py-4 rounded-lg shadow-lg ${
-                notification.type === "success"
-                  ? "bg-green-50 text-green-800 border border-green-200"
-                  : "bg-red-50 text-red-800 border border-red-200"
-              }`}
-            >
-              {notification.type === "success" ? (
-                <CheckCircle className="w-5 h-5" />
-              ) : (
-                <AlertCircle className="w-5 h-5" />
-              )}
-
-              <p className="font-medium">{notification.message}</p>
-            </div>
-          </div>
-        )}
+        <Toast notification={notification} onClose={clearNotification} />
+        <ConfirmDialog
+          open={Boolean(confirmDialog)}
+          title={confirmDialog?.title || ""}
+          message={confirmDialog?.message || ""}
+          confirmLabel={confirmDialog?.confirmLabel}
+          cancelLabel={confirmDialog?.cancelLabel}
+          variant={confirmDialog?.variant}
+          onConfirm={handleConfirmDialog}
+          onCancel={() => setConfirmDialog(null)}
+        />
 
         <main className="p-8">
           {activeSection === "vehiculos" && (
@@ -1425,7 +1579,15 @@ function App() {
                       <button
                         type="button"
                         onClick={() =>
-                          window.dispatchEvent(new Event("vehicle-form-clear"))
+                          requestConfirmation({
+                            title: "Limpiar formulario",
+                            message:
+                              "Se borraran los datos cargados del ingreso de vehiculo actual.",
+                            confirmLabel: "Limpiar formulario",
+                            variant: "danger",
+                            onConfirm: () =>
+                              window.dispatchEvent(new Event("vehicle-form-clear")),
+                          })
                         }
                         className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-red-700 focus:ring-4 focus:ring-red-200"
                       >
@@ -2031,7 +2193,16 @@ function App() {
                           </button>
 
                           <button
-                            onClick={() => handleSaveReview("Entregado")}
+                            onClick={() =>
+                              requestConfirmation({
+                                title: "Enviar a salida",
+                                message:
+                                  "El vehiculo pasara a Salida y se guardaran los servicios y repuestos registrados.",
+                                confirmLabel: "Enviar a salida",
+                                variant: "info",
+                                onConfirm: () => handleSaveReview("Entregado"),
+                              })
+                            }
                             className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-green-700 focus:ring-4 focus:ring-green-200"
                           >
                             Enviar a salida
@@ -2798,7 +2969,7 @@ function App() {
                 </p>
               </div>
 
-              {currentAuditUser?.role !== "Administrador de Taller" ? (
+              {!isSessionAdmin ? (
                 <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm font-semibold text-red-700">
                   Solo el Administrador de Taller puede ingresar a este modulo.
                 </div>
