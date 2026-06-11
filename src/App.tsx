@@ -3251,19 +3251,6 @@ function App() {
                 </button>
               </div>
 
-              <div className="rounded-lg border border-gray-200 p-4">
-                <p className="text-sm text-gray-500">Vista previa</p>
-
-                <div className="mt-3 flex gap-3">
-                  <button className="btn-primary rounded-lg px-4 py-2 text-sm font-semibold">
-                    Botón principal
-                  </button>
-
-                  <button className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-                    Botón secundario
-                  </button>
-                </div>
-              </div>
             </div>
           )}
         </main>
