@@ -2,12 +2,14 @@ import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 
 import {
   clearAuthToken,
+  createBudget,
   createVehicle,
   createAuditLog,
   createParkingRelease,
   createWorkshopUser,
   getAuthToken,
   getAuditLogs,
+  getInventoryItems,
   getParkingReleases,
   getSession,
   getVehicles,
@@ -15,6 +17,8 @@ import {
   login,
   loginDemo,
   setAuthToken,
+  deleteWorkshopUser,
+  updateInventoryItem,
   updateVehicle,
 } from "./lib/api";
 
@@ -128,10 +132,7 @@ function App() {
       notes: string;
       updated_at: string;
     }>
-  >(() => {
-    const raw = localStorage.getItem("inventoryItems");
-    return raw ? JSON.parse(raw) : [];
-  });
+  >([]);
 
   const lowStockItems = inventoryItems.filter(
     (item) => item.minStock > 0 && item.stock <= item.minStock,
@@ -416,6 +417,10 @@ function App() {
       )
       .catch((error) => console.error("Workshop users load failed", error));
 
+    getInventoryItems()
+      .then((rows) => setInventoryItems(rows))
+      .catch((error) => console.error("Inventory load failed", error));
+
     getAuditLogs()
       .then((rows) => setAuditLogs(rows))
       .catch((error) => console.error("Audit logs load failed", error));
@@ -585,8 +590,17 @@ function App() {
     showNotification("success", "Usuario creado correctamente");
   };
 
-  const performDeleteUser = (id: string) => {
+  const performDeleteUser = async (id: string) => {
     const deletedUser = workshopUsers.find((user) => user.id === id);
+    if (authToken && sessionRole === "member") {
+      try {
+        await deleteWorkshopUser(id);
+      } catch (error) {
+        console.error("Delete workshop user failed", error);
+        showNotification("error", "No se pudo eliminar el usuario");
+        return;
+      }
+    }
     setWorkshopUsers((prev) => prev.filter((user) => user.id !== id));
     logAction(
       "Usuario eliminado",
@@ -670,6 +684,37 @@ function App() {
       onConfirm: performClearBudget,
     });
   };
+
+  const handleSaveBudget = async () => {
+    if (!budgetForm.customerName.trim() || budgetItems.length === 0) {
+      showNotification(
+        "error",
+        "Agrega cliente y al menos un servicio al presupuesto",
+      );
+      return;
+    }
+
+    try {
+      await createBudget({
+        customerName: budgetForm.customerName.trim(),
+        customerPhone: budgetForm.customerPhone.trim(),
+        patente: budgetForm.patente.trim(),
+        vehicle: budgetForm.vehicle.trim(),
+        notes: budgetForm.notes.trim(),
+        items: budgetItems,
+        status: "guardado",
+      });
+      logAction(
+        "Presupuesto guardado",
+        "Presupuesto",
+        `${budgetForm.customerName} - ${budgetItems.length} servicio(s)`,
+      );
+      showNotification("success", "Presupuesto guardado");
+    } catch (error) {
+      console.error("Save budget failed", error);
+      showNotification("error", "No se pudo guardar el presupuesto");
+    }
+  };
   const buildVehiclePayload = (
     vehicle: Vehicle,
     overrides: Partial<Vehicle>,
@@ -719,6 +764,12 @@ function App() {
     observaciones: vehicle.observaciones || "",
 
     comentario_tecnico: vehicle.comentario_tecnico || "",
+
+    salida_confirmada: vehicle.salida_confirmada || false,
+
+    fecha_salida_confirmada: vehicle.fecha_salida_confirmada || null,
+
+    en_estacionamiento_manual: vehicle.en_estacionamiento_manual || false,
 
     ...overrides,
   });
@@ -969,6 +1020,23 @@ function App() {
         }),
       );
 
+      await Promise.all(
+        partDeltas
+          .filter((partDelta) => partDelta.delta !== 0)
+          .map((partDelta) => {
+            const inventoryItem = inventoryItems.find(
+              (item) => item.id === partDelta.inventoryItemId,
+            );
+            if (!inventoryItem) {
+              return Promise.resolve();
+            }
+            return updateInventoryItem(inventoryItem.id, {
+              ...inventoryItem,
+              stock: inventoryItem.stock - partDelta.delta,
+            });
+          }),
+      );
+
       logAction(
         statusOverride === "Entregado" ? "Enviado a salida" : "Revision guardada",
         "En revision",
@@ -1051,9 +1119,18 @@ function App() {
     });
   };
 
-  const performVehicleReady = (vehicle: Vehicle) => {
+  const performVehicleReady = async (vehicle: Vehicle) => {
     setReadyVehicleIds((prev) =>
       prev.includes(vehicle.id) ? prev : [...prev, vehicle.id],
+    );
+
+    await updateVehicleRecord(
+      vehicle,
+      {
+        salida_confirmada: true,
+        fecha_salida_confirmada: new Date().toISOString(),
+      },
+      `Vehiculo ${vehicle.patente} listo`,
     );
 
     setTimeout(() => {
@@ -1172,7 +1249,9 @@ function App() {
 
   const parkedVehicles = vehiclesEntregados.filter(
     (vehicle) =>
-      (getParkingDays(vehicle) > 7 || manualParkingIds.includes(vehicle.id)) &&
+      (getParkingDays(vehicle) > 7 ||
+        manualParkingIds.includes(vehicle.id) ||
+        vehicle.en_estacionamiento_manual) &&
       !releasedParkingIds.includes(vehicle.id),
   );
 
@@ -1221,7 +1300,19 @@ function App() {
     });
   };
 
-  const performSendToParking = (vehicle: Vehicle) => {
+  const performSendToParking = async (vehicle: Vehicle) => {
+    try {
+      await updateVehicleRecord(
+        vehicle,
+        { en_estacionamiento_manual: true },
+        "Vehiculo enviado a estacionamiento",
+      );
+    } catch (error) {
+      console.error("Send to parking failed", error);
+      showNotification("error", "No se pudo guardar el estacionamiento");
+      return;
+    }
+
     setManualParkingIds((prev) =>
       prev.includes(vehicle.id) ? prev : [...prev, vehicle.id],
     );
@@ -1234,7 +1325,6 @@ function App() {
       "Salida",
       `${vehicle.patente} fue enviado manualmente a estacionamiento`,
     );
-    showNotification("success", "Vehiculo enviado a estacionamiento");
   };
 
   const handleSendToParking = (vehicle: Vehicle) => {
@@ -2221,7 +2311,9 @@ function App() {
               {vehicleTab === "salida" && (
                 <div className="space-y-4">
                   {vehiclesEntregados.filter(
-                    (vehicle) => !hiddenSalidaIds.includes(vehicle.id),
+                    (vehicle) =>
+                      !hiddenSalidaIds.includes(vehicle.id) &&
+                      !vehicle.salida_confirmada,
                   ).length === 0 ? (
                     <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm text-sm text-gray-500">
                       No hay vehí­culos en salida.
@@ -2230,7 +2322,9 @@ function App() {
                     vehiclesEntregados
 
                       .filter(
-                        (vehicle) => !hiddenSalidaIds.includes(vehicle.id),
+                        (vehicle) =>
+                          !hiddenSalidaIds.includes(vehicle.id) &&
+                          !vehicle.salida_confirmada,
                       )
 
                       .map((vehicle) => (
@@ -2747,8 +2841,16 @@ function App() {
 
                   <button
                     type="button"
+                    onClick={handleSaveBudget}
+                    className="mt-6 w-full rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+                  >
+                    Guardar presupuesto
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={handleClearBudget}
-                    className="mt-6 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    className="mt-3 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
                   >
                     Limpiar presupuesto
                   </button>

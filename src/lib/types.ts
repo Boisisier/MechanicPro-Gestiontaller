@@ -25,6 +25,9 @@ export interface Vehicle {
   fallas_detectadas?: string[];
   observaciones: string;
   comentario_tecnico?: string;
+  salida_confirmada?: boolean;
+  fecha_salida_confirmada?: string | null;
+  en_estacionamiento_manual?: boolean;
   fecha_ingreso: string;
   created_at: string;
   updated_at: string;

@@ -39,6 +39,7 @@ app.use(express.json());
 const allowedStatuses = new Set(['En taller', 'En revision', 'Entregado']);
 const allowedTipos = new Set(['Auto', 'Camioneta', 'SUV', 'Moto', 'Camion', 'Furgon']);
 const patenteRegex = /^(?:[A-Z]{2}-\d{4}|[A-Z]{4}-\d{2})$/;
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const defaultRoles = [
   {
     name: 'Administrador de Taller',
@@ -125,6 +126,9 @@ const ensureVehicleColumns = async () => {
       fallas_detectadas text[] not null default '{}',
       observaciones text default '',
       comentario_tecnico text default '',
+      salida_confirmada boolean not null default false,
+      fecha_salida_confirmada timestamptz,
+      en_estacionamiento_manual boolean not null default false,
       fecha_ingreso timestamptz not null default now(),
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
@@ -231,7 +235,10 @@ const ensureVehicleColumns = async () => {
       add column if not exists assigned_mechanic_id uuid,
       add column if not exists assigned_mechanic_name text default '',
       add column if not exists fallas_detectadas text[] default '{}',
-      add column if not exists comentario_tecnico text default ''
+      add column if not exists comentario_tecnico text default '',
+      add column if not exists salida_confirmada boolean not null default false,
+      add column if not exists fecha_salida_confirmada timestamptz,
+      add column if not exists en_estacionamiento_manual boolean not null default false
   `);
   await pool.query(`
     alter table workshop_users
@@ -265,6 +272,14 @@ const ensureVehicleColumns = async () => {
   await pool.query('create index if not exists idx_budget_quotes_company_id on budget_quotes(company_id)');
   await pool.query('create index if not exists idx_audit_logs_company_created_at on audit_logs(company_id, created_at desc)');
   await pool.query('create index if not exists idx_parking_releases_company_vehicle on parking_releases(company_id, vehicle_id)');
+};
+
+const normalizeUuid = (value) => {
+  if (!value) {
+    return null;
+  }
+  const normalized = String(value).trim();
+  return uuidRegex.test(normalized) ? normalized : null;
 };
 
 const seedDefaultRoles = async (client, companyId) => {
@@ -1229,14 +1244,17 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
     fallas_detectadas = [],
     observaciones = '',
     comentario_tecnico = '',
+    salida_confirmada = false,
+    fecha_salida_confirmada = null,
+    en_estacionamiento_manual = false,
   } = req.body;
 
   try {
     const { rows } = await pool.query(
       `insert into vehicles
-        (company_id, customer_name, customer_rut, customer_phone, customer_address, customer_city, customer_email, assigned_mechanic_id, assigned_mechanic_name, patente, marca, modelo, ano, tipo_vehiculo, codigo_vin, codigo_motor, color, kilometraje, cantidad_combustible, estado, servicios, fallas_detectadas, observaciones, comentario_tecnico)
+        (company_id, customer_name, customer_rut, customer_phone, customer_address, customer_city, customer_email, assigned_mechanic_id, assigned_mechanic_name, patente, marca, modelo, ano, tipo_vehiculo, codigo_vin, codigo_motor, color, kilometraje, cantidad_combustible, estado, servicios, fallas_detectadas, observaciones, comentario_tecnico, salida_confirmada, fecha_salida_confirmada, en_estacionamiento_manual)
        values
-        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
        returning *`,
       [
         companyId,
@@ -1246,7 +1264,7 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
         customer_address,
         customer_city,
         customer_email,
-        assigned_mechanic_id || null,
+        normalizeUuid(assigned_mechanic_id),
         assigned_mechanic_name,
         patente,
         marca,
@@ -1263,6 +1281,9 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
         fallas_detectadas,
         observaciones,
         comentario_tecnico,
+        Boolean(salida_confirmada),
+        fecha_salida_confirmada || null,
+        Boolean(en_estacionamiento_manual),
       ]
     );
 
@@ -1313,6 +1334,9 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
     fallas_detectadas = [],
     observaciones = '',
     comentario_tecnico = '',
+    salida_confirmada = false,
+    fecha_salida_confirmada = null,
+    en_estacionamiento_manual = false,
   } = req.body;
 
   try {
@@ -1341,8 +1365,11 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
            fallas_detectadas = $21,
            observaciones = $22,
            comentario_tecnico = $23,
+           salida_confirmada = $24,
+           fecha_salida_confirmada = $25,
+           en_estacionamiento_manual = $26,
            updated_at = now()
-       where id = $24 and company_id = $25
+       where id = $27 and company_id = $28
        returning *`,
       [
         customer_name,
@@ -1351,7 +1378,7 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
         customer_address,
         customer_city,
         customer_email,
-        assigned_mechanic_id || null,
+        normalizeUuid(assigned_mechanic_id),
         assigned_mechanic_name,
         patente,
         marca,
@@ -1368,6 +1395,9 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
         fallas_detectadas,
         observaciones,
         comentario_tecnico,
+        Boolean(salida_confirmada),
+        fecha_salida_confirmada || null,
+        Boolean(en_estacionamiento_manual),
         id,
         companyId,
       ]

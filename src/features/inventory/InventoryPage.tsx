@@ -1,8 +1,9 @@
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useState } from "react";
 
 import InventoryForm from "./InventoryForm";
 import InventoryTable from "./InventoryTable";
 import { InventoryItem } from "../../lib/types";
+import { createInventoryItem, updateInventoryItem } from "../../lib/api";
 
 interface InventoryPageProps {
   inventoryItems: InventoryItem[];
@@ -10,24 +11,26 @@ interface InventoryPageProps {
   showNotification: (type: "success" | "error", message: string) => void;
 }
 
+const emptyInventoryForm = {
+  name: "",
+  category: "",
+  sku: "",
+  barcode: "",
+  stock: 0,
+  minStock: 0,
+  unit: "unidad",
+  location: "",
+  supplier: "",
+  cost: 0,
+  notes: "",
+};
+
 export default function InventoryPage({
   inventoryItems,
   setInventoryItems,
   showNotification,
 }: InventoryPageProps) {
-  const [inventoryForm, setInventoryForm] = useState({
-    name: "",
-    category: "",
-    sku: "",
-    barcode: "",
-    stock: 0,
-    minStock: 0,
-    unit: "unidad",
-    location: "",
-    supplier: "",
-    cost: 0,
-    notes: "",
-  });
+  const [inventoryForm, setInventoryForm] = useState(emptyInventoryForm);
 
   const [inventoryAdjust, setInventoryAdjust] = useState({
     itemId: "",
@@ -45,105 +48,100 @@ export default function InventoryPage({
       ...prev,
       [name]:
         name === "stock" || name === "minStock" || name === "cost"
-          ? parseInt(value) || 0
+          ? parseInt(value, 10) || 0
           : value,
     }));
   };
 
-  const handleInventorySubmit = (event: FormEvent) => {
+  const handleInventorySubmit = async (event: FormEvent) => {
     event.preventDefault();
-    const now = new Date().toISOString();
-    const item = {
-      id: crypto.randomUUID(),
-      name: inventoryForm.name.trim(),
-      category: inventoryForm.category.trim(),
-      sku: inventoryForm.sku.trim(),
-      barcode: inventoryForm.barcode.trim(),
-      stock: inventoryForm.stock,
-      minStock: inventoryForm.minStock,
-      unit: inventoryForm.unit.trim(),
-      location: inventoryForm.location.trim(),
-      supplier: inventoryForm.supplier.trim(),
-      cost: inventoryForm.cost,
-      notes: inventoryForm.notes.trim(),
-      updated_at: now,
-    };
-    setInventoryItems((prev) => [item, ...prev]);
-    setInventoryForm({
-      name: "",
-      category: "",
-      sku: "",
-      barcode: "",
-      stock: 0,
-      minStock: 0,
-      unit: "unidad",
-      location: "",
-      supplier: "",
-      cost: 0,
-      notes: "",
-    });
-    showNotification("success", "Insumo agregado");
+
+    try {
+      const savedItem = await createInventoryItem({
+        name: inventoryForm.name.trim(),
+        category: inventoryForm.category.trim(),
+        sku: inventoryForm.sku.trim(),
+        barcode: inventoryForm.barcode.trim(),
+        stock: inventoryForm.stock,
+        minStock: inventoryForm.minStock,
+        unit: inventoryForm.unit.trim(),
+        location: inventoryForm.location.trim(),
+        supplier: inventoryForm.supplier.trim(),
+        cost: inventoryForm.cost,
+        notes: inventoryForm.notes.trim(),
+      });
+      setInventoryItems((prev) => [savedItem, ...prev]);
+      setInventoryForm(emptyInventoryForm);
+      showNotification("success", "Insumo agregado");
+    } catch (error) {
+      console.error("Create inventory item failed", error);
+      showNotification("error", "No se pudo guardar el insumo");
+    }
   };
 
-  const handleInventoryAdjust = (event: FormEvent) => {
+  const handleInventoryAdjust = async (event: FormEvent) => {
     event.preventDefault();
     const delta = inventoryAdjust.quantity;
     if (!inventoryAdjust.itemId || !delta) {
       return;
     }
-    setInventoryItems((prev) =>
-      prev.map((item) =>
-        item.id === inventoryAdjust.itemId
-          ? {
-              ...item,
-              stock: item.stock + delta,
-              updated_at: new Date().toISOString(),
-            }
-          : item,
-      ),
+
+    const inventoryItem = inventoryItems.find(
+      (item) => item.id === inventoryAdjust.itemId,
     );
-    setInventoryAdjust({ itemId: "", quantity: 0, reason: "" });
-    showNotification("success", "Stock actualizado");
+    if (!inventoryItem) {
+      showNotification("error", "Insumo no encontrado");
+      return;
+    }
+
+    try {
+      const savedItem = await updateInventoryItem(inventoryItem.id, {
+        ...inventoryItem,
+        stock: inventoryItem.stock + delta,
+      });
+      setInventoryItems((prev) =>
+        prev.map((item) => (item.id === savedItem.id ? savedItem : item)),
+      );
+      setInventoryAdjust({ itemId: "", quantity: 0, reason: "" });
+      showNotification("success", "Stock actualizado");
+    } catch (error) {
+      console.error("Inventory adjust failed", error);
+      showNotification("error", "No se pudo actualizar el stock");
+    }
   };
 
-  const handleBarcodeSubmit = (event: FormEvent) => {
+  const handleBarcodeSubmit = async (event: FormEvent) => {
     event.preventDefault();
 
     const code = barcodeInput.trim();
-
     if (!code) {
       return;
     }
 
-    let matched = false;
-
-    setInventoryItems((prev) =>
-      prev.map((item) => {
-        if (item.barcode === code || item.sku === code) {
-          matched = true;
-
-          return {
-            ...item,
-            stock: item.stock + 1,
-            updated_at: new Date().toISOString(),
-          };
-        }
-
-        return item;
-      }),
+    const inventoryItem = inventoryItems.find(
+      (item) => item.barcode === code || item.sku === code,
     );
+    if (!inventoryItem) {
+      setBarcodeInput("");
+      showNotification("error", "Codigo no encontrado");
+      return;
+    }
 
-    setBarcodeInput("");
-
-    showNotification(
-      "success",
-      matched ? "Stock actualizado por código" : "Código no encontrado",
-    );
+    try {
+      const savedItem = await updateInventoryItem(inventoryItem.id, {
+        ...inventoryItem,
+        stock: inventoryItem.stock + 1,
+      });
+      setInventoryItems((prev) =>
+        prev.map((item) => (item.id === savedItem.id ? savedItem : item)),
+      );
+      setBarcodeInput("");
+      showNotification("success", "Stock actualizado por codigo");
+    } catch (error) {
+      console.error("Barcode stock update failed", error);
+      showNotification("error", "No se pudo actualizar el stock");
+    }
   };
-
-  useEffect(() => {
-    localStorage.setItem("inventoryItems", JSON.stringify(inventoryItems));
-  }, [inventoryItems]);
 
   const lowStockItems = inventoryItems.filter(
     (item) => item.minStock > 0 && item.stock <= item.minStock,
@@ -175,33 +173,4 @@ export default function InventoryPage({
       />
     </>
   );
-  //Para futuro
-  // return (
-  //   <>
-  //     <InventoryForm
-  //       inventoryForm={inventoryForm}
-  //       onChange={handleInventoryChange}
-  //       onSubmit={handleInventorySubmit}
-  //     />
-
-  //     <BarcodeForm
-  //       barcodeInput={barcodeInput}
-  //       setBarcodeInput={setBarcodeInput}
-  //       onSubmit={handleBarcodeSubmit}
-  //     />
-
-  //     <StockAdjustForm
-  //       inventoryItems={inventoryItems}
-  //       inventoryAdjust={inventoryAdjust}
-  //       setInventoryAdjust={setInventoryAdjust}
-  //       onSubmit={handleInventoryAdjust}
-  //     />
-
-  //     <InventoryTable
-  //       inventoryItems={inventoryItems}
-  //       lowStockItems={lowStockItems}
-  //       totalStockValue={totalStockValue}
-  //     />
-  //   </>
-  // );
 }

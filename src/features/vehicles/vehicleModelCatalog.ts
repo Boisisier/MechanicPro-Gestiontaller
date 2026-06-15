@@ -61,6 +61,7 @@ export const vehicleModelCatalog: Record<string, string[]> = {
     "Sail",
     "Spark",
     "Tracker",
+    "Aveo",
   ],
   Nissan: [
     "Kicks",
@@ -72,6 +73,7 @@ export const vehicleModelCatalog: Record<string, string[]> = {
     "Sentra",
     "Versa",
     "X-Trail",
+    "Terrano",
   ],
   Mazda: ["BT-50", "CX-3", "CX-30", "CX-5", "CX-60", "Mazda 2", "Mazda 3", "Mazda 6"],
   Peugeot: ["2008", "208", "3008", "301", "5008", "Partner", "Rifter"],
