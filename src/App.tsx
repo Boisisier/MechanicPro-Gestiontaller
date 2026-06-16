@@ -1675,8 +1675,11 @@ function App() {
                               "Se borraran los datos cargados del ingreso de vehiculo actual.",
                             confirmLabel: "Limpiar formulario",
                             variant: "danger",
-                            onConfirm: () =>
-                              window.dispatchEvent(new Event("vehicle-form-clear")),
+                            onConfirm: () => {
+                              window.dispatchEvent(
+                                new Event("vehicle-form-clear"),
+                              );
+                            },
                           })
                         }
                         className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-red-700 focus:ring-4 focus:ring-red-200"
