@@ -17,6 +17,7 @@ import {
   login,
   loginDemo,
   setAuthToken,
+  deleteParkingRelease,
   deleteWorkshopUser,
   updateInventoryItem,
   updateVehicle,
@@ -992,6 +993,10 @@ function App() {
 
         {
           estado: statusOverride || vehicle.estado,
+          fecha_salida_confirmada:
+            statusOverride === "Entregado"
+              ? vehicle.fecha_salida_confirmada || new Date().toISOString()
+              : vehicle.fecha_salida_confirmada || null,
 
           servicios: [
             ...reviewServices.map(serializeReviewService),
@@ -1124,14 +1129,18 @@ function App() {
       prev.includes(vehicle.id) ? prev : [...prev, vehicle.id],
     );
 
+    try {
     await updateVehicleRecord(
       vehicle,
       {
         salida_confirmada: true,
         fecha_salida_confirmada: new Date().toISOString(),
+        en_estacionamiento_manual: false,
       },
       `Vehiculo ${vehicle.patente} listo`,
     );
+
+    setManualParkingIds((prev) => prev.filter((id) => id !== vehicle.id));
 
     setTimeout(() => {
       setHiddenSalidaIds((prev) =>
@@ -1142,6 +1151,11 @@ function App() {
 
       setVehicleTab("ingreso");
     }, 400);
+    } catch (error) {
+      setReadyVehicleIds((prev) => prev.filter((id) => id !== vehicle.id));
+      console.error("Vehicle ready failed", error);
+      showNotification("error", "No se pudo marcar el vehiculo como listo");
+    }
   };
 
   const handleVehicleReady = (vehicle: Vehicle) => {
@@ -1237,7 +1251,9 @@ function App() {
   );
 
   const getVehicleExitDate = (vehicle: Vehicle) =>
-    new Date(vehicle.updated_at || vehicle.fecha_ingreso);
+    new Date(
+      vehicle.fecha_salida_confirmada || vehicle.updated_at || vehicle.fecha_ingreso,
+    );
 
   const getParkingDays = (vehicle: Vehicle) => {
     const exitDate = getVehicleExitDate(vehicle);
@@ -1255,6 +1271,14 @@ function App() {
       !releasedParkingIds.includes(vehicle.id),
   );
 
+  const vehiclesEnSalida = vehiclesEntregados.filter(
+    (vehicle) =>
+      !hiddenSalidaIds.includes(vehicle.id) &&
+      !vehicle.salida_confirmada &&
+      !vehicle.en_estacionamiento_manual &&
+      !manualParkingIds.includes(vehicle.id),
+  );
+
   const isParkingNotificationDay = [1, 4].includes(new Date().getDay());
 
   const getVehicleWorkTotal = (vehicle: Vehicle) => {
@@ -1269,25 +1293,35 @@ function App() {
     return serviceTotal + partTotal;
   };
 
-  const performReleaseFromParking = (vehicle: Vehicle) => {
-    setReleasedParkingIds((prev) =>
-      prev.includes(vehicle.id) ? prev : [...prev, vehicle.id],
-    );
-    logAction(
-      "Salida de estacionamiento",
-      "Estacionamiento",
-      `${vehicle.patente} fue retirado del listado de estacionamiento`,
-    );
-    if (authToken && sessionRole === "member") {
-      createParkingRelease({
-        vehicle_id: vehicle.id,
-        released_by: currentAuditUser?.name || "Usuario general",
-        detail: `${vehicle.patente} retirado del estacionamiento`,
-      }).catch((error) => {
-        console.error("Parking release sync failed", error);
-      });
+  const performReleaseFromParking = async (vehicle: Vehicle) => {
+    try {
+      if (authToken && sessionRole === "member") {
+        await createParkingRelease({
+          vehicle_id: vehicle.id,
+          released_by: currentAuditUser?.name || "Usuario general",
+          detail: `${vehicle.patente} retirado del estacionamiento`,
+        });
+      }
+
+      await updateVehicleRecord(
+        vehicle,
+        { en_estacionamiento_manual: false },
+        "Vehiculo retirado del estacionamiento",
+      );
+
+      setReleasedParkingIds((prev) =>
+        prev.includes(vehicle.id) ? prev : [...prev, vehicle.id],
+      );
+      setManualParkingIds((prev) => prev.filter((id) => id !== vehicle.id));
+      logAction(
+        "Salida de estacionamiento",
+        "Estacionamiento",
+        `${vehicle.patente} fue retirado del listado de estacionamiento`,
+      );
+    } catch (error) {
+      console.error("Parking release failed", error);
+      showNotification("error", "No se pudo guardar la salida de estacionamiento");
     }
-    showNotification("success", "Vehiculo retirado del estacionamiento");
   };
 
   const handleReleaseFromParking = (vehicle: Vehicle) => {
@@ -1304,9 +1338,20 @@ function App() {
     try {
       await updateVehicleRecord(
         vehicle,
-        { en_estacionamiento_manual: true },
+        {
+          en_estacionamiento_manual: true,
+          fecha_salida_confirmada:
+            vehicle.fecha_salida_confirmada || new Date().toISOString(),
+        },
         "Vehiculo enviado a estacionamiento",
       );
+      if (authToken && sessionRole === "member") {
+        await deleteParkingRelease(vehicle.id).catch((error) => {
+          if ((error as Error & { status?: number }).status !== 404) {
+            throw error;
+          }
+        });
+      }
     } catch (error) {
       console.error("Send to parking failed", error);
       showNotification("error", "No se pudo guardar el estacionamiento");
@@ -2313,24 +2358,12 @@ function App() {
 
               {vehicleTab === "salida" && (
                 <div className="space-y-4">
-                  {vehiclesEntregados.filter(
-                    (vehicle) =>
-                      !hiddenSalidaIds.includes(vehicle.id) &&
-                      !vehicle.salida_confirmada,
-                  ).length === 0 ? (
+                  {vehiclesEnSalida.length === 0 ? (
                     <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm text-sm text-gray-500">
                       No hay vehí­culos en salida.
                     </div>
                   ) : (
-                    vehiclesEntregados
-
-                      .filter(
-                        (vehicle) =>
-                          !hiddenSalidaIds.includes(vehicle.id) &&
-                          !vehicle.salida_confirmada,
-                      )
-
-                      .map((vehicle) => (
+                    vehiclesEnSalida.map((vehicle) => (
                         <div
                           key={vehicle.id}
                           className={`bg-white rounded-xl border border-gray-200 p-6 shadow-sm fade-item ${

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { History, RotateCcw, Save, Search, Send, X } from 'lucide-react';
+import { ChevronDown, History, RotateCcw, Save, Search, Send, X } from 'lucide-react';
 import { getModelsForBrand, vehicleBrandNames } from '../../features/vehicles/vehicleModelCatalog';
 import ConfirmDialog from '../ui/ConfirmDialog';
 
@@ -208,6 +208,10 @@ export default function VehicleForm({
   const [lookupTerm, setLookupTerm] = useState('');
   const [brandFocused, setBrandFocused] = useState(false);
   const [modelFocused, setModelFocused] = useState(false);
+  const [failureSearch, setFailureSearch] = useState('');
+  const [openFailureCategories, setOpenFailureCategories] = useState<string[]>([
+    failureChecklist[0].category,
+  ]);
   const availableModels = getModelsForBrand(formData.marca);
   const brandSuggestions = vehicleBrandNames
     .filter((brand) => normalizeSearch(brand).includes(normalizeSearch(formData.marca)))
@@ -215,6 +219,27 @@ export default function VehicleForm({
   const modelSuggestions = availableModels
     .filter((model) => normalizeSearch(model).includes(normalizeSearch(formData.modelo)))
     .slice(0, 8);
+  const selectedFailures = formData.fallas_detectadas;
+  const filteredFailureChecklist = failureChecklist
+    .map((section) => ({
+      ...section,
+      groups: section.groups
+        .map((group) => ({
+          ...group,
+          items: group.items.filter((item) => {
+            const value = `${section.category} > ${group.label} > ${item}`;
+            const search = normalizeSearch(failureSearch);
+            return (
+              !search ||
+              normalizeSearch(value).includes(search) ||
+              selectedFailures.includes(value)
+            );
+          }),
+        }))
+        .filter((group) => group.items.length > 0),
+    }))
+    .filter((section) => section.groups.length > 0);
+  const hasFailureSearch = failureSearch.trim().length > 0;
 
   useEffect(() => {
     if (editingVehicle) {
@@ -331,6 +356,24 @@ export default function VehicleForm({
           : [...prev.fallas_detectadas, failure],
       };
     });
+  };
+
+  const toggleFailureCategory = (category: string) => {
+    setOpenFailureCategories((prev) =>
+      prev.includes(category)
+        ? prev.filter((item) => item !== category)
+        : [...prev, category],
+    );
+  };
+
+  const handleClearFailures = () => {
+    setFormData((prev) => ({ ...prev, fallas_detectadas: [] }));
+    setFailureSearch('');
+  };
+
+  const getFailureParts = (failure: string) => {
+    const [category = '', group = '', item = failure] = failure.split(' > ');
+    return { category, group, item };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -648,47 +691,155 @@ export default function VehicleForm({
         </div>
 
           <div className="mt-6">
-            <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <h5 className="inline-flex rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm">Posibles fallas al ingreso</h5>
-              <span className="text-xs text-gray-500">
-                {formData.fallas_detectadas.length} seleccionada(s)
-              </span>
+            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h5 className="inline-flex rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm">
+                  Posibles fallas al ingreso
+                </h5>
+                <p className="mt-2 text-xs text-gray-500">
+                  {selectedFailures.length} seleccionada(s) para informar al mecánico en revisión.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="search"
+                    value={failureSearch}
+                    onChange={(event) => setFailureSearch(event.target.value)}
+                    className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm focus:border-[#0f3a63] focus:outline-none focus:ring-2 focus:ring-[#0f3a63]/20 sm:w-64"
+                    placeholder="Buscar falla"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleClearFailures}
+                  disabled={selectedFailures.length === 0 && !failureSearch}
+                  className="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Limpiar fallas
+                </button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 xl:grid-cols-4">
-              {failureChecklist.map((section) => (
-                <div key={section.category} className="rounded-lg border border-gray-200 bg-white p-3">
-                  <p className="text-sm font-semibold text-gray-900">{section.category}</p>
-                  <div className="mt-2 space-y-2">
-                    {section.groups.map((group) => (
-                      <div key={`${section.category}-${group.label}`}>
-                        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                          {group.label}
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {group.items.map((item) => {
-                            const value = `${section.category} > ${group.label} > ${item}`;
-                            return (
-                              <label
-                                key={value}
-                                className="flex min-h-9 items-center gap-2 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={formData.fallas_detectadas.includes(value)}
-                                  onChange={() => handleFailureToggle(value)}
-                                  className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <span>{item}</span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+            {selectedFailures.length > 0 && (
+              <div className="mb-4 rounded-lg border border-[#0f3a63]/15 bg-[#0f3a63]/5 px-4 py-3">
+                <div className="flex flex-wrap gap-2">
+                  {selectedFailures.map((failure) => {
+                    const { category, group, item } = getFailureParts(failure);
+
+                    return (
+                      <button
+                        key={failure}
+                        type="button"
+                        onClick={() => handleFailureToggle(failure)}
+                        className="inline-flex max-w-full items-center gap-2 rounded-lg bg-white px-3 py-2 text-left shadow-sm ring-1 ring-[#0f3a63]/15 hover:bg-red-50 hover:text-red-700 hover:ring-red-200"
+                        title={failure}
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-xs font-semibold text-[#0f3a63]">
+                            {item}
+                          </span>
+                          <span className="block truncate text-[11px] font-medium text-gray-500">
+                            {category} / {group}
+                          </span>
+                        </span>
+                        <X className="h-3.5 w-3.5 shrink-0" />
+                      </button>
+                    );
+                  })}
                 </div>
-              ))}
+              </div>
+            )}
+
+            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+              {filteredFailureChecklist.length === 0 ? (
+                <p className="px-4 py-8 text-center text-sm text-gray-500">
+                  No se encontraron fallas con ese criterio.
+                </p>
+              ) : (
+                filteredFailureChecklist.map((section, index) => {
+                  const sectionFailures = selectedFailures.filter((failure) =>
+                    failure.startsWith(`${section.category} > `),
+                  );
+                  const isOpen =
+                    hasFailureSearch ||
+                    openFailureCategories.includes(section.category) ||
+                    sectionFailures.length > 0;
+
+                  return (
+                    <div
+                      key={section.category}
+                      className={index > 0 ? 'border-t border-gray-200' : ''}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleFailureCategory(section.category)}
+                        className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left hover:bg-gray-50"
+                      >
+                        <div className="flex min-w-0 items-center gap-3">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0f3a63]/10 text-sm font-bold text-[#0f3a63]">
+                            {sectionFailures.length}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-gray-900">
+                              {section.category}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {section.groups.length} grupo(s) disponible(s)
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronDown
+                          className={`h-5 w-5 shrink-0 text-gray-500 transition-transform ${
+                            isOpen ? 'rotate-180' : ''
+                          }`}
+                        />
+                      </button>
+
+                      {isOpen && (
+                        <div className="border-t border-gray-100 bg-gray-50/50 px-4 py-4">
+                          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+                            {section.groups.map((group) => (
+                              <div key={`${section.category}-${group.label}`}>
+                                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                                  {group.label}
+                                </p>
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                                  {group.items.map((item) => {
+                                    const value = `${section.category} > ${group.label} > ${item}`;
+                                    const checked = selectedFailures.includes(value);
+
+                                    return (
+                                      <label
+                                        key={value}
+                                        className={`flex min-h-10 items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                                          checked
+                                            ? 'border-[#0f3a63] bg-[#0f3a63]/10 text-[#0f3a63]'
+                                            : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                                        }`}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={checked}
+                                          onChange={() => handleFailureToggle(value)}
+                                          className="h-4 w-4 rounded border-gray-300 text-[#0f3a63] focus:ring-[#0f3a63]"
+                                        />
+                                        <span className="leading-snug">{item}</span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
 
