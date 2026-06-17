@@ -1175,6 +1175,54 @@ function App() {
     });
   };
 
+  const performReturnToTallerFromSalida = async (vehicle: Vehicle) => {
+    try {
+      await updateVehicleRecord(
+        vehicle,
+        {
+          estado: "En Taller",
+          salida_confirmada: false,
+          fecha_salida_confirmada: null,
+          en_estacionamiento_manual: false,
+        },
+        `Vehiculo ${vehicle.patente} devuelto a En Taller`,
+      );
+      if (authToken && sessionRole === "member") {
+        await deleteParkingRelease(vehicle.id).catch((error) => {
+          if ((error as Error & { status?: number }).status !== 404) {
+            throw error;
+          }
+        });
+      }
+
+      setReadyVehicleIds((prev) => prev.filter((id) => id !== vehicle.id));
+      setHiddenSalidaIds((prev) => prev.filter((id) => id !== vehicle.id));
+      setManualParkingIds((prev) => prev.filter((id) => id !== vehicle.id));
+      setReleasedParkingIds((prev) => prev.filter((id) => id !== vehicle.id));
+      setVehicleTab("taller");
+      handleReviewSelect(vehicle);
+
+      logAction(
+        "Devuelto a En Taller",
+        "Salida",
+        `${vehicle.patente} fue devuelto desde Salida para agregar mas trabajos, repuestos o insumos`,
+      );
+    } catch (error) {
+      console.error("Return to workshop from salida failed", error);
+      showNotification("error", "No se pudo devolver el vehiculo a En Taller");
+    }
+  };
+
+  const handleReturnToTallerFromSalida = (vehicle: Vehicle) => {
+    requestConfirmation({
+      title: "Devolver a Taller",
+      message: `El vehiculo ${vehicle.patente} volvera a En Taller con sus servicios, repuestos, insumos y observaciones actuales para seguir editando el trabajo.`,
+      confirmLabel: "Devolver a Taller",
+      variant: "warning",
+      onConfirm: () => performReturnToTallerFromSalida(vehicle),
+    });
+  };
+
   const handleNotify = (vehicle: Vehicle) => {
     const contact = vehicle.customer_phone || "cliente";
 
@@ -2431,6 +2479,13 @@ function App() {
                                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
                               >
                                 Exportar PDF
+                              </button>
+
+                              <button
+                                onClick={() => handleReturnToTallerFromSalida(vehicle)}
+                                className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700"
+                              >
+                                Devolver a Taller
                               </button>
 
                               <button
