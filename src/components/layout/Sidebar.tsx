@@ -6,10 +6,17 @@ interface SidebarProps {
   activeSection: string;
   onSectionChange: (section: string) => void;
   isOpen: boolean;
+  isDesktopOpen: boolean;
   onClose: () => void;
 }
 
-export default function Sidebar({ activeSection, onSectionChange, isOpen, onClose }: SidebarProps) {
+export default function Sidebar({
+  activeSection,
+  onSectionChange,
+  isOpen,
+  isDesktopOpen,
+  onClose,
+}: SidebarProps) {
   const menuSections = [
     {
       title: 'Principal',
@@ -48,37 +55,44 @@ export default function Sidebar({ activeSection, onSectionChange, isOpen, onClos
       )}
 
       <aside
-        className={`w-64 bg-[#0f3a63] border-r border-blue-900/30 h-screen fixed left-0 top-0 flex flex-col z-50 transition-transform duration-300 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        className={`fixed left-0 top-0 z-50 flex h-dvh max-h-dvh w-[min(18rem,calc(100vw-1.5rem))] flex-col border-r border-blue-900/30 bg-[#0f3a63] shadow-2xl transition-transform duration-300 lg:w-64 lg:shadow-none ${
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        } ${
+          isDesktopOpen ? 'lg:translate-x-0' : 'lg:-translate-x-full'
         }`}
       >
-        <div className="p-6 border-b border-white/15">
+        <div className="shrink-0 border-b border-white/15 p-4 lg:p-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div
-                className="w-10 h-10 rounded-lg flex items-center justify-center bg-white/15 shadow-sm"
+                className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/15 shadow-sm"
               >
-                <Car className="w-6 h-6 text-white" />
+                <Car className="h-6 w-6 text-white" />
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-white">MechanicPro</h1>
+              <div className="min-w-0">
+                <h1 className="truncate text-lg font-bold text-white lg:text-xl">MechanicPro</h1>
                 <p className="text-xs text-white">Gestión de taller</p>
               </div>
             </div>
-            <button onClick={onClose} className="lg:hidden text-white/80 hover:text-white">
-              <X className="w-5 h-5" />
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-2 text-white/80 hover:bg-white/10 hover:text-white lg:hidden"
+              aria-label="Cerrar menú"
+            >
+              <X className="h-5 w-5" />
             </button>
           </div>
         </div>
 
-        <nav className="flex-1 p-4 overflow-y-auto">
-          <div className="space-y-6">
+        <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.45)_transparent]">
+          <div className="space-y-5 pb-2">
             {menuSections.map((section) => (
               <div key={section.title}>
-                <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-wide text-white">
+                <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wide text-white/75">
                   {section.title}
                 </p>
-                <ul className="space-y-2">
+                <ul className="space-y-1.5">
                   {section.items.map((item) => {
                     const Icon = item.icon;
                     const isActive = activeSection === item.id;
@@ -87,14 +101,14 @@ export default function Sidebar({ activeSection, onSectionChange, isOpen, onClos
                       <li key={item.id}>
                         <button
                           onClick={() => handleSectionChange(item.id)}
-                          className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-white transition-colors ${
+                          className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-white transition-colors ${
                             isActive
                               ? 'bg-white/20 font-semibold shadow-sm'
                               : 'hover:bg-white/10'
                           }`}
                         >
-                          <Icon className="w-5 h-5 text-white" />
-                          <span>{item.label}</span>
+                          <Icon className="h-5 w-5 shrink-0 text-white" />
+                          <span className="truncate">{item.label}</span>
                         </button>
                       </li>
                     );
@@ -105,8 +119,8 @@ export default function Sidebar({ activeSection, onSectionChange, isOpen, onClos
           </div>
         </nav>
 
-        <div className="p-4 border-t border-white/15">
-          <div className="px-4 py-3 bg-white/10 rounded-lg">
+        <div className="shrink-0 border-t border-white/15 p-3 lg:p-4">
+          <div className="rounded-lg bg-white/10 px-3 py-2.5">
             <p className="text-xs text-white mb-1">Sistema activo</p>
             <p className="text-sm font-medium text-white">Versión 1.0</p>
           </div>

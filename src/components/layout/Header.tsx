@@ -33,8 +33,10 @@ export default function Header({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
+            type="button"
             onClick={onMenuClick}
-            className="lg:hidden p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+            className="rounded-lg border border-gray-200 p-2 text-gray-600 transition-colors hover:bg-gray-50 hover:text-[#0f3a63]"
+            aria-label="Abrir o cerrar menú lateral"
           >
             <Menu className="w-6 h-6" />
           </button>

@@ -1,4 +1,4 @@
-export type VehicleStatus = "En taller" | "Entregado" | "En revision";
+export type VehicleStatus = "Ingresado" | "Entregado" | "En Taller";
 
 export interface Vehicle {
   id: string;
@@ -45,6 +45,7 @@ export interface ReviewServiceItem {
 
 export interface ReviewPartItem {
   inventoryItemId: string;
+  itemType?: "repuesto" | "insumo";
   name: string;
   sku: string;
   quantity: number;
@@ -111,6 +112,7 @@ export interface ParkingRelease {
 }
 
 export interface InventoryFormData {
+  item_type: "repuesto" | "insumo";
   name: string;
   category: string;
   sku: string;
@@ -126,6 +128,7 @@ export interface InventoryFormData {
 
 export interface InventoryItem {
   id: string;
+  item_type?: "repuesto" | "insumo";
   name: string;
   category: string;
   sku: string;

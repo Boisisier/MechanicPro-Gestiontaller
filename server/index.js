@@ -36,7 +36,7 @@ const pool = new Pool({
 app.use(cors());
 app.use(express.json());
 
-const allowedStatuses = new Set(['En taller', 'En revision', 'Entregado']);
+const allowedStatuses = new Set(['Ingresado', 'En Taller', 'Entregado']);
 const allowedTipos = new Set(['Auto', 'Camioneta', 'SUV', 'Moto', 'Camion', 'Furgon']);
 const patenteRegex = /^(?:[A-Z]{2}-\d{4}|[A-Z]{4}-\d{2})$/;
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -121,7 +121,7 @@ const ensureVehicleColumns = async () => {
       color text default '',
       kilometraje integer not null default 0,
       cantidad_combustible integer not null default 0,
-      estado text not null default 'En taller',
+      estado text not null default 'Ingresado',
       servicios text[] not null default '{}',
       fallas_detectadas text[] not null default '{}',
       observaciones text default '',
@@ -149,6 +149,7 @@ const ensureVehicleColumns = async () => {
     create table if not exists workshop_users (
       id uuid primary key default gen_random_uuid(),
       company_id uuid not null references companies(id) on delete cascade,
+      item_type text not null default 'repuesto',
       name text not null,
       rut text not null default '',
       email text not null,
@@ -240,10 +241,24 @@ const ensureVehicleColumns = async () => {
       add column if not exists fecha_salida_confirmada timestamptz,
       add column if not exists en_estacionamiento_manual boolean not null default false
   `);
+  await pool.query('alter table vehicles drop constraint if exists vehicles_estado_check');
+  await pool.query('alter table vehicles drop constraint if exists vehicles_estado_chk');
+  await pool.query("update vehicles set estado = 'Ingresado' where estado = 'En taller'");
+  await pool.query("update vehicles set estado = 'En Taller' where estado = 'En revision'");
+  await pool.query('alter table vehicles alter column estado set default \'Ingresado\'');
+  await pool.query(`
+    alter table vehicles
+      add constraint vehicles_estado_check
+      check (estado in ('Ingresado', 'En Taller', 'Entregado'))
+  `);
   await pool.query(`
     alter table workshop_users
       add column if not exists rut text not null default '',
       add column if not exists password_hash text not null default ''
+  `);
+  await pool.query(`
+    alter table inventory_items
+      add column if not exists item_type text not null default 'repuesto'
   `);
   await pool.query("update vehicles set fallas_detectadas = '{}' where fallas_detectadas is null");
   await pool.query("alter table vehicles alter column fallas_detectadas set default '{}'");
@@ -838,7 +853,7 @@ app.get('/inventory-items', authRequired, async (req, res) => {
   const { company_id: companyId } = req.user;
   try {
     const { rows } = await pool.query(
-      `select id, name, category, sku, barcode, stock, min_stock as "minStock", unit, location, supplier,
+      `select id, item_type, name, category, sku, barcode, stock, min_stock as "minStock", unit, location, supplier,
               cost::float as cost, notes, created_at, updated_at
        from inventory_items
        where company_id = $1
@@ -855,18 +870,20 @@ app.get('/inventory-items', authRequired, async (req, res) => {
 app.post('/inventory-items', authRequired, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   const name = String(req.body.name || '').trim();
+  const itemType = req.body.item_type === 'insumo' ? 'insumo' : 'repuesto';
   if (!name) {
     return res.status(400).json({ error: 'missing_name' });
   }
   try {
     const { rows } = await pool.query(
       `insert into inventory_items
-        (company_id, name, category, sku, barcode, stock, min_stock, unit, location, supplier, cost, notes)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-       returning id, name, category, sku, barcode, stock, min_stock as "minStock", unit, location, supplier,
+        (company_id, item_type, name, category, sku, barcode, stock, min_stock, unit, location, supplier, cost, notes)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+       returning id, item_type, name, category, sku, barcode, stock, min_stock as "minStock", unit, location, supplier,
                  cost::float as cost, notes, created_at, updated_at`,
       [
         companyId,
+        itemType,
         name,
         req.body.category || '',
         req.body.sku || '',
@@ -893,18 +910,20 @@ app.post('/inventory-items', authRequired, ensureWritable, async (req, res) => {
 app.put('/inventory-items/:id', authRequired, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   const name = String(req.body.name || '').trim();
+  const itemType = req.body.item_type === 'insumo' ? 'insumo' : 'repuesto';
   if (!name) {
     return res.status(400).json({ error: 'missing_name' });
   }
   try {
     const { rows } = await pool.query(
       `update inventory_items
-       set name = $1, category = $2, sku = $3, barcode = $4, stock = $5, min_stock = $6,
-           unit = $7, location = $8, supplier = $9, cost = $10, notes = $11, updated_at = now()
-       where id = $12 and company_id = $13
-       returning id, name, category, sku, barcode, stock, min_stock as "minStock", unit, location, supplier,
+       set item_type = $1, name = $2, category = $3, sku = $4, barcode = $5, stock = $6, min_stock = $7,
+           unit = $8, location = $9, supplier = $10, cost = $11, notes = $12, updated_at = now()
+       where id = $13 and company_id = $14
+       returning id, item_type, name, category, sku, barcode, stock, min_stock as "minStock", unit, location, supplier,
                  cost::float as cost, notes, created_at, updated_at`,
       [
+        itemType,
         name,
         req.body.category || '',
         req.body.sku || '',
@@ -1205,7 +1224,7 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
 
   if (!req.body.estado) {
-    req.body.estado = 'En taller';
+    req.body.estado = 'Ingresado';
   }
   if (!Array.isArray(req.body.servicios)) {
     req.body.servicios = [];
@@ -1231,7 +1250,7 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
     color = '',
     kilometraje = 0,
     cantidad_combustible = 0,
-    estado = 'En taller',
+    estado = 'Ingresado',
     customer_name = '',
     customer_rut = '',
     customer_phone = '',

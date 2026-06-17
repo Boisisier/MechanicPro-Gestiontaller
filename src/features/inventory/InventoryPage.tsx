@@ -12,6 +12,7 @@ interface InventoryPageProps {
 }
 
 const emptyInventoryForm = {
+  item_type: "repuesto" as const,
   name: "",
   category: "",
   sku: "",
@@ -59,15 +60,16 @@ export default function InventoryPage({
     try {
       const savedItem = await createInventoryItem({
         name: inventoryForm.name.trim(),
+        item_type: inventoryForm.item_type,
         category: inventoryForm.category.trim(),
         sku: inventoryForm.sku.trim(),
         barcode: inventoryForm.barcode.trim(),
         stock: inventoryForm.stock,
-        minStock: inventoryForm.minStock,
-        unit: inventoryForm.unit.trim(),
+        minStock: 0,
+        unit: "unidad",
         location: inventoryForm.location.trim(),
-        supplier: inventoryForm.supplier.trim(),
-        cost: inventoryForm.cost,
+        supplier: "",
+        cost: 0,
         notes: inventoryForm.notes.trim(),
       });
       setInventoryItems((prev) => [savedItem, ...prev]);

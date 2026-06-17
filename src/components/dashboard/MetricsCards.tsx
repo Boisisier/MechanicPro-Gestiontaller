@@ -2,12 +2,12 @@
 
 interface MetricsCardsProps {
   totalvehicles: number;
-  enTaller: number;
+  ingresados: number;
   entregados: number;
-  enRevision: number;
+  enTaller: number;
 }
 
-export default function MetricsCards({ totalvehicles, enTaller, entregados, enRevision }: MetricsCardsProps) {
+export default function MetricsCards({ totalvehicles, ingresados, entregados, enTaller }: MetricsCardsProps) {
   const metrics = [
     {
       label: 'Total vehículos',
@@ -15,8 +15,8 @@ export default function MetricsCards({ totalvehicles, enTaller, entregados, enRe
       icon: Car,
     },
     {
-      label: 'En taller',
-      value: enTaller,
+      label: 'Ingresados',
+      value: ingresados,
       icon: Wrench,
     },
     {
@@ -25,8 +25,8 @@ export default function MetricsCards({ totalvehicles, enTaller, entregados, enRe
       icon: CheckCircle,
     },
     {
-      label: 'En revisión',
-      value: enRevision,
+      label: 'En Taller',
+      value: enTaller,
       icon: Clock,
     },
   ];

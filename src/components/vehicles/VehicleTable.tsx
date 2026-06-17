@@ -85,9 +85,9 @@ export default function VehicleTable({
 
     const badges = {
 
-      'En taller': 'bg-orange-100 text-orange-700 border-orange-200',
+      Ingresado: 'bg-orange-100 text-orange-700 border-orange-200',
 
-      'En revision': 'bg-amber-100 text-amber-700 border-amber-200',
+      'En Taller': 'bg-amber-100 text-amber-700 border-amber-200',
 
       Entregado: 'bg-green-100 text-green-700 border-green-200',
 

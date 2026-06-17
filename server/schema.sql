@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS vehicles (
   color text DEFAULT '',
   kilometraje integer NOT NULL DEFAULT 0,
   cantidad_combustible integer NOT NULL DEFAULT 0,
-  estado text NOT NULL DEFAULT 'En taller',
+  estado text NOT NULL DEFAULT 'Ingresado',
   servicios text[] NOT NULL DEFAULT '{}',
   fallas_detectadas text[] NOT NULL DEFAULT '{}',
   observaciones text DEFAULT '',
@@ -83,13 +83,14 @@ CREATE TABLE IF NOT EXISTS vehicles (
   fecha_ingreso timestamptz NOT NULL DEFAULT now(),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CHECK (estado IN ('En taller', 'En revision', 'Entregado')),
+  CHECK (estado IN ('Ingresado', 'En Taller', 'Entregado')),
   CHECK (tipo_vehiculo IN ('Auto', 'Camioneta', 'SUV', 'Moto', 'Camion', 'Furgon'))
 );
 -- tabla de vehiculos en taller, con indices para consultas rapidas por empresa, patente, fecha de ingreso y estado
 CREATE TABLE IF NOT EXISTS inventory_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  item_type text NOT NULL DEFAULT 'repuesto',
   name text NOT NULL,
   category text DEFAULT '',
   sku text DEFAULT '',

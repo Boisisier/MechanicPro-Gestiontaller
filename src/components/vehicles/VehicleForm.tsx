@@ -31,7 +31,7 @@ export interface VehicleFormData {
   color: string;
   kilometraje: number;
   cantidad_combustible: number;
-  estado: 'En taller' | 'Entregado' | 'En revision';
+  estado: 'Ingresado' | 'Entregado' | 'En Taller';
   customer_name: string;
   customer_rut: string;
   customer_phone: string;
@@ -56,7 +56,7 @@ const initialFormData: VehicleFormData = {
   color: '',
   kilometraje: 0,
   cantidad_combustible: 0,
-  estado: 'En taller',
+  estado: 'Ingresado',
   customer_name: '',
   customer_rut: '',
   customer_phone: '',
@@ -179,7 +179,7 @@ const buildFormDataFromPreviousVisit = (vehicle: PreviousVehicleData, patente: s
   color: '',
   kilometraje: 0,
   cantidad_combustible: 0,
-  estado: 'En taller',
+  estado: 'Ingresado',
   customer_name: vehicle.customer_name || '',
   customer_rut: vehicle.customer_rut || '',
   customer_phone: vehicle.customer_phone || '',
@@ -408,7 +408,7 @@ export default function VehicleForm({
     setSendConfirmOpen(false);
     setIsSubmitting(true);
     try {
-      await onSubmit({ ...formData, estado: 'En revision' });
+      await onSubmit({ ...formData, estado: 'En Taller' });
       if (!editingVehicle) {
         setFormData(initialFormData);
         setLoadedPatente('');
@@ -435,9 +435,9 @@ export default function VehicleForm({
     <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
       <ConfirmDialog
         open={sendConfirmOpen}
-        title="Enviar a revision"
-        message="El vehiculo ingresara al submodulo En revision para que el mecanico pueda registrar trabajos, repuestos y observaciones."
-        confirmLabel="Enviar a revision"
+        title="Enviar a En Taller"
+        message="El vehiculo ingresara al submodulo En Taller para que el mecanico pueda registrar trabajos, repuestos y observaciones."
+        confirmLabel="Enviar a En Taller"
         variant="info"
         onConfirm={performSendToReview}
         onCancel={() => setSendConfirmOpen(false)}
@@ -697,7 +697,7 @@ export default function VehicleForm({
                   Posibles fallas al ingreso
                 </h5>
                 <p className="mt-2 text-xs text-gray-500">
-                  {selectedFailures.length} seleccionada(s) para informar al mecánico en revisión.
+                  {selectedFailures.length} seleccionada(s) para informar al mecánico en taller.
                 </p>
               </div>
 

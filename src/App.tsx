@@ -28,6 +28,7 @@ import type {
   CatalogService,
   ReviewPartItem,
   ReviewServiceItem,
+  InventoryItem,
   UserRole,
   Vehicle,
   WorkshopUser,
@@ -117,23 +118,7 @@ const defaultWorkshopUsers: WorkshopUser[] = [
 ];
 
 function App() {
-  const [inventoryItems, setInventoryItems] = useState<
-    Array<{
-      id: string;
-      name: string;
-      category: string;
-      sku: string;
-      barcode: string;
-      stock: number;
-      minStock: number;
-      unit: string;
-      location: string;
-      supplier: string;
-      cost: number;
-      notes: string;
-      updated_at: string;
-    }>
-  >([]);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
 
   const lowStockItems = inventoryItems.filter(
     (item) => item.minStock > 0 && item.stock <= item.minStock,
@@ -161,6 +146,7 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
 
   const [authToken, setAuthTokenState] = useState<string | null>(() =>
     getAuthToken(),
@@ -214,7 +200,7 @@ function App() {
   });
 
   const [vehicleTab, setVehicleTab] = useState<
-    "ingreso" | "revision" | "salida"
+    "ingreso" | "taller" | "salida"
   >("ingreso");
 
   const [reviewVehicleId, setReviewVehicleId] = useState<string | null>(null);
@@ -230,6 +216,9 @@ function App() {
   const [partSearch, setPartSearch] = useState("");
 
   const [partPickerOpen, setPartPickerOpen] = useState(false);
+  const [inventoryPickerType, setInventoryPickerType] = useState<
+    "repuesto" | "insumo"
+  >("repuesto");
 
   const [reviewNotes, setReviewNotes] = useState("");
 
@@ -281,6 +270,14 @@ function App() {
   const isSessionAdmin =
     sessionUser?.role === "admin" ||
     sessionUser?.role === "Administrador de Taller";
+
+  const handleSidebarToggle = () => {
+    if (window.innerWidth >= 1024) {
+      setDesktopSidebarOpen((prev) => !prev);
+      return;
+    }
+    setSidebarOpen(true);
+  };
 
   const requestConfirmation = (options: {
     title: string;
@@ -836,7 +833,10 @@ function App() {
 
   const handleAddReviewPart = (item: (typeof inventoryItems)[number]) => {
     if (item.stock <= 0) {
-      showNotification("error", "Este repuesto no tiene stock disponible");
+      showNotification(
+        "error",
+        `Este ${item.item_type === "insumo" ? "insumo" : "repuesto"} no tiene stock disponible`,
+      );
       return;
     }
 
@@ -866,6 +866,7 @@ function App() {
         ...prev,
         {
           inventoryItemId: item.id,
+          itemType: item.item_type === "insumo" ? "insumo" : "repuesto",
           name: item.name,
           sku: item.sku,
           quantity: 1,
@@ -877,6 +878,12 @@ function App() {
     });
     setPartSearch("");
     setPartPickerOpen(false);
+  };
+
+  const openInventoryPicker = (type: "repuesto" | "insumo") => {
+    setInventoryPickerType(type);
+    setPartSearch("");
+    setPartPickerOpen((prev) => (inventoryPickerType === type ? !prev : true));
   };
 
   const handleReviewPartQuantityChange = (
@@ -918,13 +925,13 @@ function App() {
     setPartSearch("");
     setServicePickerOpen(false);
     setPartPickerOpen(false);
-    showNotification("success", "Registro de revision limpiado");
+    showNotification("success", "Registro de En Taller limpiado");
   };
 
   const handleClearReviewRecord = () => {
     requestConfirmation({
       title: "Limpiar registro",
-      message: "Se limpiaran los servicios, repuestos y detalle del trabajo en la revision actual.",
+      message: "Se limpiaran los servicios, repuestos y detalle del trabajo actual en taller.",
       confirmLabel: "Limpiar registro",
       variant: "danger",
       onConfirm: performClearReviewRecord,
@@ -1043,9 +1050,9 @@ function App() {
       );
 
       logAction(
-        statusOverride === "Entregado" ? "Enviado a salida" : "Revision guardada",
-        "En revision",
-        `${vehicle.patente} - ${reviewServices.length} servicio(s), ${reviewParts.length} repuesto(s)`,
+        statusOverride === "Entregado" ? "Enviado a salida" : "Taller guardado",
+        "En Taller",
+        `${vehicle.patente} - ${reviewServices.length} servicio(s), ${reviewParts.length} item(s) de inventario`,
       );
 
       if (statusOverride === "Entregado") {
@@ -1058,15 +1065,15 @@ function App() {
     }
   };
 
-  const handleSendToRevision = async (vehicle: Vehicle) => {
+  const handleSendToTaller = async (vehicle: Vehicle) => {
     try {
       await updateVehicleRecord(
         vehicle,
-        { estado: "En revision" },
-        "vehí­culo enviado a revisión",
+        { estado: "En Taller" },
+        "Vehiculo enviado a En Taller",
       );
 
-      setVehicleTab("revision");
+      setVehicleTab("taller");
 
       setReviewVehicleId(vehicle.id);
 
@@ -1077,22 +1084,22 @@ function App() {
       setReviewNotes(vehicle.observaciones || "");
 
       logAction(
-        "Enviado a revision",
+        "Enviado a En Taller",
         "Vehiculos",
-        `${vehicle.patente} fue enviado a revision`,
+        `${vehicle.patente} fue enviado a En Taller`,
       );
     } catch (error) {
-      console.error("Send to revision failed", error);
+      console.error("Send to workshop failed", error);
 
-      showNotification("error", "No se pudo enviar a revisión");
+      showNotification("error", "No se pudo enviar a En Taller");
     }
   };
 
-  const performReturnFromRevision = async (vehicle: Vehicle) => {
+  const performReturnFromTaller = async (vehicle: Vehicle) => {
     try {
       await updateVehicleRecord(
         vehicle,
-        { estado: "En taller" },
+        { estado: "Ingresado" },
         "Vehículo devuelto a ingreso",
       );
 
@@ -1105,22 +1112,22 @@ function App() {
 
       logAction(
         "Devuelto a ingreso",
-        "En revision",
+        "En Taller",
         `${vehicle.patente} fue devuelto a ingreso`,
       );
     } catch (error) {
-      console.error("Return from revision failed", error);
+      console.error("Return from workshop failed", error);
       showNotification("error", "No se pudo devolver el vehículo");
     }
   };
 
-  const handleReturnFromRevision = (vehicle: Vehicle) => {
+  const handleReturnFromTaller = (vehicle: Vehicle) => {
     requestConfirmation({
       title: "Devolver a ingreso",
-      message: `El vehiculo ${vehicle.patente} volvera al ingreso y saldra del listado en revision.`,
+      message: `El vehiculo ${vehicle.patente} volvera al ingreso y saldra del listado En Taller.`,
       confirmLabel: "Devolver",
       variant: "warning",
-      onConfirm: () => performReturnFromRevision(vehicle),
+      onConfirm: () => performReturnFromTaller(vehicle),
     });
   };
 
@@ -1231,19 +1238,19 @@ function App() {
   const metrics = {
     total: vehicles.length,
 
-    enTaller: vehicles.filter((v) => v.estado === "En taller").length,
+    enTaller: vehicles.filter((v) => v.estado === "Ingresado").length,
 
     entregados: vehicles.filter((v) => v.estado === "Entregado").length,
 
-    enRevision: vehicles.filter((v) => v.estado === "En revision").length,
+    entaller: vehicles.filter((v) => v.estado === "En Taller").length,
   };
 
   const vehiclesEnTaller = vehicles.filter(
-    (vehicle) => vehicle.estado === "En taller",
+    (vehicle) => vehicle.estado === "Ingresado",
   );
 
-  const vehiclesEnRevision = vehicles.filter(
-    (vehicle) => vehicle.estado === "En revision",
+  const vehiclesEntaller = vehicles.filter(
+    (vehicle) => vehicle.estado === "En Taller",
   );
 
   const vehiclesEntregados = vehicles.filter(
@@ -1384,7 +1391,7 @@ function App() {
 
   const activeReviewVehicle =
     vehicles.find((vehicle) => vehicle.id === reviewVehicleId) ||
-    vehiclesEnRevision[0] ||
+    vehiclesEntaller[0] ||
     null;
 
   const filteredServiceCatalog = serviceCatalogByCategory.flatMap(
@@ -1418,20 +1425,22 @@ function App() {
 
   const filteredInventoryParts = inventoryItems.filter((item) => {
     const normalizedSearch = partSearch.toLowerCase();
+    const itemType = item.item_type === "insumo" ? "insumo" : "repuesto";
     return (
-      item.name.toLowerCase().includes(normalizedSearch) ||
-      item.category.toLowerCase().includes(normalizedSearch) ||
-      item.sku.toLowerCase().includes(normalizedSearch) ||
-      item.barcode.toLowerCase().includes(normalizedSearch) ||
-      item.location.toLowerCase().includes(normalizedSearch)
+      itemType === inventoryPickerType &&
+      (item.name.toLowerCase().includes(normalizedSearch) ||
+        item.category.toLowerCase().includes(normalizedSearch) ||
+        item.sku.toLowerCase().includes(normalizedSearch) ||
+        item.barcode.toLowerCase().includes(normalizedSearch) ||
+        item.location.toLowerCase().includes(normalizedSearch))
     );
   });
 
   useEffect(() => {
-    if (!reviewVehicleId && vehiclesEnRevision.length > 0) {
-      handleReviewSelect(vehiclesEnRevision[0]);
+    if (!reviewVehicleId && vehiclesEntaller.length > 0) {
+      handleReviewSelect(vehiclesEntaller[0]);
     }
-  }, [reviewVehicleId, vehiclesEnRevision]);
+  }, [reviewVehicleId, vehiclesEntaller]);
 
   const notifications = [
     lowStockItems.length > 0
@@ -1446,13 +1455,13 @@ function App() {
         }
       : null,
 
-    vehiclesEnRevision.length > 0
+    vehiclesEntaller.length > 0
       ? {
-          id: "revision",
+          id: "taller",
 
-          title: "vehículos en revisión",
+          title: "Vehiculos En Taller",
 
-          body: `${vehiclesEnRevision.length} trabajos en curso.`,
+          body: `${vehiclesEntaller.length} trabajos en curso.`,
 
           time: "Hoy",
         }
@@ -1656,12 +1665,17 @@ function App() {
         activeSection={activeSection}
         onSectionChange={setActiveSection}
         isOpen={sidebarOpen}
+        isDesktopOpen={desktopSidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
 
-      <div className="lg:ml-64">
+      <div
+        className={`transition-[margin] duration-300 ${
+          desktopSidebarOpen ? "lg:ml-64" : "lg:ml-0"
+        }`}
+      >
         <Header
-          onMenuClick={() => setSidebarOpen(true)}
+          onMenuClick={handleSidebarToggle}
           theme={theme}
           onToggleTheme={() =>
             setTheme((prev) => (prev === "dark" ? "light" : "dark"))
@@ -1684,7 +1698,7 @@ function App() {
           onCancel={() => setConfirmDialog(null)}
         />
 
-        <main className="p-8">
+        <main className="p-4 sm:p-6 lg:p-8">
           {activeSection === "vehiculos" && (
             <>
               <div className="sticky top-4 z-20 mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -1692,7 +1706,7 @@ function App() {
                   {[
                     { id: "ingreso", label: "Ingreso de vehí­culos" },
 
-                    { id: "revision", label: "En revisión" },
+                    { id: "taller", label: "En Taller" },
 
                     { id: "salida", label: "Salida vehí­culos" },
                   ].map((tab) => (
@@ -1742,7 +1756,7 @@ function App() {
                       </button>
                     </div>
                   )}
-                  {vehicleTab === "revision" && (
+                  {vehicleTab === "taller" && (
                     <div className="flex flex-wrap gap-3 lg:ml-auto">
                       <button
                         type="button"
@@ -1797,10 +1811,10 @@ function App() {
                             </div>
 
                             <button
-                              onClick={() => handleSendToRevision(vehicle)}
+                              onClick={() => handleSendToTaller(vehicle)}
                               className="rounded-lg btn-primary px-4 py-2 text-sm font-semibold"
                             >
-                              Enviar a revisión
+                              Enviar a En Taller
                             </button>
                           </div>
                         ))}
@@ -1810,11 +1824,11 @@ function App() {
                 </>
               )}
 
-              {vehicleTab === "revision" && (
+              {vehicleTab === "taller" && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      En revisión
+                      En Taller
                     </h3>
 
                     {activeReviewVehicle && (
@@ -1836,21 +1850,21 @@ function App() {
 
                     <div className="mb-4 flex items-center justify-between gap-3">
                       <h4 className="text-sm font-semibold text-gray-900">
-                        Vehí­culos en revisión
+                        Vehiculos En Taller
                       </h4>
 
                       <span className="text-xs text-gray-500">
-                        {vehiclesEnRevision.length} activos
+                        {vehiclesEntaller.length} activos
                       </span>
                     </div>
 
-                    {vehiclesEnRevision.length === 0 ? (
+                    {vehiclesEntaller.length === 0 ? (
                       <p className="text-sm text-gray-500">
-                        No hay vehí­culos en revisión.
+                        No hay vehiculos En Taller.
                       </p>
                     ) : (
                       <div className="space-y-3 max-h-[32rem] overflow-y-auto pr-1">
-                        {vehiclesEnRevision.map((vehicle) => (
+                        {vehiclesEntaller.map((vehicle) => (
                           <div
                             key={vehicle.id}
                             className={`rounded-lg border px-4 py-3 transition-colors ${
@@ -1874,13 +1888,13 @@ function App() {
                             </p>
 
                             <p className="mt-2 text-xs font-semibold text-gray-500">
-                              Sigue en revisión hasta pasar a salida
+                              Sigue En Taller hasta pasar a salida
                             </p>
                           </button>
                             <div className="mt-3 flex justify-end">
                               <button
                                 type="button"
-                                onClick={() => handleReturnFromRevision(vehicle)}
+                                onClick={() => handleReturnFromTaller(vehicle)}
                                 className="rounded-md border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
                                 title="Devolver a ingreso"
                               >
@@ -1922,12 +1936,21 @@ function App() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => setPartPickerOpen((prev) => !prev)}
+                              onClick={() => openInventoryPicker("repuesto")}
                               className="rounded-lg bg-[#0f3a63] px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#0b2d4d]"
                             >
-                              {partPickerOpen
+                              {partPickerOpen && inventoryPickerType === "repuesto"
                                 ? "Cerrar repuestos"
                                 : "Buscar repuestos"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openInventoryPicker("insumo")}
+                              className="rounded-lg bg-[#0f3a63] px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#0b2d4d]"
+                            >
+                              {partPickerOpen && inventoryPickerType === "insumo"
+                                ? "Cerrar insumos"
+                                : "Buscar insumos"}
                             </button>
                           </div>
                         </div>
@@ -2025,14 +2048,16 @@ function App() {
                                   setPartSearch(event.target.value)
                                 }
                                 className="w-full rounded-lg border border-gray-300 bg-white py-3 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none"
-                                placeholder="Buscar repuesto por nombre, SKU, codigo o ubicacion..."
+                                placeholder={`Buscar ${inventoryPickerType === "insumo" ? "insumo" : "repuesto"} por nombre, SKU, codigo o ubicacion...`}
                               />
                             </div>
 
                             <div className="mt-3 rounded-xl border border-gray-200 bg-white shadow-lg">
                               <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                  Repuestos en inventario
+                                  {inventoryPickerType === "insumo"
+                                    ? "Insumos en inventario"
+                                    : "Repuestos en inventario"}
                                 </p>
                                 <button
                                   type="button"
@@ -2045,7 +2070,7 @@ function App() {
                               <div className="max-h-72 overflow-y-auto p-2">
                                 {filteredInventoryParts.length === 0 ? (
                                   <p className="px-3 py-2 text-sm text-gray-500">
-                                    No hay repuestos disponibles con esa
+                                    No hay {inventoryPickerType === "insumo" ? "insumos" : "repuestos"} disponibles con esa
                                     busqueda.
                                   </p>
                                 ) : (
@@ -2059,6 +2084,13 @@ function App() {
                                       <span>
                                         <span className="block font-semibold text-gray-900">
                                           {item.name}
+                                        </span>
+                                        <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                          item.item_type === "insumo"
+                                            ? "bg-emerald-50 text-emerald-700"
+                                            : "bg-blue-50 text-blue-700"
+                                        }`}>
+                                          {item.item_type === "insumo" ? "Insumo" : "Repuesto"}
                                         </span>
                                         <span className="block text-xs text-gray-500">
                                           {item.category} · SKU:{" "}
@@ -2107,7 +2139,7 @@ function App() {
                                 <div className="hidden">
                                   <div className="flex items-center justify-between gap-3">
                                     <h4 className="text-sm font-semibold text-gray-900">
-                                      Repuestos utilizados
+                                      Repuestos e insumos utilizados
                                     </h4>
                                     <span className="text-xs text-gray-500">
                                       {reviewParts.length} seleccionado(s)
@@ -2116,7 +2148,7 @@ function App() {
 
                                   {reviewParts.length === 0 ? (
                                     <p className="rounded-lg border border-dashed border-gray-300 px-4 py-5 text-sm text-gray-500">
-                                      No hay repuestos seleccionados todavia.
+                                      No hay repuestos ni insumos seleccionados todavia.
                                     </p>
                                   ) : (
                                     reviewParts.map((part) => {
@@ -2183,7 +2215,7 @@ function App() {
                                                 )
                                               }
                                               className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
-                                              title="Eliminar repuesto"
+                                              title="Eliminar item"
                                             >
                                               <Trash2 className="h-4 w-4" />
                                             </button>
@@ -2234,7 +2266,7 @@ function App() {
                         <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4">
                           <div className="mb-3 flex items-center justify-between gap-3">
                             <h4 className="text-sm font-semibold text-gray-900">
-                              Repuestos utilizados
+                              Repuestos e insumos utilizados
                             </h4>
                             <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-600">
                               {reviewParts.length} seleccionado(s)
@@ -2243,7 +2275,7 @@ function App() {
 
                           {reviewParts.length === 0 ? (
                             <p className="rounded-lg border border-dashed border-gray-300 bg-white px-4 py-5 text-sm text-gray-500">
-                              No hay repuestos seleccionados todavía.
+                              No hay repuestos ni insumos seleccionados todavía.
                             </p>
                           ) : (
                             <div className="space-y-3">
@@ -2264,9 +2296,18 @@ function App() {
                                     className="grid grid-cols-1 gap-4 rounded-lg border border-gray-200 bg-white p-4 md:grid-cols-[minmax(0,1fr)_180px_44px]"
                                   >
                                     <div>
-                                      <p className="text-sm font-semibold text-gray-900">
-                                        {part.name}
-                                      </p>
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <p className="text-sm font-semibold text-gray-900">
+                                          {part.name}
+                                        </p>
+                                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                          part.itemType === "insumo"
+                                            ? "bg-emerald-50 text-emerald-700"
+                                            : "bg-blue-50 text-blue-700"
+                                        }`}>
+                                          {part.itemType === "insumo" ? "Insumo" : "Repuesto"}
+                                        </span>
+                                      </div>
                                       <p className="text-xs text-gray-500">
                                         SKU: {part.sku || "-"} · Bodega: {part.location || "-"} · Stock disponible: {availableQuantity} {part.unit}
                                       </p>
@@ -2294,7 +2335,7 @@ function App() {
                                         type="button"
                                         onClick={() => handleRemoveReviewPart(part.inventoryItemId)}
                                         className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
-                                        title="Eliminar repuesto"
+                                        title="Eliminar item"
                                       >
                                         <Trash2 className="h-4 w-4" />
                                       </button>
@@ -2349,7 +2390,7 @@ function App() {
                       </>
                     ) : (
                       <p className="text-sm text-gray-500">
-                        Enví­a un vehí­culo a revisión para registrar servicios.
+                        Envia un vehiculo a En Taller para registrar servicios.
                       </p>
                     )}
                   </div>
@@ -2544,9 +2585,9 @@ function App() {
             <div className="space-y-6">
               <MetricsCards
                 totalvehicles={metrics.total}
-                enTaller={metrics.enTaller}
+                ingresados={metrics.enTaller}
                 entregados={metrics.entregados}
-                enRevision={metrics.enRevision}
+                enTaller={metrics.entaller}
               />
 
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
@@ -2702,8 +2743,8 @@ function App() {
                     <h3 className="text-lg font-semibold text-gray-900">Estado del taller</h3>
                     <div className="mt-4 space-y-3">
                       {[
-                        { label: "En revisión", value: metrics.enRevision, color: "bg-[#0f3a63]" },
-                        { label: "En taller", value: metrics.enTaller, color: "bg-blue-300" },
+                        { label: "En Taller", value: metrics.entaller, color: "bg-[#0f3a63]" },
+                        { label: "Ingresado", value: metrics.enTaller, color: "bg-blue-300" },
                         { label: "Entregados", value: metrics.entregados, color: "bg-emerald-500" },
                       ].map((item) => (
                         <div key={item.label}>
@@ -3398,3 +3439,5 @@ function App() {
 }
 
 export default App;
+
+

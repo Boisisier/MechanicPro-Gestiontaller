@@ -32,6 +32,7 @@ export const parseStoredReviewParts = (
         unit = "unidad",
         unitCost = "0",
         location = "",
+        itemType = "repuesto",
       ] = service
         .replace(reviewPartPrefix, "")
         .trim()
@@ -45,6 +46,9 @@ export const parseStoredReviewParts = (
         unit,
         unitCost: parseInt(unitCost) || 0,
         location,
+        itemType: (itemType === "insumo" ? "insumo" : "repuesto") as
+          | "repuesto"
+          | "insumo",
       };
     })
     .filter((part) => part.inventoryItemId && part.name);
@@ -58,4 +62,5 @@ export const serializeReviewPart = (part: ReviewPartItem) =>
     part.unit,
     part.unitCost,
     part.location,
+    part.itemType || "repuesto",
   ].join("|")}`;
