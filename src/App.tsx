@@ -911,6 +911,20 @@ function App() {
     );
   };
 
+  const handleReviewPartUnitCostChange = (
+    inventoryItemId: string,
+    unitCost: string,
+  ) => {
+    const normalizedCost = unitCost.replace(/[^\d]/g, "");
+    setReviewParts((prev) =>
+      prev.map((part) =>
+        part.inventoryItemId === inventoryItemId
+          ? { ...part, unitCost: parseInt(normalizedCost, 10) || 0 }
+          : part,
+      ),
+    );
+  };
+
   const handleRemoveReviewPart = (inventoryItemId: string) => {
     setReviewParts((prev) =>
       prev.filter((part) => part.inventoryItemId !== inventoryItemId),
@@ -1347,6 +1361,22 @@ function App() {
     );
     return serviceTotal + partTotal;
   };
+
+  const reviewServiceTotal = reviewServices.reduce(
+    (sum, service) => sum + (parseInt(service.price || "0", 10) || 0),
+    0,
+  );
+
+  const reviewPartTotal = reviewParts
+    .filter((part) => part.itemType !== "insumo")
+    .reduce((sum, part) => sum + part.quantity * (part.unitCost || 0), 0);
+
+  const reviewSupplyTotal = reviewParts
+    .filter((part) => part.itemType === "insumo")
+    .reduce((sum, part) => sum + part.quantity * (part.unitCost || 0), 0);
+
+  const reviewAttentionTotal =
+    reviewServiceTotal + reviewPartTotal + reviewSupplyTotal;
 
   const performReleaseFromParking = async (vehicle: Vehicle) => {
     try {
@@ -2341,7 +2371,7 @@ function App() {
                                 return (
                                   <div
                                     key={part.inventoryItemId}
-                                    className="grid grid-cols-1 gap-4 rounded-lg border border-gray-200 bg-white p-4 md:grid-cols-[minmax(0,1fr)_180px_44px]"
+                                    className="grid grid-cols-1 gap-4 rounded-lg border border-gray-200 bg-white p-4 md:grid-cols-[minmax(0,1fr)_120px_170px_44px]"
                                   >
                                     <div>
                                       <div className="flex flex-wrap items-center gap-2">
@@ -2378,6 +2408,27 @@ function App() {
                                         className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
                                       />
                                     </div>
+                                    <div>
+                                      <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                                        Valor unitario
+                                      </label>
+                                      <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={part.unitCost || ""}
+                                        onChange={(event) =>
+                                          handleReviewPartUnitCostChange(
+                                            part.inventoryItemId,
+                                            event.target.value,
+                                          )
+                                        }
+                                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                                        placeholder="0"
+                                      />
+                                      <p className="mt-1 text-xs font-semibold text-gray-500">
+                                        Subtotal: ${(part.quantity * (part.unitCost || 0)).toLocaleString("es-CL")}
+                                      </p>
+                                    </div>
                                     <div className="flex items-end">
                                       <button
                                         type="button"
@@ -2396,6 +2447,49 @@ function App() {
                         </div>
 
                         <div>
+                          <div className="mb-6 rounded-xl border border-[#0f3a63]/20 bg-white p-4 shadow-sm">
+                            <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                              <div>
+                                <h4 className="text-sm font-semibold text-gray-900">
+                                  Resumen de atención
+                                </h4>
+                                <p className="text-xs text-gray-500">
+                                  Total actualizado con servicios, repuestos e insumos seleccionados.
+                                </p>
+                              </div>
+                              <p className="text-2xl font-bold text-[#0f3a63]">
+                                ${reviewAttentionTotal.toLocaleString("es-CL")}
+                              </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                  Servicios
+                                </p>
+                                <p className="mt-1 text-lg font-bold text-gray-900">
+                                  ${reviewServiceTotal.toLocaleString("es-CL")}
+                                </p>
+                              </div>
+                              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                  Repuestos
+                                </p>
+                                <p className="mt-1 text-lg font-bold text-gray-900">
+                                  ${reviewPartTotal.toLocaleString("es-CL")}
+                                </p>
+                              </div>
+                              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                  Insumos
+                                </p>
+                                <p className="mt-1 text-lg font-bold text-gray-900">
+                                  ${reviewSupplyTotal.toLocaleString("es-CL")}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
                           <label className="block text-sm font-medium text-gray-700 mb-2">
                             Detalle del trabajo
                           </label>

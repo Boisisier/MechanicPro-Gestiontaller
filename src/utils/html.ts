@@ -21,8 +21,20 @@ export const exportVehiclePdf = (vehicle: Vehicle) => {
   const services = parseStoredReviewServices(vehicle.servicios).map(
     serializeReviewService,
   );
+  const serviceItems = parseStoredReviewServices(vehicle.servicios);
   const parts = parseStoredReviewParts(vehicle.servicios);
   const failures = vehicle.fallas_detectadas || [];
+  const serviceTotal = serviceItems.reduce(
+    (sum, service) => sum + (parseInt(service.price || "0", 10) || 0),
+    0,
+  );
+  const partsTotal = parts
+    .filter((part) => part.itemType !== "insumo")
+    .reduce((sum, part) => sum + part.quantity * (part.unitCost || 0), 0);
+  const suppliesTotal = parts
+    .filter((part) => part.itemType === "insumo")
+    .reduce((sum, part) => sum + part.quantity * (part.unitCost || 0), 0);
+  const attentionTotal = serviceTotal + partsTotal + suppliesTotal;
 
   const html = `
       <html>
@@ -58,6 +70,12 @@ export const exportVehiclePdf = (vehicle: Vehicle) => {
 
 
             .muted { color: #6b7280; }
+
+            .summary { border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; margin-top: 14px; }
+
+            .summary-row { display: flex; justify-content: space-between; margin: 6px 0; }
+
+            .summary-total { border-top: 1px solid #d1d5db; padding-top: 8px; margin-top: 8px; font-weight: 700; font-size: 16px; }
 
 
 
@@ -199,9 +217,18 @@ ${
 
 ${
   parts.length === 0
-    ? '<p class="muted">Sin repuestos registrados.</p>'
-    : `<ul>${parts.map((part) => `<li>${escapeHtml(`${part.name} x${part.quantity} ${part.unit}`)}</li>`).join("")}</ul>`
+    ? '<p class="muted">Sin repuestos ni insumos registrados.</p>'
+    : `<ul>${parts.map((part) => `<li>${escapeHtml(`${part.itemType === "insumo" ? "Insumo" : "Repuesto"}: ${part.name} x${part.quantity} ${part.unit} - $${(part.quantity * (part.unitCost || 0)).toLocaleString("es-CL")}`)}</li>`).join("")}</ul>`
 }
+
+<h2>Resumen de atencion</h2>
+
+<div class="summary">
+  <div class="summary-row"><span>Servicios</span><strong>$${serviceTotal.toLocaleString("es-CL")}</strong></div>
+  <div class="summary-row"><span>Repuestos</span><strong>$${partsTotal.toLocaleString("es-CL")}</strong></div>
+  <div class="summary-row"><span>Insumos</span><strong>$${suppliesTotal.toLocaleString("es-CL")}</strong></div>
+  <div class="summary-row summary-total"><span>Total atencion</span><strong>$${attentionTotal.toLocaleString("es-CL")}</strong></div>
+</div>
 
 
 
