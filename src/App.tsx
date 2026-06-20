@@ -19,6 +19,7 @@ import {
   setAuthToken,
   deleteParkingRelease,
   deleteWorkshopUser,
+  updateWorkshopUser,
   updateInventoryItem,
   updateVehicle,
 } from "./lib/api";
@@ -57,6 +58,7 @@ import {
   Calculator,
   RotateCcw,
   Send,
+  Edit2,
   TrendingUp,
   History,
   Package,
@@ -116,6 +118,9 @@ const defaultWorkshopUsers: WorkshopUser[] = [
     role: "Mecánico",
   },
 ];
+
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const auditLogsPageSize = 15;
 
 function App() {
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
@@ -198,6 +203,7 @@ function App() {
     password: "",
     role: "Administrativo",
   });
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
 
   const [vehicleTab, setVehicleTab] = useState<
     "ingreso" | "taller" | "salida"
@@ -245,6 +251,9 @@ function App() {
     const raw = localStorage.getItem("auditLogs");
     return raw ? JSON.parse(raw) : [];
   });
+  const [auditDateFrom, setAuditDateFrom] = useState("");
+  const [auditDateTo, setAuditDateTo] = useState("");
+  const [auditPage, setAuditPage] = useState(1);
 
   const [releasedParkingIds, setReleasedParkingIds] = useState<string[]>(() => {
     const raw = localStorage.getItem("releasedParkingIds");
@@ -271,6 +280,16 @@ function App() {
     sessionUser?.role === "admin" ||
     sessionUser?.role === "Administrador de Taller";
 
+  const sessionUserRole = sessionUser?.role || "";
+  const isMechanicSession = sessionUserRole === "Mecánico";
+  const canViewPrices = !isMechanicSession;
+  const canEditPrices =
+    sessionUserRole === "admin" ||
+    sessionUserRole === "Administrador de Taller" ||
+    sessionUserRole === "Administrativo";
+  const canSendToSalida = canEditPrices;
+  const canAccessBudget = canViewPrices;
+
   const handleSidebarToggle = () => {
     if (window.innerWidth >= 1024) {
       setDesktopSidebarOpen((prev) => !prev);
@@ -278,6 +297,18 @@ function App() {
     }
     setSidebarOpen(true);
   };
+
+  useEffect(() => {
+    if (!canAccessBudget && activeSection === "presupuesto") {
+      setActiveSection("dashboard");
+    }
+  }, [activeSection, canAccessBudget]);
+
+  useEffect(() => {
+    if (!canSendToSalida && vehicleTab === "salida") {
+      setVehicleTab("taller");
+    }
+  }, [canSendToSalida, vehicleTab]);
 
   const requestConfirmation = (options: {
     title: string;
@@ -364,6 +395,10 @@ function App() {
   }, [auditLogs]);
 
   useEffect(() => {
+    setAuditPage(1);
+  }, [auditDateFrom, auditDateTo]);
+
+  useEffect(() => {
     localStorage.setItem("releasedParkingIds", JSON.stringify(releasedParkingIds));
   }, [releasedParkingIds]);
 
@@ -419,16 +454,25 @@ function App() {
       .then((rows) => setInventoryItems(rows))
       .catch((error) => console.error("Inventory load failed", error));
 
-    getAuditLogs()
-      .then((rows) => setAuditLogs(rows))
-      .catch((error) => console.error("Audit logs load failed", error));
-
     getParkingReleases()
       .then((rows) =>
         setReleasedParkingIds(rows.map((item: { vehicle_id: string }) => item.vehicle_id)),
       )
       .catch((error) => console.error("Parking releases load failed", error));
   }, [authToken, sessionRole]);
+
+  useEffect(() => {
+    if (!authToken || sessionRole !== "member") {
+      return;
+    }
+
+    getAuditLogs({
+      date_from: auditDateFrom || undefined,
+      date_to: auditDateTo || undefined,
+    })
+      .then((rows) => setAuditLogs(rows))
+      .catch((error) => console.error("Audit logs load failed", error));
+  }, [authToken, sessionRole, auditDateFrom, auditDateTo]);
 
   useEffect(() => {
     if (
@@ -524,13 +568,20 @@ function App() {
     const email = userForm.email.trim();
     const password = userForm.password.trim();
 
-    if (!name || !rut || !email || !password) {
+    if (!name || !rut || !email || (!editingUserId && !password)) {
       showNotification("error", "Completa nombre, RUT, correo y contraseña");
       return;
     }
 
+    if (!emailRegex.test(email)) {
+      showNotification("error", "Ingresa un correo electronico valido");
+      return;
+    }
+
     const exists = workshopUsers.some(
-      (user) => user.email.toLowerCase() === email.toLowerCase(),
+      (user) =>
+        user.email.toLowerCase() === email.toLowerCase() &&
+        user.id !== editingUserId,
     );
     if (exists) {
       showNotification("error", "Ya existe un usuario con ese correo");
@@ -546,7 +597,44 @@ function App() {
     };
 
     try {
-      if (authToken && sessionRole === "member") {
+      if (editingUserId) {
+        if (authToken && sessionRole === "member") {
+          const savedUser = await updateWorkshopUser(editingUserId, {
+            name,
+            rut,
+            email,
+            password,
+            role: userForm.role,
+          });
+          setWorkshopUsers((prev) =>
+            prev.map((user) =>
+              user.id === editingUserId
+                ? {
+                    ...user,
+                    name: savedUser.name,
+                    rut: savedUser.rut,
+                    email: savedUser.email,
+                    role: savedUser.role_name || savedUser.role || userForm.role,
+                  }
+                : user,
+            ),
+          );
+        } else {
+          setWorkshopUsers((prev) =>
+            prev.map((user) =>
+              user.id === editingUserId
+                ? {
+                    ...user,
+                    name,
+                    rut,
+                    email,
+                    role: userForm.role,
+                  }
+                : user,
+            ),
+          );
+        }
+      } else if (authToken && sessionRole === "member") {
         const savedUser = await createWorkshopUser({
           name,
           rut,
@@ -568,11 +656,17 @@ function App() {
         setWorkshopUsers((prev) => [...prev, nextUser]);
       }
     } catch (error) {
-      console.error("Create workshop user failed", error);
-      showNotification("error", "No se pudo crear el usuario");
+      console.error("Save workshop user failed", error);
+      showNotification(
+        "error",
+        editingUserId
+          ? "No se pudo actualizar el usuario"
+          : "No se pudo crear el usuario",
+      );
       return;
     }
 
+    const wasEditing = Boolean(editingUserId);
     setUserForm({
       name: "",
       rut: "",
@@ -580,12 +674,40 @@ function App() {
       password: "",
       role: "Administrativo",
     });
+    setEditingUserId(null);
     logAction(
-      "Usuario creado",
+      wasEditing ? "Usuario actualizado" : "Usuario creado",
       "Configuracion",
-      `${name} fue creado con perfil ${userForm.role}`,
+      `${name} fue ${wasEditing ? "actualizado" : "creado"} con perfil ${userForm.role}`,
     );
-    showNotification("success", "Usuario creado correctamente");
+    showNotification(
+      "success",
+      wasEditing
+        ? "Usuario actualizado correctamente"
+        : "Usuario creado correctamente",
+    );
+  };
+
+  const handleEditUser = (user: WorkshopUser) => {
+    setEditingUserId(user.id);
+    setUserForm({
+      name: user.name,
+      rut: user.rut || "",
+      email: user.email,
+      password: "",
+      role: (user.role_name || user.role) as UserRole,
+    });
+  };
+
+  const handleCancelUserEdit = () => {
+    setEditingUserId(null);
+    setUserForm({
+      name: "",
+      rut: "",
+      email: "",
+      password: "",
+      role: "Administrativo",
+    });
   };
 
   const performDeleteUser = async (id: string) => {
@@ -600,6 +722,9 @@ function App() {
       }
     }
     setWorkshopUsers((prev) => prev.filter((user) => user.id !== id));
+    if (editingUserId === id) {
+      handleCancelUserEdit();
+    }
     logAction(
       "Usuario eliminado",
       "Configuracion",
@@ -871,7 +996,7 @@ function App() {
           sku: item.sku,
           quantity: 1,
           unit: item.unit || "unidad",
-          unitCost: item.cost || 0,
+          unitCost: canEditPrices ? item.cost || 0 : 0,
           location: item.location,
         },
       ];
@@ -953,6 +1078,11 @@ function App() {
   };
 
   const handleSaveReview = async (statusOverride?: Vehicle["estado"]) => {
+    if (statusOverride === "Entregado" && !canSendToSalida) {
+      showNotification("error", "Tu perfil no puede enviar vehiculos a salida");
+      return;
+    }
+
     const vehicle = vehicles.find((item) => item.id === reviewVehicleId);
 
     if (!vehicle) {
@@ -1378,6 +1508,42 @@ function App() {
   const reviewAttentionTotal =
     reviewServiceTotal + reviewPartTotal + reviewSupplyTotal;
 
+  const auditFromTime = auditDateFrom
+    ? new Date(`${auditDateFrom}T00:00:00`).getTime()
+    : null;
+  const auditToTime = auditDateTo
+    ? new Date(`${auditDateTo}T23:59:59.999`).getTime()
+    : null;
+  const filteredAuditLogs = auditLogs.filter((entry) => {
+    const createdTime = new Date(entry.created_at).getTime();
+    if (Number.isNaN(createdTime)) {
+      return false;
+    }
+    if (auditFromTime !== null && createdTime < auditFromTime) {
+      return false;
+    }
+    if (auditToTime !== null && createdTime > auditToTime) {
+      return false;
+    }
+    return true;
+  });
+  const auditTotalPages = Math.max(
+    1,
+    Math.ceil(filteredAuditLogs.length / auditLogsPageSize),
+  );
+  const auditCurrentPage = Math.min(auditPage, auditTotalPages);
+  const auditStartIndex = (auditCurrentPage - 1) * auditLogsPageSize;
+  const paginatedAuditLogs = filteredAuditLogs.slice(
+    auditStartIndex,
+    auditStartIndex + auditLogsPageSize,
+  );
+  const auditVisibleFrom =
+    filteredAuditLogs.length === 0 ? 0 : auditStartIndex + 1;
+  const auditVisibleTo = Math.min(
+    auditStartIndex + auditLogsPageSize,
+    filteredAuditLogs.length,
+  );
+
   const performReleaseFromParking = async (vehicle: Vehicle) => {
     try {
       if (authToken && sessionRole === "member") {
@@ -1744,6 +1910,7 @@ function App() {
         onSectionChange={setActiveSection}
         isOpen={sidebarOpen}
         isDesktopOpen={desktopSidebarOpen}
+        hiddenSections={!canAccessBudget ? ["presupuesto"] : []}
         onClose={() => setSidebarOpen(false)}
       />
 
@@ -1787,7 +1954,9 @@ function App() {
                     { id: "taller", label: "En Taller" },
 
                     { id: "salida", label: "Salida vehí­culos" },
-                  ].map((tab) => (
+                  ]
+                    .filter((tab) => canSendToSalida || tab.id !== "salida")
+                    .map((tab) => (
                     <button
                       key={tab.id}
                       onClick={() => setVehicleTab(tab.id as typeof vehicleTab)}
@@ -1799,7 +1968,7 @@ function App() {
                     >
                       {tab.label}
                     </button>
-                  ))}
+                    ))}
 
                   {vehicleTab === "ingreso" && (
                     <div className="flex flex-wrap gap-3 lg:ml-auto">
@@ -2202,7 +2371,11 @@ function App() {
                             reviewServices.map((service) => (
                               <div
                                 key={service.name}
-                                className="grid grid-cols-1 gap-4 rounded-lg border border-gray-200 p-4 md:grid-cols-[minmax(0,1fr)_220px_44px]"
+                                className={`grid grid-cols-1 gap-4 rounded-lg border border-gray-200 p-4 ${
+                                  canEditPrices
+                                    ? "md:grid-cols-[minmax(0,1fr)_220px_44px]"
+                                    : "md:grid-cols-[minmax(0,1fr)_44px]"
+                                }`}
                               >
                                 <div>
                                   <p className="text-sm font-semibold text-gray-900">
@@ -2304,25 +2477,27 @@ function App() {
                                   )}
                                 </div>
 
-                                <div>
-                                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                                    Valor
-                                  </label>
+                                {canEditPrices && (
+                                  <div>
+                                    <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                                      Valor
+                                    </label>
 
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={service.price}
-                                    onChange={(event) =>
-                                      handleReviewServicePriceChange(
-                                        service.name,
-                                        event.target.value,
-                                      )
-                                    }
-                                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                                    placeholder="15000"
-                                  />
-                                </div>
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      value={service.price}
+                                      onChange={(event) =>
+                                        handleReviewServicePriceChange(
+                                          service.name,
+                                          event.target.value,
+                                        )
+                                      }
+                                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                                      placeholder="15000"
+                                    />
+                                  </div>
+                                )}
 
                                 <div className="flex items-end">
                                   <button
@@ -2371,7 +2546,11 @@ function App() {
                                 return (
                                   <div
                                     key={part.inventoryItemId}
-                                    className="grid grid-cols-1 gap-4 rounded-lg border border-gray-200 bg-white p-4 md:grid-cols-[minmax(0,1fr)_120px_170px_44px]"
+                                    className={`grid grid-cols-1 gap-4 rounded-lg border border-gray-200 bg-white p-4 ${
+                                      canEditPrices
+                                        ? "md:grid-cols-[minmax(0,1fr)_120px_170px_44px]"
+                                        : "md:grid-cols-[minmax(0,1fr)_120px_44px]"
+                                    }`}
                                   >
                                     <div>
                                       <div className="flex flex-wrap items-center gap-2">
@@ -2408,27 +2587,29 @@ function App() {
                                         className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
                                       />
                                     </div>
-                                    <div>
-                                      <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                                        Valor unitario
-                                      </label>
-                                      <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        value={part.unitCost || ""}
-                                        onChange={(event) =>
-                                          handleReviewPartUnitCostChange(
-                                            part.inventoryItemId,
-                                            event.target.value,
-                                          )
-                                        }
-                                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                                        placeholder="0"
-                                      />
-                                      <p className="mt-1 text-xs font-semibold text-gray-500">
-                                        Subtotal: ${(part.quantity * (part.unitCost || 0)).toLocaleString("es-CL")}
-                                      </p>
-                                    </div>
+                                    {canEditPrices && (
+                                      <div>
+                                        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                                          Valor unitario
+                                        </label>
+                                        <input
+                                          type="text"
+                                          inputMode="numeric"
+                                          value={part.unitCost || ""}
+                                          onChange={(event) =>
+                                            handleReviewPartUnitCostChange(
+                                              part.inventoryItemId,
+                                              event.target.value,
+                                            )
+                                          }
+                                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                                          placeholder="0"
+                                        />
+                                        <p className="mt-1 text-xs font-semibold text-gray-500">
+                                          Subtotal: ${(part.quantity * (part.unitCost || 0)).toLocaleString("es-CL")}
+                                        </p>
+                                      </div>
+                                    )}
                                     <div className="flex items-end">
                                       <button
                                         type="button"
@@ -2447,6 +2628,7 @@ function App() {
                         </div>
 
                         <div>
+                          {canViewPrices && (
                           <div className="mb-6 rounded-xl border border-[#0f3a63]/20 bg-white p-4 shadow-sm">
                             <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                               <div>
@@ -2489,6 +2671,7 @@ function App() {
                               </div>
                             </div>
                           </div>
+                          )}
 
                           <label className="block text-sm font-medium text-gray-700 mb-2">
                             Detalle del trabajo
@@ -2510,24 +2693,26 @@ function App() {
                             onClick={() => handleSaveReview()}
                             className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
                           >
-                            Guardar selección
+                            {canEditPrices ? "Guardar selección" : "Guardar trabajo"}
                           </button>
 
-                          <button
-                            onClick={() =>
-                              requestConfirmation({
-                                title: "Enviar a salida",
-                                message:
-                                  "El vehiculo pasara a Salida y se guardaran los servicios y repuestos registrados.",
-                                confirmLabel: "Enviar a salida",
-                                variant: "info",
-                                onConfirm: () => handleSaveReview("Entregado"),
-                              })
-                            }
-                            className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-green-700 focus:ring-4 focus:ring-green-200"
-                          >
-                            Enviar a salida
-                          </button>
+                          {canSendToSalida && (
+                            <button
+                              onClick={() =>
+                                requestConfirmation({
+                                  title: "Enviar a salida",
+                                  message:
+                                    "El vehiculo pasara a Salida y se guardaran los servicios y repuestos registrados.",
+                                  confirmLabel: "Enviar a salida",
+                                  variant: "info",
+                                  onConfirm: () => handleSaveReview("Entregado"),
+                                })
+                              }
+                              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-green-700 focus:ring-4 focus:ring-green-200"
+                            >
+                              Enviar a salida
+                            </button>
+                          )}
                         </div>
                       </>
                     ) : (
@@ -2742,6 +2927,7 @@ function App() {
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
                 <div className="space-y-6 xl:col-span-2">
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {canViewPrices && (
                     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
                       <div className="flex items-center justify-between">
                         <div>
@@ -2755,6 +2941,7 @@ function App() {
                         </div>
                       </div>
                     </div>
+                    )}
 
                     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
                       <div className="flex items-center justify-between">
@@ -2771,6 +2958,7 @@ function App() {
                     </div>
                   </div>
 
+                  {canViewPrices && (
                   <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
                     <div className="mb-6 flex items-center justify-between">
                       <div>
@@ -2796,6 +2984,7 @@ function App() {
                       ))}
                     </div>
                   </div>
+                  )}
 
                   <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
                     <div className="mb-4 flex items-center justify-between">
@@ -2924,7 +3113,7 @@ function App() {
             />
           )}
 
-          {activeSection === "presupuesto" && (
+          {activeSection === "presupuesto" && canAccessBudget && (
             <div className="space-y-6">
               <div className="flex flex-col gap-2">
                 <h2 className="text-2xl font-bold text-gray-900">
@@ -3176,6 +3365,7 @@ function App() {
                         </div>
 
                         <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+                          {canViewPrices && (
                           <div className="rounded-lg border border-gray-200 p-4">
                             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                               Cliente
@@ -3187,6 +3377,7 @@ function App() {
                             <p className="text-xs text-gray-500">{vehicle.customer_phone || "-"}</p>
                             <p className="text-xs text-gray-500">{vehicle.customer_city || "-"}</p>
                           </div>
+                          )}
 
                           <div className="rounded-lg border border-gray-200 p-4">
                             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -3281,6 +3472,7 @@ function App() {
                   showDelete={false}
                   onNotify={handleNotify}
                   onExportPdf={exportVehiclePdf}
+                  pageSize={8}
                 />
               )}
             </>
@@ -3304,62 +3496,148 @@ function App() {
               ) : (
                 <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
                   <div className="border-b border-gray-200 px-5 py-4">
-                    <p className="text-sm font-semibold text-gray-900">
-                      {auditLogs.length} accion(es) registradas
-                    </p>
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {filteredAuditLogs.length} accion(es) encontradas
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Total almacenado: {auditLogs.length} registro(s)
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div>
+                          <label
+                            htmlFor="audit-date-from"
+                            className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500"
+                          >
+                            Desde
+                          </label>
+                          <input
+                            id="audit-date-from"
+                            type="date"
+                            value={auditDateFrom}
+                            onChange={(event) => setAuditDateFrom(event.target.value)}
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#0f3a63] focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label
+                            htmlFor="audit-date-to"
+                            className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500"
+                          >
+                            Hasta
+                          </label>
+                          <input
+                            id="audit-date-to"
+                            type="date"
+                            value={auditDateTo}
+                            onChange={(event) => setAuditDateTo(event.target.value)}
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#0f3a63] focus:outline-none"
+                          />
+                        </div>
+                        <div className="flex items-end">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAuditDateFrom("");
+                              setAuditDateTo("");
+                            }}
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                          >
+                            Limpiar filtro
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  {auditLogs.length === 0 ? (
+                  {filteredAuditLogs.length === 0 ? (
                     <div className="p-8 text-sm text-gray-500">
-                      Todavia no hay acciones registradas.
+                      No hay acciones registradas para el rango seleccionado.
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700">
-                              Fecha y hora
-                            </th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700">
-                              Usuario
-                            </th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700">
-                              Modulo
-                            </th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700">
-                              Accion
-                            </th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700">
-                              Detalle
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200 bg-white">
-                          {auditLogs.map((entry) => (
-                            <tr key={entry.id}>
-                              <td className="whitespace-nowrap px-4 py-3 text-gray-600">
-                                {new Date(entry.created_at).toLocaleString("es-CL")}
-                              </td>
-                              <td className="px-4 py-3 font-semibold text-gray-900">
-                                {entry.user_name}
-                              </td>
-                              <td className="px-4 py-3 text-gray-700">
-                                {entry.module}
-                              </td>
-                              <td className="px-4 py-3 text-gray-700">
-                                {entry.action}
-                              </td>
-                              <td className="px-4 py-3 text-gray-600">
-                                {entry.detail || "-"}
-                              </td>
+                    <>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200 text-sm">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-3 text-left font-semibold text-gray-700">
+                                Fecha y hora
+                              </th>
+                              <th className="px-4 py-3 text-left font-semibold text-gray-700">
+                                Usuario
+                              </th>
+                              <th className="px-4 py-3 text-left font-semibold text-gray-700">
+                                Modulo
+                              </th>
+                              <th className="px-4 py-3 text-left font-semibold text-gray-700">
+                                Accion
+                              </th>
+                              <th className="px-4 py-3 text-left font-semibold text-gray-700">
+                                Detalle
+                              </th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200 bg-white">
+                            {paginatedAuditLogs.map((entry) => (
+                              <tr key={entry.id}>
+                                <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                                  {new Date(entry.created_at).toLocaleString("es-CL")}
+                                </td>
+                                <td className="px-4 py-3 font-semibold text-gray-900">
+                                  {entry.user_name}
+                                </td>
+                                <td className="px-4 py-3 text-gray-700">
+                                  {entry.module}
+                                </td>
+                                <td className="px-4 py-3 text-gray-700">
+                                  {entry.action}
+                                </td>
+                                <td className="px-4 py-3 text-gray-600">
+                                  {entry.detail || "-"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="flex flex-col gap-3 border-t border-gray-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-sm text-gray-500">
+                          Mostrando {auditVisibleFrom}-{auditVisibleTo} de{" "}
+                          {filteredAuditLogs.length}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setAuditPage((page) => Math.max(1, page - 1))
+                            }
+                            disabled={auditCurrentPage === 1}
+                            className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Anterior
+                          </button>
+                          <span className="min-w-24 text-center text-sm font-semibold text-gray-700">
+                            Pagina {auditCurrentPage} de {auditTotalPages}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setAuditPage((page) =>
+                                Math.min(auditTotalPages, page + 1),
+                              )
+                            }
+                            disabled={auditCurrentPage === auditTotalPages}
+                            className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Siguiente
+                          </button>
+                        </div>
+                      </div>
+                    </>
                   )}
-                </div>
+                    </div>
               )}
             </div>
           )}
@@ -3371,7 +3649,9 @@ function App() {
                   Mantenedor de usuarios
                 </h3>
                 <p className="text-sm text-gray-500">
-                  Crea usuarios y asigna perfiles de acceso por rol.
+                  {editingUserId
+                    ? "Edita los datos del usuario. La contrasena solo cambia si escribes una nueva."
+                    : "Crea usuarios y asigna perfiles de acceso por rol."}
                 </p>
               </div>
 
@@ -3430,6 +3710,7 @@ function App() {
                     type="email"
                     value={userForm.email}
                     onChange={handleUserFormChange}
+                    pattern="^[^\s@]+@[^\s@]+\.[^\s@]+$"
                     className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
                     placeholder="usuario@taller.cl"
                     required
@@ -3452,7 +3733,7 @@ function App() {
                     className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
                     placeholder="Contraseña"
                     autoComplete="new-password"
-                    required
+                    required={!editingUserId}
                   />
                 </div>
 
@@ -3479,14 +3760,27 @@ function App() {
                   </select>
                 </div>
 
-                <div className="flex items-end">
+                <div className="flex items-end gap-2">
                   <button
                     type="submit"
-                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+                    className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
                   >
-                    <Plus className="h-4 w-4" />
-                    Crear usuario
+                    {editingUserId ? (
+                      <Edit2 className="h-4 w-4" />
+                    ) : (
+                      <Plus className="h-4 w-4" />
+                    )}
+                    {editingUserId ? "Actualizar usuario" : "Crear usuario"}
                   </button>
+                  {editingUserId && (
+                    <button
+                      type="button"
+                      onClick={handleCancelUserEdit}
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      Cancelar
+                    </button>
+                  )}
                 </div>
               </form>
 
@@ -3527,6 +3821,15 @@ function App() {
                           {roleModules[user.role].join(", ")}
                         </td>
                         <td className="px-4 py-3 text-right">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleEditUser(user)}
+                              className="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                              Editar
+                            </button>
                           <button
                             type="button"
                             onClick={() => handleDeleteUser(user.id)}
@@ -3535,6 +3838,7 @@ function App() {
                             <Trash2 className="h-4 w-4" />
                             Eliminar
                           </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

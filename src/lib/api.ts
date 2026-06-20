@@ -193,12 +193,25 @@ export const deleteBudget = async (id: string) =>
     })
   );
 
-export const getAuditLogs = async () =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/audit-logs`, {
+export const getAuditLogs = async (filters?: {
+  date_from?: string;
+  date_to?: string;
+}) => {
+  const params = new URLSearchParams();
+  if (filters?.date_from) {
+    params.set("date_from", filters.date_from);
+  }
+  if (filters?.date_to) {
+    params.set("date_to", filters.date_to);
+  }
+  const query = params.toString();
+
+  return handleResponse(
+    await fetch(`${apiBaseUrl}/audit-logs${query ? `?${query}` : ""}`, {
       headers: withAuthHeader(),
     })
   );
+};
 
 export const createAuditLog = async (body: unknown) =>
   handleResponse(

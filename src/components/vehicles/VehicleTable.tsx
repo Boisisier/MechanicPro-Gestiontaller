@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Edit2, Trash2, Search, AlertCircle, Send, FileDown } from 'lucide-react';
 
@@ -25,6 +25,8 @@ interface VehicleTableProps {
 
   title?: string;
 
+  pageSize?: number;
+
 }
 
 
@@ -47,11 +49,15 @@ export default function VehicleTable({
 
   title = 'vehículos registrados',
 
+  pageSize,
+
 }: VehicleTableProps) {
 
   const [searchTerm, setSearchTerm] = useState('');
 
   const [deleteConfirm, setDeleteConfirm] = useState<Vehicle | null>(null);
+
+  const [currentPage, setCurrentPage] = useState(1);
 
 
 
@@ -64,6 +70,24 @@ export default function VehicleTable({
     vehicle.modelo.toLowerCase().includes(searchTerm.toLowerCase())
 
   );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, vehicles.length, pageSize]);
+
+  const paginationEnabled = Boolean(pageSize && pageSize > 0);
+  const totalPages = paginationEnabled
+    ? Math.max(1, Math.ceil(filteredvehicles.length / pageSize!))
+    : 1;
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = paginationEnabled ? (safeCurrentPage - 1) * pageSize! : 0;
+  const visibleVehicles = paginationEnabled
+    ? filteredvehicles.slice(startIndex, startIndex + pageSize!)
+    : filteredvehicles;
+  const visibleFrom = filteredvehicles.length === 0 ? 0 : startIndex + 1;
+  const visibleTo = paginationEnabled
+    ? Math.min(startIndex + pageSize!, filteredvehicles.length)
+    : filteredvehicles.length;
 
 
 
@@ -195,6 +219,7 @@ export default function VehicleTable({
 
       ) : (
 
+        <>
         <div className="overflow-x-auto">
 
           <table className="w-full">
@@ -261,7 +286,7 @@ export default function VehicleTable({
 
             <tbody className="divide-y divide-gray-200">
 
-              {filteredvehicles.map((vehicle) => (
+              {visibleVehicles.map((vehicle) => (
 
                 <tr key={vehicle.id} className="hover:bg-gray-50 transition-colors">
 
@@ -418,6 +443,37 @@ export default function VehicleTable({
           </table>
 
         </div>
+        {paginationEnabled && (
+          <div className="flex flex-col gap-3 border-t border-gray-200 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-gray-500">
+              Mostrando {visibleFrom}-{visibleTo} de {filteredvehicles.length}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                disabled={safeCurrentPage === 1}
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Anterior
+              </button>
+              <span className="min-w-24 text-center text-sm font-semibold text-gray-700">
+                Pagina {safeCurrentPage} de {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setCurrentPage((page) => Math.min(totalPages, page + 1))
+                }
+                disabled={safeCurrentPage === totalPages}
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+        )}
+        </>
 
       )}
 

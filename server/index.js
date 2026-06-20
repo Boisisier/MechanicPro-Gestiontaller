@@ -39,6 +39,7 @@ app.use(express.json());
 const allowedStatuses = new Set(['Ingresado', 'En Taller', 'Entregado']);
 const allowedTipos = new Set(['Auto', 'Camioneta', 'SUV', 'Moto', 'Camion', 'Furgon']);
 const patenteRegex = /^(?:[A-Z]{2}-\d{4}|[A-Z]{4}-\d{2})$/;
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const defaultRoles = [
   {
@@ -390,6 +391,74 @@ const authRequired = (req, res, next) => {
 };
 
 const ensureWritable = (req, res, next) => next();
+
+const isMechanicRole = (role = '') => role === 'Mecánico';
+
+const splitServicePrice = (service = '') => {
+  const match = String(service).match(/^(.*?)\s*\(\$\s*([^)]+)\)\s*$/);
+  return {
+    name: (match?.[1] || service).trim(),
+    price: match?.[2]?.replace(/[^\d]/g, '') || '',
+  };
+};
+
+const sanitizeServicesForMechanic = (services = []) =>
+  services.map((service) => {
+    if (String(service).startsWith('[REPUESTO]')) {
+      const parts = String(service).replace('[REPUESTO]', '').trim().split('|');
+      while (parts.length < 8) {
+        parts.push('');
+      }
+      parts[5] = '0';
+      return `[REPUESTO] ${parts.join('|')}`;
+    }
+    return splitServicePrice(service).name;
+  });
+
+const mergeMechanicServicesWithStoredPrices = (storedServices = [], incomingServices = []) => {
+  const servicePrices = new Map();
+  const partPrices = new Map();
+
+  storedServices.forEach((service) => {
+    const text = String(service);
+    if (text.startsWith('[REPUESTO]')) {
+      const parts = text.replace('[REPUESTO]', '').trim().split('|');
+      if (parts[0]) {
+        partPrices.set(parts[0], parts[5] || '0');
+      }
+      return;
+    }
+    const parsed = splitServicePrice(text);
+    if (parsed.name && parsed.price) {
+      servicePrices.set(parsed.name, parsed.price);
+    }
+  });
+
+  return incomingServices.map((service) => {
+    const text = String(service);
+    if (text.startsWith('[REPUESTO]')) {
+      const parts = text.replace('[REPUESTO]', '').trim().split('|');
+      while (parts.length < 8) {
+        parts.push('');
+      }
+      parts[5] = partPrices.get(parts[0]) || '0';
+      return `[REPUESTO] ${parts.join('|')}`;
+    }
+    const parsed = splitServicePrice(text);
+    const price = servicePrices.get(parsed.name);
+    return price ? `${parsed.name} ($${price})` : parsed.name;
+  });
+};
+
+const sanitizeVehicleForRole = (vehicle, role) => {
+  if (!isMechanicRole(role)) {
+    return vehicle;
+  }
+  return {
+    ...vehicle,
+    servicios: sanitizeServicesForMechanic(vehicle.servicios || []),
+  };
+};
 
 app.get('/health', async (req, res) => {
   try {
@@ -746,6 +815,9 @@ app.post('/workshop-users', authRequired, ensureWritable, async (req, res) => {
   if (!name || !rut || !email || !password || !roleName) {
     return res.status(400).json({ error: 'missing_fields' });
   }
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ error: 'invalid_email' });
+  }
 
   try {
     const roleResult = await pool.query(
@@ -783,6 +855,9 @@ app.put('/workshop-users/:id', authRequired, ensureWritable, async (req, res) =>
 
   if (!name || !rut || !email || !roleName) {
     return res.status(400).json({ error: 'missing_fields' });
+  }
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ error: 'invalid_email' });
   }
 
   try {
@@ -860,7 +935,11 @@ app.get('/inventory-items', authRequired, async (req, res) => {
        order by name`,
       [companyId]
     );
-    res.json(rows);
+    res.json(
+      isMechanicRole(req.user.role)
+        ? rows.map((item) => ({ ...item, cost: 0 }))
+        : rows
+    );
   } catch (error) {
     console.error('GET /inventory-items failed', error);
     res.status(500).json({ error: 'internal_error' });
@@ -971,6 +1050,9 @@ app.delete('/inventory-items/:id', authRequired, ensureWritable, async (req, res
 
 app.get('/budgets', authRequired, async (req, res) => {
   const { company_id: companyId } = req.user;
+  if (isMechanicRole(req.user.role)) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
   try {
     const { rows } = await pool.query(
       `select b.*,
@@ -992,6 +1074,9 @@ app.get('/budgets', authRequired, async (req, res) => {
 
 app.post('/budgets', authRequired, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
+  if (isMechanicRole(req.user.role)) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
   const items = Array.isArray(req.body.items) ? req.body.items : [];
   const total = items.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
   const client = await pool.connect();
@@ -1036,6 +1121,9 @@ app.post('/budgets', authRequired, ensureWritable, async (req, res) => {
 
 app.put('/budgets/:id', authRequired, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
+  if (isMechanicRole(req.user.role)) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
   const items = Array.isArray(req.body.items) ? req.body.items : [];
   const total = items.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
   const client = await pool.connect();
@@ -1087,6 +1175,9 @@ app.put('/budgets/:id', authRequired, ensureWritable, async (req, res) => {
 
 app.delete('/budgets/:id', authRequired, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
+  if (isMechanicRole(req.user.role)) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
   try {
     const { rows } = await pool.query(
       'delete from budget_quotes where id = $1 and company_id = $2 returning id',
@@ -1104,14 +1195,38 @@ app.delete('/budgets/:id', authRequired, ensureWritable, async (req, res) => {
 
 app.get('/audit-logs', authRequired, async (req, res) => {
   const { company_id: companyId } = req.user;
+  const dateFrom = String(req.query.date_from || '').trim();
+  const dateTo = String(req.query.date_to || '').trim();
+
+  const filters = ['company_id = $1'];
+  const values = [companyId];
+
+  if (dateFrom) {
+    const fromDate = new Date(`${dateFrom}T00:00:00.000Z`);
+    if (Number.isNaN(fromDate.getTime())) {
+      return res.status(400).json({ error: 'invalid_date_from' });
+    }
+    values.push(fromDate.toISOString());
+    filters.push(`created_at >= $${values.length}`);
+  }
+
+  if (dateTo) {
+    const toDate = new Date(`${dateTo}T23:59:59.999Z`);
+    if (Number.isNaN(toDate.getTime())) {
+      return res.status(400).json({ error: 'invalid_date_to' });
+    }
+    values.push(toDate.toISOString());
+    filters.push(`created_at <= $${values.length}`);
+  }
+
   try {
     const { rows } = await pool.query(
       `select id, user_name, module, action, detail, created_at
        from audit_logs
-       where company_id = $1
+       where ${filters.join(' and ')}
        order by created_at desc
        limit 500`,
-      [companyId]
+      values
     );
     res.json(rows);
   } catch (error) {
@@ -1213,7 +1328,7 @@ app.get('/vehicles', authRequired, async (req, res) => {
       'select * from vehicles where company_id = $1 order by fecha_ingreso desc',
       [companyId]
     );
-    res.json(rows);
+    res.json(rows.map((vehicle) => sanitizeVehicleForRole(vehicle, req.user.role)));
   } catch (error) {
     console.error('GET /vehicles failed', error);
     res.status(500).json({ error: 'internal_error' });
@@ -1269,6 +1384,24 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
   } = req.body;
 
   try {
+    let servicesToPersist = servicios;
+    if (isMechanicRole(req.user.role)) {
+      if (estado === 'Entregado' || Boolean(salida_confirmada) || fecha_salida_confirmada) {
+        return res.status(403).json({ error: 'mechanic_cannot_close_vehicle' });
+      }
+      const existing = await pool.query(
+        'select servicios from vehicles where id = $1 and company_id = $2',
+        [id, companyId]
+      );
+      if (existing.rows.length === 0) {
+        return res.status(404).json({ error: 'not_found' });
+      }
+      servicesToPersist = mergeMechanicServicesWithStoredPrices(
+        existing.rows[0].servicios || [],
+        servicios || []
+      );
+    }
+
     const { rows } = await pool.query(
       `insert into vehicles
         (company_id, customer_name, customer_rut, customer_phone, customer_address, customer_city, customer_email, assigned_mechanic_id, assigned_mechanic_name, patente, marca, modelo, ano, tipo_vehiculo, codigo_vin, codigo_motor, color, kilometraje, cantidad_combustible, estado, servicios, fallas_detectadas, observaciones, comentario_tecnico, salida_confirmada, fecha_salida_confirmada, en_estacionamiento_manual)
@@ -1296,7 +1429,7 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
         kilometraje,
         cantidad_combustible,
         estado,
-        servicios,
+        servicesToPersist,
         fallas_detectadas,
         observaciones,
         comentario_tecnico,
@@ -1359,6 +1492,10 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
   } = req.body;
 
   try {
+    if (isMechanicRole(req.user.role) && (estado === 'Entregado' || Boolean(salida_confirmada) || fecha_salida_confirmada)) {
+      return res.status(403).json({ error: 'mechanic_cannot_close_vehicle' });
+    }
+
     const { rows } = await pool.query(
       `update vehicles
        set customer_name = $1,

@@ -8,6 +8,7 @@ interface SidebarProps {
   isOpen: boolean;
   isDesktopOpen: boolean;
   onClose: () => void;
+  hiddenSections?: string[];
 }
 
 export default function Sidebar({
@@ -16,6 +17,7 @@ export default function Sidebar({
   isOpen,
   isDesktopOpen,
   onClose,
+  hiddenSections = [],
 }: SidebarProps) {
   const menuSections = [
     {
@@ -93,7 +95,9 @@ export default function Sidebar({
                   {section.title}
                 </p>
                 <ul className="space-y-1.5">
-                  {section.items.map((item) => {
+                  {section.items
+                    .filter((item) => !hiddenSections.includes(item.id))
+                    .map((item) => {
                     const Icon = item.icon;
                     const isActive = activeSection === item.id;
 
