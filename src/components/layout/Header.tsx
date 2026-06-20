@@ -1,10 +1,8 @@
-﻿import { Bell, User, Menu, Moon, Sun, LogOut } from "lucide-react";
+﻿import { Bell, User, Menu, LogOut } from "lucide-react";
 import { useState } from "react";
 
 interface HeaderProps {
   onMenuClick: () => void;
-  theme: "light" | "dark";
-  onToggleTheme: () => void;
   notifications: Array<{
     id: string;
     title: string;
@@ -18,8 +16,6 @@ interface HeaderProps {
 
 export default function Header({
   onMenuClick,
-  theme,
-  onToggleTheme,
   notifications,
   onLogout,
   userName = "Usuario general",
@@ -51,17 +47,6 @@ export default function Header({
         </div>
 
         <div className="flex items-center gap-2 lg:gap-4">
-          <button
-            onClick={onToggleTheme}
-            className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
-            title="Cambiar modo"
-          >
-            {theme === "dark" ? (
-              <Sun className="w-5 h-5" />
-            ) : (
-              <Moon className="w-5 h-5" />
-            )}
-          </button>
           <div className="relative">
             <button
               className="relative p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"

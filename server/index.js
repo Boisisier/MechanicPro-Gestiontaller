@@ -112,6 +112,7 @@ const ensureVehicleColumns = async () => {
       customer_email text default '',
       assigned_mechanic_id uuid,
       assigned_mechanic_name text default '',
+      customer_advance numeric(12,2) not null default 0 check (customer_advance >= 0),
       patente text not null,
       marca text not null,
       modelo text not null,
@@ -236,6 +237,7 @@ const ensureVehicleColumns = async () => {
       add column if not exists customer_email text default '',
       add column if not exists assigned_mechanic_id uuid,
       add column if not exists assigned_mechanic_name text default '',
+      add column if not exists customer_advance numeric(12,2) not null default 0,
       add column if not exists fallas_detectadas text[] default '{}',
       add column if not exists comentario_tecnico text default '',
       add column if not exists salida_confirmada boolean not null default false,
@@ -393,6 +395,8 @@ const authRequired = (req, res, next) => {
 const ensureWritable = (req, res, next) => next();
 
 const isMechanicRole = (role = '') => role === 'Mecánico';
+const isWorkshopAdminRole = (role = '') =>
+  role === 'admin' || role === 'Administrador de Taller';
 
 const splitServicePrice = (service = '') => {
   const match = String(service).match(/^(.*?)\s*\(\$\s*([^)]+)\)\s*$/);
@@ -457,6 +461,7 @@ const sanitizeVehicleForRole = (vehicle, role) => {
   return {
     ...vehicle,
     servicios: sanitizeServicesForMechanic(vehicle.servicios || []),
+    customer_advance: 0,
   };
 };
 
@@ -1374,6 +1379,7 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
     customer_email = '',
     assigned_mechanic_id = null,
     assigned_mechanic_name = '',
+    customer_advance = 0,
     servicios = [],
     fallas_detectadas = [],
     observaciones = '',
@@ -1382,6 +1388,17 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
     fecha_salida_confirmada = null,
     en_estacionamiento_manual = false,
   } = req.body;
+
+  const parsedCustomerAdvance = Number(customer_advance);
+  if (
+    isWorkshopAdminRole(req.user.role) &&
+    (!Number.isFinite(parsedCustomerAdvance) || parsedCustomerAdvance < 0)
+  ) {
+    return res.status(400).json({ error: 'invalid_customer_advance' });
+  }
+  const customerAdvanceToPersist = isWorkshopAdminRole(req.user.role)
+    ? parsedCustomerAdvance
+    : 0;
 
   try {
     let servicesToPersist = servicios;
@@ -1404,9 +1421,9 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
 
     const { rows } = await pool.query(
       `insert into vehicles
-        (company_id, customer_name, customer_rut, customer_phone, customer_address, customer_city, customer_email, assigned_mechanic_id, assigned_mechanic_name, patente, marca, modelo, ano, tipo_vehiculo, codigo_vin, codigo_motor, color, kilometraje, cantidad_combustible, estado, servicios, fallas_detectadas, observaciones, comentario_tecnico, salida_confirmada, fecha_salida_confirmada, en_estacionamiento_manual)
+        (company_id, customer_name, customer_rut, customer_phone, customer_address, customer_city, customer_email, assigned_mechanic_id, assigned_mechanic_name, customer_advance, patente, marca, modelo, ano, tipo_vehiculo, codigo_vin, codigo_motor, color, kilometraje, cantidad_combustible, estado, servicios, fallas_detectadas, observaciones, comentario_tecnico, salida_confirmada, fecha_salida_confirmada, en_estacionamiento_manual)
        values
-        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
+        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
        returning *`,
       [
         companyId,
@@ -1418,6 +1435,7 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
         customer_email,
         normalizeUuid(assigned_mechanic_id),
         assigned_mechanic_name,
+        customerAdvanceToPersist,
         patente,
         marca,
         modelo,
@@ -1482,6 +1500,7 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
     customer_email = '',
     assigned_mechanic_id = null,
     assigned_mechanic_name = '',
+    customer_advance = 0,
     servicios = [],
     fallas_detectadas = [],
     observaciones = '',
@@ -1492,6 +1511,22 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
   } = req.body;
 
   try {
+    let customerAdvanceToPersist = Number(customer_advance);
+    if (isWorkshopAdminRole(req.user.role)) {
+      if (!Number.isFinite(customerAdvanceToPersist) || customerAdvanceToPersist < 0) {
+        return res.status(400).json({ error: 'invalid_customer_advance' });
+      }
+    } else {
+      const existingAdvance = await pool.query(
+        'select customer_advance from vehicles where id = $1 and company_id = $2',
+        [id, companyId]
+      );
+      if (existingAdvance.rows.length === 0) {
+        return res.status(404).json({ error: 'not_found' });
+      }
+      customerAdvanceToPersist = Number(existingAdvance.rows[0].customer_advance) || 0;
+    }
+
     if (isMechanicRole(req.user.role) && (estado === 'Entregado' || Boolean(salida_confirmada) || fecha_salida_confirmada)) {
       return res.status(403).json({ error: 'mechanic_cannot_close_vehicle' });
     }
@@ -1506,26 +1541,27 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
            customer_email = $6,
            assigned_mechanic_id = $7,
            assigned_mechanic_name = $8,
-           patente = $9,
-           marca = $10,
-           modelo = $11,
-           ano = $12,
-           tipo_vehiculo = $13,
-           codigo_vin = $14,
-           codigo_motor = $15,
-           color = $16,
-           kilometraje = $17,
-           cantidad_combustible = $18,
-           estado = $19,
-           servicios = $20,
-           fallas_detectadas = $21,
-           observaciones = $22,
-           comentario_tecnico = $23,
-           salida_confirmada = $24,
-           fecha_salida_confirmada = $25,
-           en_estacionamiento_manual = $26,
+           customer_advance = $9,
+           patente = $10,
+           marca = $11,
+           modelo = $12,
+           ano = $13,
+           tipo_vehiculo = $14,
+           codigo_vin = $15,
+           codigo_motor = $16,
+           color = $17,
+           kilometraje = $18,
+           cantidad_combustible = $19,
+           estado = $20,
+           servicios = $21,
+           fallas_detectadas = $22,
+           observaciones = $23,
+           comentario_tecnico = $24,
+           salida_confirmada = $25,
+           fecha_salida_confirmada = $26,
+           en_estacionamiento_manual = $27,
            updated_at = now()
-       where id = $27 and company_id = $28
+       where id = $28 and company_id = $29
        returning *`,
       [
         customer_name,
@@ -1536,6 +1572,7 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
         customer_email,
         normalizeUuid(assigned_mechanic_id),
         assigned_mechanic_name,
+        customerAdvanceToPersist,
         patente,
         marca,
         modelo,

@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS vehicles (
   customer_email text DEFAULT '',
   assigned_mechanic_id uuid,
   assigned_mechanic_name text DEFAULT '',
+  customer_advance numeric(12,2) NOT NULL DEFAULT 0 CHECK (customer_advance >= 0),
   patente text NOT NULL,
   marca text NOT NULL,
   modelo text NOT NULL,

@@ -18,6 +18,7 @@ interface VehicleFormProps {
   onCancelEdit?: () => void;
   existingVehicles?: PreviousVehicleData[];
   mechanics?: Array<{ id: string; name: string }>;
+  canManageAdvance?: boolean;
 }
 
 export interface VehicleFormData {
@@ -40,6 +41,7 @@ export interface VehicleFormData {
   customer_email: string;
   assigned_mechanic_id: string;
   assigned_mechanic_name: string;
+  customer_advance: number;
   observaciones: string;
   comentario_tecnico: string;
   fallas_detectadas: string[];
@@ -65,6 +67,7 @@ const initialFormData: VehicleFormData = {
   customer_email: '',
   assigned_mechanic_id: '',
   assigned_mechanic_name: '',
+  customer_advance: 0,
   observaciones: '',
   comentario_tecnico: '',
   fallas_detectadas: [],
@@ -188,6 +191,7 @@ const buildFormDataFromPreviousVisit = (vehicle: PreviousVehicleData, patente: s
   customer_email: vehicle.customer_email || '',
   assigned_mechanic_id: '',
   assigned_mechanic_name: '',
+  customer_advance: 0,
   observaciones: '',
   comentario_tecnico: '',
   fallas_detectadas: [],
@@ -199,6 +203,7 @@ export default function VehicleForm({
   onCancelEdit,
   existingVehicles = [],
   mechanics = [],
+  canManageAdvance = false,
 }: VehicleFormProps) {
   const [formData, setFormData] = useState<VehicleFormData>(editingVehicle || initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -340,7 +345,7 @@ export default function VehicleForm({
 
     setFormData((prev) => ({
       ...prev,
-      [name]: ['ano', 'kilometraje', 'cantidad_combustible'].includes(name)
+      [name]: ['ano', 'kilometraje', 'cantidad_combustible', 'customer_advance'].includes(name)
         ? parseInt(value) || 0
         : value,
     }));
@@ -1009,8 +1014,30 @@ export default function VehicleForm({
                 ))}
               </select>
             </div>
+            {canManageAdvance && (
+              <div>
+                <label htmlFor="customer_advance" className="block text-sm font-medium text-gray-700 mb-2">
+                  Abono del cliente
+                </label>
+                <input
+                  type="number"
+                  id="customer_advance"
+                  name="customer_advance"
+                  value={formData.customer_advance || ''}
+                  onChange={handleChange}
+                  min="0"
+                  step="1000"
+                  inputMode="numeric"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  placeholder="Monto abonado"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Se descontara del total final de la atencion.
+                </p>
+              </div>
+            )}
             {formData.assigned_mechanic_name && (
-              <div className="rounded-lg border border-violet-100 bg-white px-4 py-3 text-sm text-gray-600">
+              <div className={`rounded-lg border border-violet-100 bg-white px-4 py-3 text-sm text-gray-600 ${canManageAdvance ? 'md:col-span-2' : ''}`}>
                 Responsable: {formData.assigned_mechanic_name}
               </div>
             )}

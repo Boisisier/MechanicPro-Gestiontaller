@@ -132,10 +132,6 @@ function App() {
   const { notification, showNotification, clearNotification } =
     useNotification();
 
-  const [theme, setTheme] = useState<"light" | "dark">(() =>
-    localStorage.getItem("theme") === "dark" ? "dark" : "light",
-  );
-
   const [accentColor, setAccentColor] = useState(
     () => localStorage.getItem("accentColor") || "#1f3a5f",
   );
@@ -371,11 +367,6 @@ function App() {
     };
     loadSession();
   }, [authToken]);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("theme-dark", theme === "dark");
-    localStorage.setItem("theme", theme);
-  }, [theme]);
 
   useEffect(() => {
     document.documentElement.style.setProperty("--accent", accentColor);
@@ -879,6 +870,8 @@ function App() {
     assigned_mechanic_id: vehicle.assigned_mechanic_id || "",
 
     assigned_mechanic_name: vehicle.assigned_mechanic_name || "",
+
+    customer_advance: vehicle.customer_advance || 0,
 
     servicios: vehicle.servicios || [],
 
@@ -1921,10 +1914,6 @@ function App() {
       >
         <Header
           onMenuClick={handleSidebarToggle}
-          theme={theme}
-          onToggleTheme={() =>
-            setTheme((prev) => (prev === "dark" ? "light" : "dark"))
-          }
           notifications={notifications}
           onLogout={handleLogout}
           userName={sessionUser?.name || "Usuario general"}
@@ -2027,6 +2016,7 @@ function App() {
                       onCancelEdit={() => setEditingVehicle(null)}
                       existingVehicles={vehicles}
                       mechanics={mechanicOptions}
+                      canManageAdvance={isSessionAdmin}
                     />
                   </div>
 
@@ -2782,6 +2772,35 @@ function App() {
                               </button>
                             </div>
                           </div>
+
+                          {isSessionAdmin && (
+                            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                  Total atencion
+                                </p>
+                                <p className="mt-1 text-lg font-bold text-gray-900">
+                                  ${getVehicleWorkTotal(vehicle).toLocaleString("es-CL")}
+                                </p>
+                              </div>
+                              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                  Abono cliente
+                                </p>
+                                <p className="mt-1 text-lg font-bold text-green-700">
+                                  ${(Number(vehicle.customer_advance) || 0).toLocaleString("es-CL")}
+                                </p>
+                              </div>
+                              <div className="rounded-lg border border-[#0f3a63]/20 bg-[#0f3a63]/5 px-4 py-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                  Saldo pendiente
+                                </p>
+                                <p className="mt-1 text-lg font-bold text-[#0f3a63]">
+                                  ${Math.max(0, getVehicleWorkTotal(vehicle) - (Number(vehicle.customer_advance) || 0)).toLocaleString("es-CL")}
+                                </p>
+                              </div>
+                            </div>
+                          )}
 
                           <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
                             <div className="rounded-lg border border-gray-200 p-4">

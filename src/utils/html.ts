@@ -35,6 +35,9 @@ export const exportVehiclePdf = (vehicle: Vehicle) => {
     .filter((part) => part.itemType === "insumo")
     .reduce((sum, part) => sum + part.quantity * (part.unitCost || 0), 0);
   const attentionTotal = serviceTotal + partsTotal + suppliesTotal;
+  const customerAdvance = Math.max(0, Number(vehicle.customer_advance) || 0);
+  const pendingBalance = Math.max(0, attentionTotal - customerAdvance);
+  const advanceCredit = Math.max(0, customerAdvance - attentionTotal);
 
   const html = `
       <html>
@@ -227,7 +230,10 @@ ${
   <div class="summary-row"><span>Servicios</span><strong>$${serviceTotal.toLocaleString("es-CL")}</strong></div>
   <div class="summary-row"><span>Repuestos</span><strong>$${partsTotal.toLocaleString("es-CL")}</strong></div>
   <div class="summary-row"><span>Insumos</span><strong>$${suppliesTotal.toLocaleString("es-CL")}</strong></div>
-  <div class="summary-row summary-total"><span>Total atencion</span><strong>$${attentionTotal.toLocaleString("es-CL")}</strong></div>
+  <div class="summary-row"><span>Total atencion</span><strong>$${attentionTotal.toLocaleString("es-CL")}</strong></div>
+  <div class="summary-row"><span>Abono cliente</span><strong>-$${customerAdvance.toLocaleString("es-CL")}</strong></div>
+  <div class="summary-row summary-total"><span>Saldo pendiente</span><strong>$${pendingBalance.toLocaleString("es-CL")}</strong></div>
+  ${advanceCredit > 0 ? `<div class="summary-row"><span>Saldo a favor</span><strong>$${advanceCredit.toLocaleString("es-CL")}</strong></div>` : ""}
 </div>
 
 
