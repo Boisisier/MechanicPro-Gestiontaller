@@ -959,6 +959,21 @@ app.post('/inventory-items', authRequired, ensureWritable, async (req, res) => {
     return res.status(400).json({ error: 'missing_name' });
   }
   try {
+    if (isMechanicRole(req.user.role)) {
+      const { rows } = await pool.query(
+        `update inventory_items
+         set stock = $1, updated_at = now()
+         where id = $2 and company_id = $3
+         returning id, item_type, name, category, sku, barcode, stock, min_stock as "minStock", unit, location,
+                   ''::text as supplier, 0::float as cost, notes, created_at, updated_at`,
+        [Number(req.body.stock) || 0, req.params.id, companyId]
+      );
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'not_found' });
+      }
+      return res.json(rows[0]);
+    }
+
     const { rows } = await pool.query(
       `insert into inventory_items
         (company_id, item_type, name, category, sku, barcode, stock, min_stock, unit, location, supplier, cost, notes)
@@ -1457,7 +1472,7 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
       ]
     );
 
-    res.status(201).json(rows[0]);
+    res.status(201).json(sanitizeVehicleForRole(rows[0], req.user.role));
   } catch (error) {
     if (error.code === '23505') {
       return res.status(409).json({ error: 'patente_exists' });
@@ -1512,23 +1527,29 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
 
   try {
     let customerAdvanceToPersist = Number(customer_advance);
+    let servicesToPersist = servicios;
+    if (isMechanicRole(req.user.role) && Boolean(salida_confirmada)) {
+      return res.status(403).json({ error: 'mechanic_cannot_confirm_exit' });
+    }
     if (isWorkshopAdminRole(req.user.role)) {
       if (!Number.isFinite(customerAdvanceToPersist) || customerAdvanceToPersist < 0) {
         return res.status(400).json({ error: 'invalid_customer_advance' });
       }
     } else {
       const existingAdvance = await pool.query(
-        'select customer_advance from vehicles where id = $1 and company_id = $2',
+        'select customer_advance, servicios from vehicles where id = $1 and company_id = $2',
         [id, companyId]
       );
       if (existingAdvance.rows.length === 0) {
         return res.status(404).json({ error: 'not_found' });
       }
       customerAdvanceToPersist = Number(existingAdvance.rows[0].customer_advance) || 0;
-    }
-
-    if (isMechanicRole(req.user.role) && (estado === 'Entregado' || Boolean(salida_confirmada) || fecha_salida_confirmada)) {
-      return res.status(403).json({ error: 'mechanic_cannot_close_vehicle' });
+      if (isMechanicRole(req.user.role)) {
+        servicesToPersist = mergeMechanicServicesWithStoredPrices(
+          existingAdvance.rows[0].servicios || [],
+          servicios || []
+        );
+      }
     }
 
     const { rows } = await pool.query(
@@ -1584,7 +1605,7 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
         kilometraje,
         cantidad_combustible,
         estado,
-        servicios,
+        servicesToPersist,
         fallas_detectadas,
         observaciones,
         comentario_tecnico,
@@ -1600,7 +1621,7 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
       return res.status(404).json({ error: 'not_found' });
     }
 
-    res.json(rows[0]);
+    res.json(sanitizeVehicleForRole(rows[0], req.user.role));
   } catch (error) {
     if (error.code === '23505') {
       return res.status(409).json({ error: 'patente_exists' });

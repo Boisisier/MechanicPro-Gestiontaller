@@ -47,6 +47,7 @@ import VehicleForm, {
 } from "./components/vehicles/VehicleForm";
 
 import VehicleTable from "./components/vehicles/VehicleTable";
+import ExitPricingSection from "./components/vehicles/ExitPricingSection";
 import ConfirmDialog from "./components/ui/ConfirmDialog";
 import Toast from "./components/ui/Toast";
 
@@ -283,7 +284,8 @@ function App() {
     sessionUserRole === "admin" ||
     sessionUserRole === "Administrador de Taller" ||
     sessionUserRole === "Administrativo";
-  const canSendToSalida = canEditPrices;
+  const canSendToSalida = Boolean(sessionUser);
+  const canAccessSalida = canEditPrices;
   const canAccessBudget = canViewPrices;
 
   const handleSidebarToggle = () => {
@@ -301,10 +303,10 @@ function App() {
   }, [activeSection, canAccessBudget]);
 
   useEffect(() => {
-    if (!canSendToSalida && vehicleTab === "salida") {
+    if (!canAccessSalida && vehicleTab === "salida") {
       setVehicleTab("taller");
     }
-  }, [canSendToSalida, vehicleTab]);
+  }, [canAccessSalida, vehicleTab]);
 
   const requestConfirmation = (options: {
     title: string;
@@ -1193,7 +1195,7 @@ function App() {
       );
 
       if (statusOverride === "Entregado") {
-        setVehicleTab("salida");
+        setVehicleTab(canAccessSalida ? "salida" : "taller");
       }
     } catch (error) {
       console.error("Review update failed", error);
@@ -1303,6 +1305,21 @@ function App() {
   };
 
   const handleVehicleReady = (vehicle: Vehicle) => {
+    const hasServicesWithoutValue = parseStoredReviewServices(
+      vehicle.servicios,
+    ).some((service) => (parseInt(service.price || "0", 10) || 0) <= 0);
+    const hasItemsWithoutValue = parseStoredReviewParts(vehicle.servicios).some(
+      (part) => (part.unitCost || 0) <= 0,
+    );
+
+    if (hasServicesWithoutValue || hasItemsWithoutValue) {
+      showNotification(
+        "error",
+        "Completa los valores de todos los servicios, repuestos e insumos antes de marcar el vehiculo listo",
+      );
+      return;
+    }
+
     requestConfirmation({
       title: "Marcar vehiculo listo",
       message: `El vehiculo ${vehicle.patente} se ocultara de salida y quedara marcado como listo.`,
@@ -1358,6 +1375,35 @@ function App() {
       variant: "warning",
       onConfirm: () => performReturnToTallerFromSalida(vehicle),
     });
+  };
+
+  const handleSaveExitPricing = async (
+    vehicle: Vehicle,
+    services: ReviewServiceItem[],
+    parts: ReviewPartItem[],
+  ) => {
+    try {
+      await updateVehicleRecord(
+        vehicle,
+        {
+          servicios: [
+            ...services.map(serializeReviewService),
+            ...parts.map(serializeReviewPart),
+          ],
+        },
+        `Valores de ${vehicle.patente} actualizados en Salida`,
+      );
+      logAction(
+        "Valores actualizados",
+        "Salida",
+        `${vehicle.patente} - ${services.length} servicio(s), ${parts.length} item(s) valorizados`,
+      );
+      showNotification("success", "Valores de la atencion guardados");
+    } catch (error) {
+      console.error("Exit pricing update failed", error);
+      showNotification("error", "No se pudieron guardar los valores");
+      throw error;
+    }
   };
 
   const handleNotify = (vehicle: Vehicle) => {
@@ -1944,7 +1990,7 @@ function App() {
 
                     { id: "salida", label: "Salida vehí­culos" },
                   ]
-                    .filter((tab) => canSendToSalida || tab.id !== "salida")
+                    .filter((tab) => canAccessSalida || tab.id !== "salida")
                     .map((tab) => (
                     <button
                       key={tab.id}
@@ -2361,11 +2407,7 @@ function App() {
                             reviewServices.map((service) => (
                               <div
                                 key={service.name}
-                                className={`grid grid-cols-1 gap-4 rounded-lg border border-gray-200 p-4 ${
-                                  canEditPrices
-                                    ? "md:grid-cols-[minmax(0,1fr)_220px_44px]"
-                                    : "md:grid-cols-[minmax(0,1fr)_44px]"
-                                }`}
+                                className="grid grid-cols-1 gap-4 rounded-lg border border-gray-200 p-4 md:grid-cols-[minmax(0,1fr)_44px]"
                               >
                                 <div>
                                   <p className="text-sm font-semibold text-gray-900">
@@ -2467,28 +2509,6 @@ function App() {
                                   )}
                                 </div>
 
-                                {canEditPrices && (
-                                  <div>
-                                    <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                                      Valor
-                                    </label>
-
-                                    <input
-                                      type="text"
-                                      inputMode="numeric"
-                                      value={service.price}
-                                      onChange={(event) =>
-                                        handleReviewServicePriceChange(
-                                          service.name,
-                                          event.target.value,
-                                        )
-                                      }
-                                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                                      placeholder="15000"
-                                    />
-                                  </div>
-                                )}
-
                                 <div className="flex items-end">
                                   <button
                                     type="button"
@@ -2536,11 +2556,7 @@ function App() {
                                 return (
                                   <div
                                     key={part.inventoryItemId}
-                                    className={`grid grid-cols-1 gap-4 rounded-lg border border-gray-200 bg-white p-4 ${
-                                      canEditPrices
-                                        ? "md:grid-cols-[minmax(0,1fr)_120px_170px_44px]"
-                                        : "md:grid-cols-[minmax(0,1fr)_120px_44px]"
-                                    }`}
+                                    className="grid grid-cols-1 gap-4 rounded-lg border border-gray-200 bg-white p-4 md:grid-cols-[minmax(0,1fr)_120px_44px]"
                                   >
                                     <div>
                                       <div className="flex flex-wrap items-center gap-2">
@@ -2577,29 +2593,6 @@ function App() {
                                         className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
                                       />
                                     </div>
-                                    {canEditPrices && (
-                                      <div>
-                                        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                                          Valor unitario
-                                        </label>
-                                        <input
-                                          type="text"
-                                          inputMode="numeric"
-                                          value={part.unitCost || ""}
-                                          onChange={(event) =>
-                                            handleReviewPartUnitCostChange(
-                                              part.inventoryItemId,
-                                              event.target.value,
-                                            )
-                                          }
-                                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                                          placeholder="0"
-                                        />
-                                        <p className="mt-1 text-xs font-semibold text-gray-500">
-                                          Subtotal: ${(part.quantity * (part.unitCost || 0)).toLocaleString("es-CL")}
-                                        </p>
-                                      </div>
-                                    )}
                                     <div className="flex items-end">
                                       <button
                                         type="button"
@@ -2616,6 +2609,96 @@ function App() {
                             </div>
                           )}
                         </div>
+
+                        {canEditPrices && (
+                          <div className="mb-6 rounded-xl border border-[#0f3a63]/20 bg-white p-4 shadow-sm">
+                            <div className="mb-4">
+                              <h4 className="text-sm font-semibold text-gray-900">
+                                Valores de la atencion
+                              </h4>
+                              <p className="mt-1 text-xs text-gray-500">
+                                Completa los valores de servicios, repuestos e insumos antes de finalizar.
+                              </p>
+                            </div>
+
+                            {reviewServices.length === 0 && reviewParts.length === 0 ? (
+                              <p className="rounded-lg border border-dashed border-gray-300 px-4 py-5 text-sm text-gray-500">
+                                Agrega servicios o items de inventario para completar sus valores.
+                              </p>
+                            ) : (
+                              <div className="divide-y divide-gray-200 rounded-lg border border-gray-200">
+                                {reviewServices.map((service) => (
+                                  <div
+                                    key={`value-service-${service.name}`}
+                                    className="grid grid-cols-1 gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-center"
+                                  >
+                                    <div>
+                                      <p className="text-sm font-semibold text-gray-900">
+                                        {service.name}
+                                      </p>
+                                      <p className="text-xs text-gray-500">Servicio</p>
+                                    </div>
+                                    <div>
+                                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                        Valor
+                                      </label>
+                                      <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={service.price}
+                                        onChange={(event) =>
+                                          handleReviewServicePriceChange(
+                                            service.name,
+                                            event.target.value,
+                                          )
+                                        }
+                                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                                        placeholder="0"
+                                      />
+                                    </div>
+                                  </div>
+                                ))}
+
+                                {reviewParts.map((part) => (
+                                  <div
+                                    key={`value-part-${part.inventoryItemId}`}
+                                    className="grid grid-cols-1 gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-center"
+                                  >
+                                    <div>
+                                      <p className="text-sm font-semibold text-gray-900">
+                                        {part.name}
+                                      </p>
+                                      <p className="text-xs text-gray-500">
+                                        {part.itemType === "insumo" ? "Insumo" : "Repuesto"} · Cantidad {part.quantity}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                        Valor unitario
+                                      </label>
+                                      <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={part.unitCost || ""}
+                                        onChange={(event) =>
+                                          handleReviewPartUnitCostChange(
+                                            part.inventoryItemId,
+                                            event.target.value,
+                                          )
+                                        }
+                                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                                        placeholder="0"
+                                      />
+                                      <p className="mt-1 text-xs font-semibold text-gray-500">
+                                        Subtotal: ${(part.quantity * (part.unitCost || 0)).toLocaleString("es-CL")}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         <div>
                           {canViewPrices && (
@@ -2772,6 +2855,15 @@ function App() {
                               </button>
                             </div>
                           </div>
+
+                          {canEditPrices && (
+                            <ExitPricingSection
+                              vehicle={vehicle}
+                              onSave={(services, parts) =>
+                                handleSaveExitPricing(vehicle, services, parts)
+                              }
+                            />
+                          )}
 
                           {isSessionAdmin && (
                             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -3410,14 +3502,16 @@ function App() {
                             </p>
                           </div>
 
-                          <div className="rounded-lg border border-gray-200 p-4">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                              Valor total
-                            </p>
-                            <p className="mt-2 text-2xl font-bold text-gray-900">
-                              ${total.toLocaleString("es-CL")}
-                            </p>
-                          </div>
+                          {canViewPrices && (
+                            <div className="rounded-lg border border-gray-200 p-4">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                Valor total
+                              </p>
+                              <p className="mt-2 text-2xl font-bold text-gray-900">
+                                ${total.toLocaleString("es-CL")}
+                              </p>
+                            </div>
+                          )}
                         </div>
 
                         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -3434,9 +3528,11 @@ function App() {
                                 {services.map((service) => (
                                   <li key={service.name} className="flex justify-between gap-3">
                                     <span>{service.name}</span>
-                                    <span className="font-semibold">
-                                      ${(parseInt(service.price || "0", 10) || 0).toLocaleString("es-CL")}
-                                    </span>
+                                    {canViewPrices && (
+                                      <span className="font-semibold">
+                                        ${(parseInt(service.price || "0", 10) || 0).toLocaleString("es-CL")}
+                                      </span>
+                                    )}
                                   </li>
                                 ))}
                               </ul>
@@ -3458,9 +3554,11 @@ function App() {
                                     <span>
                                       {part.name} x{part.quantity} {part.unit}
                                     </span>
-                                    <span className="font-semibold">
-                                      ${(part.quantity * (part.unitCost || 0)).toLocaleString("es-CL")}
-                                    </span>
+                                    {canViewPrices && (
+                                      <span className="font-semibold">
+                                        ${(part.quantity * (part.unitCost || 0)).toLocaleString("es-CL")}
+                                      </span>
+                                    )}
                                   </li>
                                 ))}
                               </ul>
@@ -3490,7 +3588,7 @@ function App() {
                   showEdit={false}
                   showDelete={false}
                   onNotify={handleNotify}
-                  onExportPdf={exportVehiclePdf}
+                  onExportPdf={canViewPrices ? exportVehiclePdf : undefined}
                   pageSize={8}
                 />
               )}
