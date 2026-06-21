@@ -96,7 +96,7 @@ const roleModules: Record<UserRole, string[]> = {
     "Configuración",
   ],
   Administrativo: ["Dashboard", "Vehículos", "Presupuesto", "Reportes"],
-  Mecánico: ["Dashboard", "Vehículos", "Reportes"],
+  Mecánico: ["Vehículos", "Reportes"],
 };
 
 const defaultWorkshopUsers: WorkshopUser[] = [
@@ -297,10 +297,13 @@ function App() {
   };
 
   useEffect(() => {
-    if (!canAccessBudget && activeSection === "presupuesto") {
-      setActiveSection("dashboard");
+    if (
+      isMechanicSession &&
+      (activeSection === "dashboard" || activeSection === "presupuesto")
+    ) {
+      setActiveSection("vehiculos");
     }
-  }, [activeSection, canAccessBudget]);
+  }, [activeSection, isMechanicSession]);
 
   useEffect(() => {
     if (!canAccessSalida && vehicleTab === "salida") {
@@ -1949,7 +1952,9 @@ function App() {
         onSectionChange={setActiveSection}
         isOpen={sidebarOpen}
         isDesktopOpen={desktopSidebarOpen}
-        hiddenSections={!canAccessBudget ? ["presupuesto"] : []}
+        hiddenSections={
+          isMechanicSession ? ["dashboard", "presupuesto"] : []
+        }
         onClose={() => setSidebarOpen(false)}
       />
 
@@ -3026,7 +3031,7 @@ function App() {
             </>
           )}
 
-          {activeSection === "dashboard" && (
+          {activeSection === "dashboard" && !isMechanicSession && (
             <div className="space-y-6">
               <MetricsCards
                 totalvehicles={metrics.total}

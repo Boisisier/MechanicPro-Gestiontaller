@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, History, RotateCcw, Save, Search, Send, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, History, RotateCcw, Save, Search, Send, X } from 'lucide-react';
 import { getModelsForBrand, vehicleBrandNames } from '../../features/vehicles/vehicleModelCatalog';
+import { serviceCatalogByCategory } from '../../features/vehicles/serviceCatalog';
 import ConfirmDialog from '../ui/ConfirmDialog';
 
 type PreviousVehicleData = Partial<VehicleFormData> & {
@@ -11,6 +12,20 @@ type PreviousVehicleData = Partial<VehicleFormData> & {
 };
 
 type LookupMode = 'patente' | 'rut';
+
+const formSteps = [
+  'Datos de Vehículo y Datos de Ingreso Actual',
+  'Datos de Cliente',
+  'Observaciones Iniciales y Comentario Técnico',
+  'Posibles Fallas, Asignación y Abono',
+];
+
+const requiredFieldsByStep = [
+  ['patente', 'marca', 'modelo', 'ano'],
+  ['customer_name', 'customer_rut', 'customer_phone', 'customer_address', 'customer_city', 'customer_email'],
+  [],
+  ['customer_advance'],
+];
 
 interface VehicleFormProps {
   onSubmit: (data: VehicleFormData) => Promise<void>;
@@ -42,6 +57,7 @@ export interface VehicleFormData {
   assigned_mechanic_id: string;
   assigned_mechanic_name: string;
   customer_advance: number;
+  servicios: string[];
   observaciones: string;
   comentario_tecnico: string;
   fallas_detectadas: string[];
@@ -68,6 +84,7 @@ const initialFormData: VehicleFormData = {
   assigned_mechanic_id: '',
   assigned_mechanic_name: '',
   customer_advance: 0,
+  servicios: [],
   observaciones: '',
   comentario_tecnico: '',
   fallas_detectadas: [],
@@ -192,6 +209,7 @@ const buildFormDataFromPreviousVisit = (vehicle: PreviousVehicleData, patente: s
   assigned_mechanic_id: '',
   assigned_mechanic_name: '',
   customer_advance: 0,
+  servicios: [],
   observaciones: '',
   comentario_tecnico: '',
   fallas_detectadas: [],
@@ -205,7 +223,11 @@ export default function VehicleForm({
   mechanics = [],
   canManageAdvance = false,
 }: VehicleFormProps) {
-  const [formData, setFormData] = useState<VehicleFormData>(editingVehicle || initialFormData);
+  const [formData, setFormData] = useState<VehicleFormData>({
+    ...initialFormData,
+    ...(editingVehicle || {}),
+    servicios: editingVehicle?.servicios || [],
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadedPatente, setLoadedPatente] = useState('');
   const [sendConfirmOpen, setSendConfirmOpen] = useState(false);
@@ -214,6 +236,9 @@ export default function VehicleForm({
   const [brandFocused, setBrandFocused] = useState(false);
   const [modelFocused, setModelFocused] = useState(false);
   const [failureSearch, setFailureSearch] = useState('');
+  const [serviceSearch, setServiceSearch] = useState('');
+  const [serviceCatalogOpen, setServiceCatalogOpen] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
   const [openFailureCategories, setOpenFailureCategories] = useState<string[]>([
     failureChecklist[0].category,
   ]);
@@ -245,17 +270,35 @@ export default function VehicleForm({
     }))
     .filter((section) => section.groups.length > 0);
   const hasFailureSearch = failureSearch.trim().length > 0;
+  const normalizedServiceSearch = normalizeSearch(serviceSearch);
+  const filteredServiceCatalog = serviceCatalogByCategory
+    .map((category) => ({
+      ...category,
+      services: category.services.filter((service) =>
+        normalizeSearch(`${category.category} ${service}`).includes(
+          normalizedServiceSearch,
+        ),
+      ),
+    }))
+    .filter((category) => category.services.length > 0);
 
   useEffect(() => {
     if (editingVehicle) {
       const { id, ...data } = editingVehicle;
-      setFormData(data);
+      setFormData({
+        ...initialFormData,
+        ...data,
+        servicios: data.servicios || [],
+      });
     } else {
       setFormData(initialFormData);
     }
     setLoadedPatente('');
     setLookupMode(null);
     setLookupTerm('');
+    setCurrentStep(0);
+    setServiceSearch('');
+    setServiceCatalogOpen(false);
   }, [editingVehicle]);
 
   const lookupMatches = existingVehicles
@@ -363,6 +406,15 @@ export default function VehicleForm({
     });
   };
 
+  const handleServiceToggle = (service: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      servicios: prev.servicios.includes(service)
+        ? prev.servicios.filter((item) => item !== service)
+        : [...prev.servicios, service],
+    }));
+  };
+
   const toggleFailureCategory = (category: string) => {
     setOpenFailureCategories((prev) =>
       prev.includes(category)
@@ -381,14 +433,57 @@ export default function VehicleForm({
     return { category, group, item };
   };
 
+  const getInvalidFieldForStep = (step: number) =>
+    requiredFieldsByStep[step]
+      .map((id) => document.getElementById(id) as HTMLInputElement | null)
+      .find((field) => field && !field.checkValidity()) || null;
+
+  const validateStep = (step: number) => {
+    const invalidField = getInvalidFieldForStep(step);
+    if (!invalidField) {
+      return true;
+    }
+    invalidField.reportValidity();
+    invalidField.focus();
+    return false;
+  };
+
+  const handleNextStep = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!validateStep(currentStep)) {
+      return;
+    }
+    setCurrentStep((step) => Math.min(formSteps.length - 1, step + 1));
+  };
+
+  const handlePreviousStep = () => {
+    setCurrentStep((step) => Math.max(0, step - 1));
+  };
+
+  const focusInvalidStep = () => {
+    const invalidStep = requiredFieldsByStep.findIndex((_, step) =>
+      Boolean(getInvalidFieldForStep(step)),
+    );
+    if (invalidStep < 0) {
+      return false;
+    }
+    setCurrentStep(invalidStep);
+    window.setTimeout(() => {
+      const invalidField = getInvalidFieldForStep(invalidStep);
+      invalidField?.reportValidity();
+      invalidField?.focus();
+    }, 0);
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await handleSendToReview();
   };
 
   const handleSendToReview = async () => {
-    const form = document.getElementById('vehicle-entry-form') as HTMLFormElement | null;
-    if (form && !form.reportValidity()) {
+    if (focusInvalidStep()) {
       return;
     }
     setSendConfirmOpen(true);
@@ -398,6 +493,9 @@ export default function VehicleForm({
   const handleClear = () => {
     setFormData(initialFormData);
     setLoadedPatente('');
+    setCurrentStep(0);
+    setServiceSearch('');
+    setServiceCatalogOpen(false);
     if (onCancelEdit) {
       onCancelEdit();
     }
@@ -417,6 +515,9 @@ export default function VehicleForm({
       if (!editingVehicle) {
         setFormData(initialFormData);
         setLoadedPatente('');
+        setCurrentStep(0);
+        setServiceSearch('');
+        setServiceCatalogOpen(false);
       }
     } finally {
       setIsSubmitting(false);
@@ -427,6 +528,9 @@ export default function VehicleForm({
     const handleExternalClear = () => {
       setFormData(initialFormData);
       setLoadedPatente('');
+      setCurrentStep(0);
+      setServiceSearch('');
+      setServiceCatalogOpen(false);
       if (onCancelEdit) {
         onCancelEdit();
       }
@@ -437,7 +541,7 @@ export default function VehicleForm({
   }, [onCancelEdit]);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
+    <div className="vehicle-entry-form bg-white rounded-xl border border-gray-200 p-4 shadow-sm sm:p-6">
       <ConfirmDialog
         open={sendConfirmOpen}
         title="Enviar a En Taller"
@@ -452,6 +556,47 @@ export default function VehicleForm({
           {editingVehicle ? 'Editar vehículo' : 'Registro de vehículo'}
         </h3>
         <p className="text-sm text-gray-500 mt-1">Complete los datos del vehículo</p>
+      </div>
+
+      <div className="mb-5 px-3 sm:px-6">
+        <div className="relative mx-5">
+          <div className="absolute left-0 right-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-gray-200">
+            <div
+              className="h-full rounded-full bg-[#0f3a63] transition-[width] duration-500 ease-out"
+              style={{
+                width: `${(currentStep / (formSteps.length - 1)) * 100}%`,
+              }}
+            />
+          </div>
+
+          <div className="relative z-10 flex items-center justify-between">
+          {formSteps.map((step, index) => {
+            const isActive = currentStep === index;
+            const isCompleted = currentStep > index;
+
+            return (
+              <button
+                key={step}
+                type="button"
+                onClick={() => index <= currentStep && setCurrentStep(index)}
+                disabled={index > currentStep}
+                title={step}
+                aria-label={`Paso ${index + 1}: ${step}`}
+                aria-current={isActive ? 'step' : undefined}
+                className={`flex h-10 w-10 items-center justify-center rounded-full border-2 text-sm font-bold transition-colors ${
+                  isActive
+                    ? 'border-[#0f3a63] bg-[#0f3a63] text-white shadow-sm ring-4 ring-[#0f3a63]/15'
+                    : isCompleted
+                      ? 'border-[#0f3a63] bg-white text-[#0f3a63]'
+                      : 'border-gray-300 bg-white text-gray-400'
+                } disabled:cursor-not-allowed`}
+              >
+                {index + 1}
+              </button>
+            );
+          })}
+          </div>
+        </div>
       </div>
 
       <div className="hidden">
@@ -484,7 +629,7 @@ export default function VehicleForm({
       </div>
 
       <form id="vehicle-entry-form" onSubmit={handleSubmit} className="space-y-6">
-        <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-5 shadow-sm">
+        <div className={currentStep === 0 ? "rounded-xl border border-blue-100 bg-blue-50/40 p-5 shadow-sm" : "hidden"}>
           <h4 className="mb-4 inline-flex rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm">Datos del Vehículo</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
@@ -644,7 +789,8 @@ export default function VehicleForm({
           </div>
         </div>
 
-        <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-5 shadow-sm">
+        <div className={[0, 2, 3].includes(currentStep) ? "rounded-xl border border-emerald-100 bg-emerald-50/40 p-5 shadow-sm" : "hidden"}>
+          <div className={currentStep === 0 ? "" : "hidden"}>
           <h4 className="mb-4 inline-flex rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm">Datos del ingreso actual</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
@@ -694,8 +840,9 @@ export default function VehicleForm({
             />
           </div>
         </div>
+          </div>
 
-          <div className="mt-6">
+          <div className={currentStep === 3 ? "mt-1" : "hidden"}>
             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h5 className="inline-flex rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm">
@@ -848,7 +995,102 @@ export default function VehicleForm({
             </div>
           </div>
 
-          <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className={currentStep === 2 ? "mb-4" : "hidden"}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-900">
+                  Servicios y reparaciones solicitadas
+                </h4>
+                <p className="mt-1 text-xs text-gray-500">
+                  {formData.servicios.length} servicio(s) seleccionado(s)
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setServiceCatalogOpen((open) => !open)}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0f3a63] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b2d4d]"
+              >
+                <Search className="h-4 w-4" />
+                Buscar servicios
+              </button>
+            </div>
+
+            {formData.servicios.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {formData.servicios.map((service) => (
+                  <button
+                    key={service}
+                    type="button"
+                    onClick={() => handleServiceToggle(service)}
+                    className="inline-flex items-center gap-2 rounded-lg border border-[#0f3a63]/20 bg-white px-3 py-1.5 text-xs font-semibold text-[#0f3a63] hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+                    title="Quitar servicio"
+                  >
+                    {service}
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {serviceCatalogOpen && (
+              <div className="mt-4 overflow-hidden rounded-lg border border-gray-200 bg-white">
+                <div className="border-b border-gray-200 p-3">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="search"
+                      value={serviceSearch}
+                      onChange={(event) => setServiceSearch(event.target.value)}
+                      className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-[#0f3a63] focus:outline-none"
+                      placeholder="Buscar servicio o sistema"
+                    />
+                  </div>
+                </div>
+
+                <div className="max-h-80 overflow-y-auto p-3">
+                  {filteredServiceCatalog.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-gray-500">
+                      No se encontraron servicios.
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {filteredServiceCatalog.map((category) => (
+                        <div key={category.category}>
+                          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                            {category.category}
+                          </p>
+                          <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                            {category.services.map((service) => {
+                              const selected = formData.servicios.includes(service);
+                              return (
+                                <button
+                                  key={service}
+                                  type="button"
+                                  onClick={() => handleServiceToggle(service)}
+                                  className={`flex min-h-10 items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                                    selected
+                                      ? 'border-[#0f3a63] bg-[#0f3a63]/5 font-semibold text-[#0f3a63]'
+                                      : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  <span>{service}</span>
+                                  <span className="text-xs font-bold">
+                                    {selected ? 'Seleccionado' : '+'}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className={currentStep === 2 ? "grid grid-cols-1 gap-6 lg:grid-cols-2" : "hidden"}>
             <div>
               <label htmlFor="observaciones" className="mb-2 inline-flex rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 shadow-sm">
                 Observaciones iniciales (Cliente)
@@ -858,7 +1100,7 @@ export default function VehicleForm({
                 name="observaciones"
                 value={formData.observaciones}
                 onChange={handleChange}
-                rows={4}
+                rows={3}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
                 placeholder="Detalles adicionales, reparaciones necesarias, etc."
               />
@@ -873,7 +1115,7 @@ export default function VehicleForm({
                 name="comentario_tecnico"
                 value={formData.comentario_tecnico}
                 onChange={handleChange}
-                rows={4}
+                rows={3}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
                 placeholder="Comentario interno de recepción o mecánico"
               />
@@ -882,7 +1124,7 @@ export default function VehicleForm({
 
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
+        <div className={currentStep === 1 ? "rounded-xl border border-slate-200 bg-slate-50 p-5 shadow-sm" : "hidden"}>
           <h4 className="mb-4 inline-flex rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm">Datos del cliente</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -992,7 +1234,7 @@ export default function VehicleForm({
           </div>
         </div>
 
-        <div className="rounded-xl border border-violet-100 bg-violet-50/40 p-5 shadow-sm">
+        <div className={currentStep === 3 ? "rounded-xl border border-violet-100 bg-violet-50/40 p-5 shadow-sm" : "hidden"}>
           <h4 className="mb-4 inline-flex rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm">Asignación de reparación</h4>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div>
@@ -1044,6 +1286,40 @@ export default function VehicleForm({
           </div>
         </div>
 
+        <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
+          <button
+            type="button"
+            onClick={handlePreviousStep}
+            disabled={currentStep === 0}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Anterior
+          </button>
+
+          {currentStep < formSteps.length - 1 ? (
+            <button
+              key="next-step"
+              type="button"
+              onClick={handleNextStep}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0f3a63] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#0b2d4d]"
+            >
+              Siguiente
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          ) : (
+            <button
+              key="submit-vehicle"
+              type="button"
+              onClick={handleSendToReview}
+              disabled={isSubmitting}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Send className="h-4 w-4" />
+              {isSubmitting ? 'Guardando...' : 'Ingresar Vehículo'}
+            </button>
+          )}
+        </div>
       </form>
 
       {lookupMode && (

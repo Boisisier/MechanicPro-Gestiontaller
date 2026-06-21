@@ -58,6 +58,25 @@ body {
   transform: translateY(6px);
 }
 
+.vehicle-entry-form .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 1rem;
+}
+
+.vehicle-entry-form .gap-6 {
+  gap: 1rem;
+}
+
+.vehicle-entry-form .p-5 {
+  padding: 1rem;
+}
+
+.vehicle-entry-form input:not([type="checkbox"]):not([type="radio"]),
+.vehicle-entry-form select,
+.vehicle-entry-form textarea {
+  padding-top: 0.625rem;
+  padding-bottom: 0.625rem;
+}
+
 @layer utilities {
   @keyframes slide-in {
     from {

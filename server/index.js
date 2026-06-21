@@ -52,7 +52,7 @@ const defaultRoles = [
   },
   {
     name: 'Mecánico',
-    modules: ['Dashboard', 'Vehículos', 'Reportes'],
+    modules: ['Vehículos', 'Reportes'],
   },
 ];
 

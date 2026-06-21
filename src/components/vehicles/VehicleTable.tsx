@@ -260,6 +260,12 @@ export default function VehicleTable({
 
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
 
+                  Mecánico responsable
+
+                </th>
+
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+
                   Fecha ingreso
 
                 </th>
@@ -326,6 +332,14 @@ export default function VehicleTable({
 
                       {vehicle.estado}
 
+                    </span>
+
+                  </td>
+
+                  <td className="px-6 py-4 text-gray-700">
+
+                    <span className="font-medium text-gray-900">
+                      {vehicle.assigned_mechanic_name || 'Sin asignar'}
                     </span>
 
                   </td>

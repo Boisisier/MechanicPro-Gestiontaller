@@ -215,3 +215,8 @@ UPDATE roles
 SET modules = ARRAY['Dashboard', 'VehÃ­culos', 'Presupuesto', 'Inventario', 'Estacionamiento', 'Reportes', 'ConfiguraciÃ³n', 'Registro de acciones'],
     updated_at = now()
 WHERE name = 'Administrador de Taller';     
+
+UPDATE roles
+SET modules = ARRAY['Vehículos', 'Reportes'],
+    updated_at = now()
+WHERE name = 'Mecánico';
