@@ -64,6 +64,7 @@ import {
   History,
   Package,
   Wrench,
+  Clock,
 } from "lucide-react";
 
 import { toSoftAccent } from "./utils/colors";
@@ -211,6 +212,8 @@ function App() {
   const [reviewServices, setReviewServices] = useState<ReviewServiceItem[]>([]);
 
   const [reviewParts, setReviewParts] = useState<ReviewPartItem[]>([]);
+
+  const [workClockNow, setWorkClockNow] = useState(() => Date.now());
 
   const [serviceSearch, setServiceSearch] = useState("");
 
@@ -389,6 +392,11 @@ function App() {
   useEffect(() => {
     localStorage.setItem("auditLogs", JSON.stringify(auditLogs));
   }, [auditLogs]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setWorkClockNow(Date.now()), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     setAuditPage(1);
@@ -878,9 +886,15 @@ function App() {
 
     customer_advance: vehicle.customer_advance || 0,
 
-    servicios: vehicle.servicios || [],
+    attention_priority: vehicle.attention_priority || "Normal",
 
-    fallas_detectadas: vehicle.fallas_detectadas || [],
+    estimated_work_hours: vehicle.estimated_work_hours || 0,
+
+    promised_delivery_date: vehicle.promised_delivery_date || null,
+
+    customer_authorized: vehicle.customer_authorized || false,
+
+    servicios: vehicle.servicios || [],
 
     observaciones: vehicle.observaciones || "",
 
@@ -1522,6 +1536,25 @@ function App() {
 
   const isParkingNotificationDay = [1, 4].includes(new Date().getDay());
 
+  const getVehicleWorkElapsedSeconds = (vehicle: Vehicle) => {
+    const accumulated = Math.max(0, Number(vehicle.work_elapsed_seconds) || 0);
+    if (!vehicle.work_timer_started_at) {
+      return accumulated;
+    }
+    const startedAt = new Date(vehicle.work_timer_started_at).getTime();
+    if (Number.isNaN(startedAt)) {
+      return accumulated;
+    }
+    return accumulated + Math.max(0, Math.floor((workClockNow - startedAt) / 1000));
+  };
+
+  const formatVehicleWorkTime = (vehicle: Vehicle) => {
+    const totalMinutes = Math.floor(getVehicleWorkElapsedSeconds(vehicle) / 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${hours} h ${minutes.toString().padStart(2, "0")} min`;
+  };
+
   const getVehicleWorkTotal = (vehicle: Vehicle) => {
     const serviceTotal = parseStoredReviewServices(vehicle.servicios).reduce(
       (sum, service) => sum + (parseInt(service.price || "0", 10) || 0),
@@ -2133,6 +2166,11 @@ function App() {
                         <p className="mt-1 text-xs font-semibold text-blue-800">
                           Mecánico: {activeReviewVehicle.assigned_mechanic_name || "Sin asignar"}
                         </p>
+                        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600">
+                          <span>Prioridad: <strong>{activeReviewVehicle.attention_priority || "Normal"}</strong></span>
+                          <span>Plan: <strong>{Number(activeReviewVehicle.estimated_work_hours) || 0} h</strong></span>
+                          <span>Entrega: <strong>{activeReviewVehicle.promised_delivery_date ? new Date(`${activeReviewVehicle.promised_delivery_date}T00:00:00`).toLocaleDateString("es-CL") : "Sin fecha"}</strong></span>
+                        </div>
                       </div>
                     )}
 
@@ -2178,8 +2216,22 @@ function App() {
                             <p className="mt-2 text-xs font-semibold text-gray-500">
                               Sigue En Taller hasta pasar a salida
                             </p>
+                            <p className="mt-1 text-xs text-gray-500">
+                              {vehicle.attention_priority || "Normal"} · {Number(vehicle.estimated_work_hours) || 0} h estimadas
+                            </p>
                           </button>
-                            <div className="mt-3 flex justify-end">
+                            <div className="mt-3 flex flex-col items-end gap-2">
+                              <div className="flex items-center gap-2 text-right">
+                                <Clock className="h-4 w-4 text-[#0f3a63]" />
+                                <div>
+                                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                                    Tiempo de trabajo
+                                  </p>
+                                  <p className="text-sm font-bold text-[#0f3a63]">
+                                    {formatVehicleWorkTime(vehicle)}
+                                  </p>
+                                </div>
+                              </div>
                               <button
                                 type="button"
                                 onClick={() => handleReturnFromTaller(vehicle)}
@@ -2706,7 +2758,7 @@ function App() {
                         )}
 
                         <div>
-                          {canViewPrices && (
+                          {canEditPrices && (
                           <div className="mb-6 rounded-xl border border-[#0f3a63]/20 bg-white p-4 shadow-sm">
                             <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                               <div>
@@ -2722,7 +2774,7 @@ function App() {
                               </p>
                             </div>
 
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
                               <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                                   Servicios
@@ -2745,6 +2797,26 @@ function App() {
                                 </p>
                                 <p className="mt-1 text-lg font-bold text-gray-900">
                                   ${reviewSupplyTotal.toLocaleString("es-CL")}
+                                </p>
+                              </div>
+                              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                                  Abono cliente
+                                </p>
+                                <p className="mt-1 text-lg font-bold text-emerald-800">
+                                  ${(Number(activeReviewVehicle?.customer_advance) || 0).toLocaleString("es-CL")}
+                                </p>
+                              </div>
+                              <div className="rounded-lg border border-[#0f3a63]/20 bg-[#0f3a63]/5 px-4 py-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-[#0f3a63]">
+                                  Saldo pendiente
+                                </p>
+                                <p className="mt-1 text-lg font-bold text-[#0f3a63]">
+                                  ${Math.max(
+                                    0,
+                                    reviewAttentionTotal -
+                                      (Number(activeReviewVehicle?.customer_advance) || 0),
+                                  ).toLocaleString("es-CL")}
                                 </p>
                               </div>
                             </div>
@@ -2944,10 +3016,6 @@ function App() {
                               </p>
 
                               <p className="text-xs text-gray-500">
-                                Fallas: {vehicle.fallas_detectadas?.length || 0}
-                              </p>
-
-                              <p className="text-xs text-gray-500">
                                 Estado: {vehicle.estado}
                               </p>
                             </div>
@@ -2971,23 +3039,6 @@ function App() {
                               ) : (
                                 <p className="text-xs text-gray-500 mt-2">
                                   Sin servicios registrados.
-                                </p>
-                              )}
-
-                              <p className="mt-4 text-xs uppercase tracking-wide text-gray-500">
-                                Fallas ingreso
-                              </p>
-
-                              {vehicle.fallas_detectadas &&
-                              vehicle.fallas_detectadas.length > 0 ? (
-                                <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-gray-700">
-                                  {vehicle.fallas_detectadas.map((failure) => (
-                                    <li key={failure}>{failure}</li>
-                                  ))}
-                                </ul>
-                              ) : (
-                                <p className="mt-2 text-xs text-gray-500">
-                                  Sin fallas seleccionadas.
                                 </p>
                               )}
 

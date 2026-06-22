@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, History, RotateCcw, Save, Search, Send, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, History, RotateCcw, Save, Search, Send, X } from 'lucide-react';
 import { getModelsForBrand, vehicleBrandNames } from '../../features/vehicles/vehicleModelCatalog';
 import { serviceCatalogByCategory } from '../../features/vehicles/serviceCatalog';
 import ConfirmDialog from '../ui/ConfirmDialog';
 
-type PreviousVehicleData = Partial<VehicleFormData> & {
+type PreviousVehicleData = Omit<Partial<VehicleFormData>, 'promised_delivery_date'> & {
   id?: string;
   patente: string;
+  promised_delivery_date?: string | null;
   fecha_ingreso?: string;
   created_at?: string;
 };
@@ -17,14 +18,14 @@ const formSteps = [
   'Datos de Vehículo y Datos de Ingreso Actual',
   'Datos de Cliente',
   'Observaciones Iniciales y Comentario Técnico',
-  'Posibles Fallas, Asignación y Abono',
+  'Planificación de la atención',
 ];
 
 const requiredFieldsByStep = [
   ['patente', 'marca', 'modelo', 'ano'],
   ['customer_name', 'customer_rut', 'customer_phone', 'customer_address', 'customer_city', 'customer_email'],
   [],
-  ['customer_advance'],
+  ['attention_priority', 'estimated_work_hours', 'promised_delivery_date', 'customer_authorized'],
 ];
 
 interface VehicleFormProps {
@@ -57,10 +58,13 @@ export interface VehicleFormData {
   assigned_mechanic_id: string;
   assigned_mechanic_name: string;
   customer_advance: number;
+  attention_priority: 'Baja' | 'Normal' | 'Alta' | 'Urgente';
+  estimated_work_hours: number;
+  promised_delivery_date: string;
+  customer_authorized: boolean;
   servicios: string[];
   observaciones: string;
   comentario_tecnico: string;
-  fallas_detectadas: string[];
 }
 
 const initialFormData: VehicleFormData = {
@@ -84,73 +88,14 @@ const initialFormData: VehicleFormData = {
   assigned_mechanic_id: '',
   assigned_mechanic_name: '',
   customer_advance: 0,
+  attention_priority: 'Normal',
+  estimated_work_hours: 0,
+  promised_delivery_date: '',
+  customer_authorized: false,
   servicios: [],
   observaciones: '',
   comentario_tecnico: '',
-  fallas_detectadas: [],
 };
-
-const failureChecklist = [
-  {
-    category: 'Motor',
-    groups: [
-      { label: 'Niveles', items: ['Aceite', 'Refrigerante'] },
-      { label: 'Fugas', items: ['Aceite', 'Refrigerante'] },
-      { label: 'Componentes', items: ['Bujías', 'Filtro de aceite', 'Mangueras', 'Correas de mando'] },
-      { label: 'Línea de escape', items: ['Estado', 'Fugas'] },
-    ],
-  },
-  {
-    category: 'Transmisión',
-    groups: [
-      { label: 'Aceite', items: ['Nivel de aceite', 'Fuga de aceite'] },
-      { label: 'Estado embrague', items: ['Dureza', 'Desgaste'] },
-    ],
-  },
-  {
-    category: 'Dirección',
-    groups: [
-      { label: 'Sistema', items: ['Nivel de líquido', 'Terminales'] },
-    ],
-  },
-  {
-    category: 'Frenos',
-    groups: [
-      { label: 'Desgaste', items: ['Pastillas', 'Balatas'] },
-      { label: 'Fuga de líquido', items: ['Nivel de líquido'] },
-      { label: 'Regulación', items: ['Freno de mano'] },
-    ],
-  },
-  {
-    category: 'Ejes',
-    groups: [
-      { label: 'Estado', items: ['Fuelles', 'Soporte'] },
-    ],
-  },
-  {
-    category: 'Suspensión y amortiguación',
-    groups: [
-      { label: 'Suspensión', items: ['Estado de rótulas de suspensión', 'Bujes de bandeja'] },
-      { label: 'Amortiguadores', items: ['Dureza', 'Humedad'] },
-      { label: 'Neumáticos', items: ['Estado', 'Presión'] },
-    ],
-  },
-  {
-    category: 'Electricidad',
-    groups: [
-      { label: 'Bateria', items: ['Estado', 'Nivel', 'Densidad'] },
-      { label: 'Luces', items: ['Interior', 'Exterior'] },
-      { label: 'Sistema', items: ['Bocina', 'Aire acondicionado'] },
-    ],
-  },
-  {
-    category: 'Carroceria',
-    groups: [
-      { label: 'Estado exterior', items: ['Puertas', 'Pintura y superficie'] },
-      { label: 'Limpia parabrisas', items: ['Estado de plumillas'] },
-    ],
-  },
-];
 
 const formatPatente = (value: string) => {
   const normalized = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
@@ -209,10 +154,13 @@ const buildFormDataFromPreviousVisit = (vehicle: PreviousVehicleData, patente: s
   assigned_mechanic_id: '',
   assigned_mechanic_name: '',
   customer_advance: 0,
+  attention_priority: 'Normal',
+  estimated_work_hours: 0,
+  promised_delivery_date: '',
+  customer_authorized: false,
   servicios: [],
   observaciones: '',
   comentario_tecnico: '',
-  fallas_detectadas: [],
 });
 
 export default function VehicleForm({
@@ -235,13 +183,9 @@ export default function VehicleForm({
   const [lookupTerm, setLookupTerm] = useState('');
   const [brandFocused, setBrandFocused] = useState(false);
   const [modelFocused, setModelFocused] = useState(false);
-  const [failureSearch, setFailureSearch] = useState('');
   const [serviceSearch, setServiceSearch] = useState('');
   const [serviceCatalogOpen, setServiceCatalogOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
-  const [openFailureCategories, setOpenFailureCategories] = useState<string[]>([
-    failureChecklist[0].category,
-  ]);
   const availableModels = getModelsForBrand(formData.marca);
   const brandSuggestions = vehicleBrandNames
     .filter((brand) => normalizeSearch(brand).includes(normalizeSearch(formData.marca)))
@@ -249,27 +193,6 @@ export default function VehicleForm({
   const modelSuggestions = availableModels
     .filter((model) => normalizeSearch(model).includes(normalizeSearch(formData.modelo)))
     .slice(0, 8);
-  const selectedFailures = formData.fallas_detectadas;
-  const filteredFailureChecklist = failureChecklist
-    .map((section) => ({
-      ...section,
-      groups: section.groups
-        .map((group) => ({
-          ...group,
-          items: group.items.filter((item) => {
-            const value = `${section.category} > ${group.label} > ${item}`;
-            const search = normalizeSearch(failureSearch);
-            return (
-              !search ||
-              normalizeSearch(value).includes(search) ||
-              selectedFailures.includes(value)
-            );
-          }),
-        }))
-        .filter((group) => group.items.length > 0),
-    }))
-    .filter((section) => section.groups.length > 0);
-  const hasFailureSearch = failureSearch.trim().length > 0;
   const normalizedServiceSearch = normalizeSearch(serviceSearch);
   const filteredServiceCatalog = serviceCatalogByCategory
     .map((category) => ({
@@ -390,20 +313,10 @@ export default function VehicleForm({
       ...prev,
       [name]: ['ano', 'kilometraje', 'cantidad_combustible', 'customer_advance'].includes(name)
         ? parseInt(value) || 0
-        : value,
+        : name === 'estimated_work_hours'
+          ? parseFloat(value) || 0
+          : value,
     }));
-  };
-
-  const handleFailureToggle = (failure: string) => {
-    setFormData((prev) => {
-      const exists = prev.fallas_detectadas.includes(failure);
-      return {
-        ...prev,
-        fallas_detectadas: exists
-          ? prev.fallas_detectadas.filter((item) => item !== failure)
-          : [...prev.fallas_detectadas, failure],
-      };
-    });
   };
 
   const handleServiceToggle = (service: string) => {
@@ -413,24 +326,6 @@ export default function VehicleForm({
         ? prev.servicios.filter((item) => item !== service)
         : [...prev.servicios, service],
     }));
-  };
-
-  const toggleFailureCategory = (category: string) => {
-    setOpenFailureCategories((prev) =>
-      prev.includes(category)
-        ? prev.filter((item) => item !== category)
-        : [...prev, category],
-    );
-  };
-
-  const handleClearFailures = () => {
-    setFormData((prev) => ({ ...prev, fallas_detectadas: [] }));
-    setFailureSearch('');
-  };
-
-  const getFailureParts = (failure: string) => {
-    const [category = '', group = '', item = failure] = failure.split(' > ');
-    return { category, group, item };
   };
 
   const getInvalidFieldForStep = (step: number) =>
@@ -789,7 +684,7 @@ export default function VehicleForm({
           </div>
         </div>
 
-        <div className={[0, 2, 3].includes(currentStep) ? "rounded-xl border border-emerald-100 bg-emerald-50/40 p-5 shadow-sm" : "hidden"}>
+        <div className={[0, 2].includes(currentStep) ? "rounded-xl border border-emerald-100 bg-emerald-50/40 p-5 shadow-sm" : "hidden"}>
           <div className={currentStep === 0 ? "" : "hidden"}>
           <h4 className="mb-4 inline-flex rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm">Datos del ingreso actual</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -842,158 +737,7 @@ export default function VehicleForm({
         </div>
           </div>
 
-          <div className={currentStep === 3 ? "mt-1" : "hidden"}>
-            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <h5 className="inline-flex rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm">
-                  Posibles fallas al ingreso
-                </h5>
-                <p className="mt-2 text-xs text-gray-500">
-                  {selectedFailures.length} seleccionada(s) para informar al mecánico en taller.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="search"
-                    value={failureSearch}
-                    onChange={(event) => setFailureSearch(event.target.value)}
-                    className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm focus:border-[#0f3a63] focus:outline-none focus:ring-2 focus:ring-[#0f3a63]/20 sm:w-64"
-                    placeholder="Buscar falla"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleClearFailures}
-                  disabled={selectedFailures.length === 0 && !failureSearch}
-                  className="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Limpiar fallas
-                </button>
-              </div>
-            </div>
-
-            {selectedFailures.length > 0 && (
-              <div className="mb-4 rounded-lg border border-[#0f3a63]/15 bg-[#0f3a63]/5 px-4 py-3">
-                <div className="flex flex-wrap gap-2">
-                  {selectedFailures.map((failure) => {
-                    const { category, group, item } = getFailureParts(failure);
-
-                    return (
-                      <button
-                        key={failure}
-                        type="button"
-                        onClick={() => handleFailureToggle(failure)}
-                        className="inline-flex max-w-full items-center gap-2 rounded-lg bg-white px-3 py-2 text-left shadow-sm ring-1 ring-[#0f3a63]/15 hover:bg-red-50 hover:text-red-700 hover:ring-red-200"
-                        title={failure}
-                      >
-                        <span className="min-w-0">
-                          <span className="block truncate text-xs font-semibold text-[#0f3a63]">
-                            {item}
-                          </span>
-                          <span className="block truncate text-[11px] font-medium text-gray-500">
-                            {category} / {group}
-                          </span>
-                        </span>
-                        <X className="h-3.5 w-3.5 shrink-0" />
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-              {filteredFailureChecklist.length === 0 ? (
-                <p className="px-4 py-8 text-center text-sm text-gray-500">
-                  No se encontraron fallas con ese criterio.
-                </p>
-              ) : (
-                filteredFailureChecklist.map((section, index) => {
-                  const sectionFailures = selectedFailures.filter((failure) =>
-                    failure.startsWith(`${section.category} > `),
-                  );
-                  const isOpen =
-                    hasFailureSearch ||
-                    openFailureCategories.includes(section.category) ||
-                    sectionFailures.length > 0;
-
-                  return (
-                    <div
-                      key={section.category}
-                      className={index > 0 ? 'border-t border-gray-200' : ''}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => toggleFailureCategory(section.category)}
-                        className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left hover:bg-gray-50"
-                      >
-                        <div className="flex min-w-0 items-center gap-3">
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0f3a63]/10 text-sm font-bold text-[#0f3a63]">
-                            {sectionFailures.length}
-                          </span>
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-gray-900">
-                              {section.category}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {section.groups.length} grupo(s) disponible(s)
-                            </p>
-                          </div>
-                        </div>
-                        <ChevronDown
-                          className={`h-5 w-5 shrink-0 text-gray-500 transition-transform ${
-                            isOpen ? 'rotate-180' : ''
-                          }`}
-                        />
-                      </button>
-
-                      {isOpen && (
-                        <div className="border-t border-gray-100 bg-gray-50/50 px-4 py-4">
-                          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
-                            {section.groups.map((group) => (
-                              <div key={`${section.category}-${group.label}`}>
-                                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                                  {group.label}
-                                </p>
-                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1">
-                                  {group.items.map((item) => {
-                                    const value = `${section.category} > ${group.label} > ${item}`;
-                                    const checked = selectedFailures.includes(value);
-
-                                    return (
-                                      <label
-                                        key={value}
-                                        className={`flex min-h-10 items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                                          checked
-                                            ? 'border-[#0f3a63] bg-[#0f3a63]/10 text-[#0f3a63]'
-                                            : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
-                                        }`}
-                                      >
-                                        <input
-                                          type="checkbox"
-                                          checked={checked}
-                                          onChange={() => handleFailureToggle(value)}
-                                          className="h-4 w-4 rounded border-gray-300 text-[#0f3a63] focus:ring-[#0f3a63]"
-                                        />
-                                        <span className="leading-snug">{item}</span>
-                                      </label>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
+          
 
           <div className={currentStep === 2 ? "mb-4" : "hidden"}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1234,9 +978,9 @@ export default function VehicleForm({
           </div>
         </div>
 
-        <div className={currentStep === 3 ? "rounded-xl border border-violet-100 bg-violet-50/40 p-5 shadow-sm" : "hidden"}>
-          <h4 className="mb-4 inline-flex rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm">Asignación de reparación</h4>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className={currentStep === 3 ? "rounded-xl border border-blue-100 bg-blue-50/30 p-5 shadow-sm" : "hidden"}>
+          <h4 className="mb-4 inline-flex rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm">Planificación de la atención</h4>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
             <div>
               <label htmlFor="assigned_mechanic_id" className="block text-sm font-medium text-gray-700 mb-2">
                 Mecánico asignado
@@ -1256,8 +1000,25 @@ export default function VehicleForm({
                 ))}
               </select>
             </div>
+            <div>
+              <label htmlFor="attention_priority" className="block text-sm font-medium text-gray-700 mb-2">Prioridad *</label>
+              <select id="attention_priority" name="attention_priority" value={formData.attention_priority} onChange={handleChange} required className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                <option value="Baja">Baja</option>
+                <option value="Normal">Normal</option>
+                <option value="Alta">Alta</option>
+                <option value="Urgente">Urgente</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="estimated_work_hours" className="block text-sm font-medium text-gray-700 mb-2">Horas estimadas *</label>
+              <input type="number" id="estimated_work_hours" name="estimated_work_hours" value={formData.estimated_work_hours || ''} onChange={handleChange} min="0.5" step="0.5" required className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" placeholder="Ej. 4,5" />
+            </div>
+            <div>
+              <label htmlFor="promised_delivery_date" className="block text-sm font-medium text-gray-700 mb-2">Fecha comprometida *</label>
+              <input type="date" id="promised_delivery_date" name="promised_delivery_date" value={formData.promised_delivery_date} onChange={handleChange} min={new Date().toLocaleDateString('en-CA')} required className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
             {canManageAdvance && (
-              <div>
+              <div className="md:col-span-2">
                 <label htmlFor="customer_advance" className="block text-sm font-medium text-gray-700 mb-2">
                   Abono del cliente
                 </label>
@@ -1278,11 +1039,31 @@ export default function VehicleForm({
                 </p>
               </div>
             )}
-            {formData.assigned_mechanic_name && (
-              <div className={`rounded-lg border border-violet-100 bg-white px-4 py-3 text-sm text-gray-600 ${canManageAdvance ? 'md:col-span-2' : ''}`}>
-                Responsable: {formData.assigned_mechanic_name}
-              </div>
-            )}
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-blue-200 bg-white px-4 py-3 md:col-span-2">
+              <input
+                type="checkbox"
+                id="customer_authorized"
+                checked={formData.customer_authorized}
+                onChange={(event) => setFormData((previous) => ({ ...previous, customer_authorized: event.target.checked }))}
+                required
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#0f3a63] focus:ring-[#0f3a63]"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-gray-800">Autorización del cliente *</span>
+                <span className="mt-0.5 block text-xs text-gray-500">El cliente autorizó el diagnóstico y los servicios seleccionados para iniciar la atención.</span>
+              </span>
+            </label>
+          </div>
+
+          <div className="mt-5 border-t border-blue-100 pt-4">
+            <h5 className="text-sm font-semibold text-gray-900">Resumen antes de enviar a En Taller</h5>
+            <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3 text-sm md:grid-cols-4">
+              <div><dt className="text-gray-500">Vehículo</dt><dd className="mt-0.5 font-medium text-gray-900">{formData.patente || 'Sin patente'}</dd></div>
+              <div><dt className="text-gray-500">Servicios</dt><dd className="mt-0.5 font-medium text-gray-900">{formData.servicios.length} seleccionado(s)</dd></div>
+              <div><dt className="text-gray-500">Responsable</dt><dd className="mt-0.5 font-medium text-gray-900">{formData.assigned_mechanic_name || 'Sin asignar'}</dd></div>
+              <div><dt className="text-gray-500">Planificación</dt><dd className="mt-0.5 font-medium text-gray-900">{formData.estimated_work_hours || 0} h · {formData.attention_priority}</dd></div>
+              {canManageAdvance && <div><dt className="text-gray-500">Abono</dt><dd className="mt-0.5 font-medium text-gray-900">${formData.customer_advance.toLocaleString('es-CL')}</dd></div>}
+            </dl>
           </div>
         </div>
 

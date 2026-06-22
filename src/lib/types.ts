@@ -11,6 +11,13 @@ export interface Vehicle {
   assigned_mechanic_id?: string;
   assigned_mechanic_name?: string;
   customer_advance?: number;
+  attention_priority?: "Baja" | "Normal" | "Alta" | "Urgente";
+  estimated_work_hours?: number;
+  promised_delivery_date?: string | null;
+  customer_authorized?: boolean;
+  customer_authorized_at?: string | null;
+  work_timer_started_at?: string | null;
+  work_elapsed_seconds?: number;
   patente: string;
   marca: string;
   modelo: string;
@@ -23,7 +30,6 @@ export interface Vehicle {
   cantidad_combustible: number;
   estado: VehicleStatus;
   servicios?: string[];
-  fallas_detectadas?: string[];
   observaciones: string;
   comentario_tecnico?: string;
   salida_confirmada?: boolean;

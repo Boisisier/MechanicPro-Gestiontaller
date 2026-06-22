@@ -113,6 +113,13 @@ const ensureVehicleColumns = async () => {
       assigned_mechanic_id uuid,
       assigned_mechanic_name text default '',
       customer_advance numeric(12,2) not null default 0 check (customer_advance >= 0),
+      attention_priority text not null default 'Normal',
+      estimated_work_hours numeric(8,2) not null default 0 check (estimated_work_hours >= 0),
+      promised_delivery_date date,
+      customer_authorized boolean not null default false,
+      customer_authorized_at timestamptz,
+      work_timer_started_at timestamptz,
+      work_elapsed_seconds bigint not null default 0 check (work_elapsed_seconds >= 0),
       patente text not null,
       marca text not null,
       modelo text not null,
@@ -125,7 +132,6 @@ const ensureVehicleColumns = async () => {
       cantidad_combustible integer not null default 0,
       estado text not null default 'Ingresado',
       servicios text[] not null default '{}',
-      fallas_detectadas text[] not null default '{}',
       observaciones text default '',
       comentario_tecnico text default '',
       salida_confirmada boolean not null default false,
@@ -238,11 +244,27 @@ const ensureVehicleColumns = async () => {
       add column if not exists assigned_mechanic_id uuid,
       add column if not exists assigned_mechanic_name text default '',
       add column if not exists customer_advance numeric(12,2) not null default 0,
-      add column if not exists fallas_detectadas text[] default '{}',
+      add column if not exists attention_priority text not null default 'Normal',
+      add column if not exists estimated_work_hours numeric(8,2) not null default 0,
+      add column if not exists promised_delivery_date date,
+      add column if not exists customer_authorized boolean not null default false,
+      add column if not exists customer_authorized_at timestamptz,
+      add column if not exists work_timer_started_at timestamptz,
+      add column if not exists work_elapsed_seconds bigint not null default 0,
       add column if not exists comentario_tecnico text default '',
       add column if not exists salida_confirmada boolean not null default false,
       add column if not exists fecha_salida_confirmada timestamptz,
       add column if not exists en_estacionamiento_manual boolean not null default false
+  `);
+  await pool.query('alter table vehicles drop column if exists fallas_detectadas');
+  await pool.query('alter table vehicles drop constraint if exists vehicles_attention_priority_check');
+  await pool.query('alter table vehicles drop constraint if exists vehicles_estimated_work_hours_nonnegative');
+  await pool.query(`
+    alter table vehicles
+      add constraint vehicles_attention_priority_check
+        check (attention_priority in ('Baja', 'Normal', 'Alta', 'Urgente')),
+      add constraint vehicles_estimated_work_hours_nonnegative
+        check (estimated_work_hours >= 0)
   `);
   await pool.query('alter table vehicles drop constraint if exists vehicles_estado_check');
   await pool.query('alter table vehicles drop constraint if exists vehicles_estado_chk');
@@ -263,9 +285,13 @@ const ensureVehicleColumns = async () => {
     alter table inventory_items
       add column if not exists item_type text not null default 'repuesto'
   `);
-  await pool.query("update vehicles set fallas_detectadas = '{}' where fallas_detectadas is null");
-  await pool.query("alter table vehicles alter column fallas_detectadas set default '{}'");
-  await pool.query('alter table vehicles alter column fallas_detectadas set not null');
+  await pool.query(`
+    update vehicles
+    set work_timer_started_at = coalesce(updated_at, now())
+    where estado = 'En Taller'
+      and work_timer_started_at is null
+      and (assigned_mechanic_id is not null or assigned_mechanic_name <> '')
+  `);
   await pool.query(`
     alter table vehicles
       drop constraint if exists vehicles_company_patente_unique
@@ -1364,9 +1390,6 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
   if (!Array.isArray(req.body.servicios)) {
     req.body.servicios = [];
   }
-  if (!Array.isArray(req.body.fallas_detectadas)) {
-    req.body.fallas_detectadas = [];
-  }
   req.body.patente = normalizePatente(req.body.patente);
 
   const errorMessage = validateVehicle(req.body);
@@ -1395,8 +1418,11 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
     assigned_mechanic_id = null,
     assigned_mechanic_name = '',
     customer_advance = 0,
+    attention_priority = 'Normal',
+    estimated_work_hours = 0,
+    promised_delivery_date = null,
+    customer_authorized = false,
     servicios = [],
-    fallas_detectadas = [],
     observaciones = '',
     comentario_tecnico = '',
     salida_confirmada = false,
@@ -1414,31 +1440,35 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
   const customerAdvanceToPersist = isWorkshopAdminRole(req.user.role)
     ? parsedCustomerAdvance
     : 0;
+  const parsedEstimatedWorkHours = Number(estimated_work_hours);
+  if (
+    !['Baja', 'Normal', 'Alta', 'Urgente'].includes(attention_priority) ||
+    !Number.isFinite(parsedEstimatedWorkHours) ||
+    parsedEstimatedWorkHours < 0 ||
+    (promised_delivery_date && (
+      !/^\d{4}-\d{2}-\d{2}$/.test(promised_delivery_date) ||
+      Number.isNaN(Date.parse(`${promised_delivery_date}T00:00:00Z`))
+    ))
+  ) {
+    return res.status(400).json({ error: 'invalid_attention_planning' });
+  }
+  const customerAuthorized = customer_authorized === true;
+  const customerAuthorizedAt = customerAuthorized ? new Date().toISOString() : null;
 
   try {
     let servicesToPersist = servicios;
     if (isMechanicRole(req.user.role)) {
-      if (estado === 'Entregado' || Boolean(salida_confirmada) || fecha_salida_confirmada) {
+      if (estado === 'Entregado' || Boolean(salida_confirmada)) {
         return res.status(403).json({ error: 'mechanic_cannot_close_vehicle' });
       }
-      const existing = await pool.query(
-        'select servicios from vehicles where id = $1 and company_id = $2',
-        [id, companyId]
-      );
-      if (existing.rows.length === 0) {
-        return res.status(404).json({ error: 'not_found' });
-      }
-      servicesToPersist = mergeMechanicServicesWithStoredPrices(
-        existing.rows[0].servicios || [],
-        servicios || []
-      );
+      servicesToPersist = sanitizeServicesForMechanic(servicios || []);
     }
 
     const { rows } = await pool.query(
       `insert into vehicles
-        (company_id, customer_name, customer_rut, customer_phone, customer_address, customer_city, customer_email, assigned_mechanic_id, assigned_mechanic_name, customer_advance, patente, marca, modelo, ano, tipo_vehiculo, codigo_vin, codigo_motor, color, kilometraje, cantidad_combustible, estado, servicios, fallas_detectadas, observaciones, comentario_tecnico, salida_confirmada, fecha_salida_confirmada, en_estacionamiento_manual)
+        (company_id, customer_name, customer_rut, customer_phone, customer_address, customer_city, customer_email, assigned_mechanic_id, assigned_mechanic_name, customer_advance, attention_priority, estimated_work_hours, promised_delivery_date, customer_authorized, customer_authorized_at, patente, marca, modelo, ano, tipo_vehiculo, codigo_vin, codigo_motor, color, kilometraje, cantidad_combustible, estado, servicios, observaciones, comentario_tecnico, salida_confirmada, fecha_salida_confirmada, en_estacionamiento_manual)
        values
-        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
+        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)
        returning *`,
       [
         companyId,
@@ -1451,6 +1481,11 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
         normalizeUuid(assigned_mechanic_id),
         assigned_mechanic_name,
         customerAdvanceToPersist,
+        attention_priority,
+        parsedEstimatedWorkHours,
+        promised_delivery_date || null,
+        customerAuthorized,
+        customerAuthorizedAt,
         patente,
         marca,
         modelo,
@@ -1463,7 +1498,6 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
         cantidad_combustible,
         estado,
         servicesToPersist,
-        fallas_detectadas,
         observaciones,
         comentario_tecnico,
         Boolean(salida_confirmada),
@@ -1471,6 +1505,19 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
         Boolean(en_estacionamiento_manual),
       ]
     );
+
+    if (estado === 'En Taller' && normalizeUuid(assigned_mechanic_id)) {
+      const timerResult = await pool.query(
+        `update vehicles
+         set work_timer_started_at = coalesce(work_timer_started_at, now())
+         where id = $1 and company_id = $2
+         returning *`,
+        [rows[0].id, companyId]
+      );
+      if (timerResult.rows[0]) {
+        rows[0] = timerResult.rows[0];
+      }
+    }
 
     res.status(201).json(sanitizeVehicleForRole(rows[0], req.user.role));
   } catch (error) {
@@ -1485,9 +1532,6 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
 app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   req.body.patente = normalizePatente(req.body.patente);
-  if (!Array.isArray(req.body.fallas_detectadas)) {
-    req.body.fallas_detectadas = [];
-  }
 
   const errorMessage = validateVehicle(req.body);
   if (errorMessage) {
@@ -1516,8 +1560,11 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
     assigned_mechanic_id = null,
     assigned_mechanic_name = '',
     customer_advance = 0,
+    attention_priority = 'Normal',
+    estimated_work_hours = 0,
+    promised_delivery_date = null,
+    customer_authorized = false,
     servicios = [],
-    fallas_detectadas = [],
     observaciones = '',
     comentario_tecnico = '',
     salida_confirmada = false,
@@ -1526,6 +1573,38 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
   } = req.body;
 
   try {
+    const existingResult = await pool.query(
+      `select customer_advance, servicios, estado, assigned_mechanic_id,
+              customer_authorized, customer_authorized_at,
+              work_timer_started_at, work_elapsed_seconds
+       from vehicles
+       where id = $1 and company_id = $2`,
+      [id, companyId]
+    );
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+    const existingVehicle = existingResult.rows[0];
+
+    const parsedEstimatedWorkHours = Number(estimated_work_hours);
+    if (
+      !['Baja', 'Normal', 'Alta', 'Urgente'].includes(attention_priority) ||
+      !Number.isFinite(parsedEstimatedWorkHours) ||
+      parsedEstimatedWorkHours < 0 ||
+      (promised_delivery_date && (
+        !/^\d{4}-\d{2}-\d{2}$/.test(promised_delivery_date) ||
+        Number.isNaN(Date.parse(`${promised_delivery_date}T00:00:00Z`))
+      ))
+    ) {
+      return res.status(400).json({ error: 'invalid_attention_planning' });
+    }
+    const customerAuthorized = customer_authorized === true;
+    const customerAuthorizedAt = customerAuthorized
+      ? existingVehicle.customer_authorized && existingVehicle.customer_authorized_at
+        ? existingVehicle.customer_authorized_at
+        : new Date().toISOString()
+      : null;
+
     let customerAdvanceToPersist = Number(customer_advance);
     let servicesToPersist = servicios;
     if (isMechanicRole(req.user.role) && Boolean(salida_confirmada)) {
@@ -1536,20 +1615,37 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
         return res.status(400).json({ error: 'invalid_customer_advance' });
       }
     } else {
-      const existingAdvance = await pool.query(
-        'select customer_advance, servicios from vehicles where id = $1 and company_id = $2',
-        [id, companyId]
-      );
-      if (existingAdvance.rows.length === 0) {
-        return res.status(404).json({ error: 'not_found' });
-      }
-      customerAdvanceToPersist = Number(existingAdvance.rows[0].customer_advance) || 0;
+      customerAdvanceToPersist = Number(existingVehicle.customer_advance) || 0;
       if (isMechanicRole(req.user.role)) {
         servicesToPersist = mergeMechanicServicesWithStoredPrices(
-          existingAdvance.rows[0].servicios || [],
+          existingVehicle.servicios || [],
           servicios || []
         );
       }
+    }
+
+    const now = new Date();
+    let workTimerStartedAt = existingVehicle.work_timer_started_at
+      ? new Date(existingVehicle.work_timer_started_at)
+      : null;
+    let workElapsedSeconds = Math.max(
+      0,
+      Number(existingVehicle.work_elapsed_seconds) || 0,
+    );
+    const timerWasRunning = Boolean(
+      workTimerStartedAt && !Number.isNaN(workTimerStartedAt.getTime()),
+    );
+    const timerShouldRun =
+      estado === 'En Taller' && Boolean(normalizeUuid(assigned_mechanic_id));
+
+    if (timerWasRunning && !timerShouldRun && workTimerStartedAt) {
+      workElapsedSeconds += Math.max(
+        0,
+        Math.floor((now.getTime() - workTimerStartedAt.getTime()) / 1000),
+      );
+      workTimerStartedAt = null;
+    } else if (!timerWasRunning && timerShouldRun) {
+      workTimerStartedAt = now;
     }
 
     const { rows } = await pool.query(
@@ -1563,26 +1659,30 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
            assigned_mechanic_id = $7,
            assigned_mechanic_name = $8,
            customer_advance = $9,
-           patente = $10,
-           marca = $11,
-           modelo = $12,
-           ano = $13,
-           tipo_vehiculo = $14,
-           codigo_vin = $15,
-           codigo_motor = $16,
-           color = $17,
-           kilometraje = $18,
-           cantidad_combustible = $19,
-           estado = $20,
-           servicios = $21,
-           fallas_detectadas = $22,
-           observaciones = $23,
-           comentario_tecnico = $24,
-           salida_confirmada = $25,
-           fecha_salida_confirmada = $26,
-           en_estacionamiento_manual = $27,
+           attention_priority = $10,
+           estimated_work_hours = $11,
+           promised_delivery_date = $12,
+           customer_authorized = $13,
+           customer_authorized_at = $14,
+           patente = $15,
+           marca = $16,
+           modelo = $17,
+           ano = $18,
+           tipo_vehiculo = $19,
+           codigo_vin = $20,
+           codigo_motor = $21,
+           color = $22,
+           kilometraje = $23,
+           cantidad_combustible = $24,
+           estado = $25,
+           servicios = $26,
+           observaciones = $27,
+           comentario_tecnico = $28,
+           salida_confirmada = $29,
+           fecha_salida_confirmada = $30,
+           en_estacionamiento_manual = $31,
            updated_at = now()
-       where id = $28 and company_id = $29
+       where id = $32 and company_id = $33
        returning *`,
       [
         customer_name,
@@ -1594,6 +1694,11 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
         normalizeUuid(assigned_mechanic_id),
         assigned_mechanic_name,
         customerAdvanceToPersist,
+        attention_priority,
+        parsedEstimatedWorkHours,
+        promised_delivery_date || null,
+        customerAuthorized,
+        customerAuthorizedAt,
         patente,
         marca,
         modelo,
@@ -1606,7 +1711,6 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
         cantidad_combustible,
         estado,
         servicesToPersist,
-        fallas_detectadas,
         observaciones,
         comentario_tecnico,
         Boolean(salida_confirmada),
@@ -1621,7 +1725,21 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
       return res.status(404).json({ error: 'not_found' });
     }
 
-    res.json(sanitizeVehicleForRole(rows[0], req.user.role));
+    const timerResult = await pool.query(
+      `update vehicles
+       set work_timer_started_at = $1,
+           work_elapsed_seconds = $2
+       where id = $3 and company_id = $4
+       returning *`,
+      [
+        workTimerStartedAt ? workTimerStartedAt.toISOString() : null,
+        workElapsedSeconds,
+        id,
+        companyId,
+      ]
+    );
+
+    res.json(sanitizeVehicleForRole(timerResult.rows[0] || rows[0], req.user.role));
   } catch (error) {
     if (error.code === '23505') {
       return res.status(409).json({ error: 'patente_exists' });

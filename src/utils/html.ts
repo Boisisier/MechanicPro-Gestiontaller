@@ -23,7 +23,6 @@ export const exportVehiclePdf = (vehicle: Vehicle) => {
   );
   const serviceItems = parseStoredReviewServices(vehicle.servicios);
   const parts = parseStoredReviewParts(vehicle.servicios);
-  const failures = vehicle.fallas_detectadas || [];
   const serviceTotal = serviceItems.reduce(
     (sum, service) => sum + (parseInt(service.price || "0", 10) || 0),
     0,
@@ -202,16 +201,6 @@ ${
   services.length === 0
     ? '<p class="muted">Sin servicios registrados.</p>'
     : `<ul>${services.map((service) => `<li>${escapeHtml(service)}</li>`).join("")}</ul>`
-}
-
-
-
-<h2>Fallas declaradas al ingreso</h2>
-
-${
-  failures.length === 0
-    ? '<p class="muted">Sin fallas seleccionadas.</p>'
-    : `<ul>${failures.map((failure) => `<li>${escapeHtml(failure)}</li>`).join("")}</ul>`
 }
 
 
