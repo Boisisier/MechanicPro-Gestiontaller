@@ -19,13 +19,13 @@ export default function Toast({ notification, onClose }: ToastProps) {
         className={`flex items-start gap-3 rounded-xl border px-4 py-3 shadow-lg ${
           isSuccess
             ? "border-green-200 bg-green-50 text-green-900"
-            : "border-red-200 bg-red-50 text-red-900"
+            : "border-[#fc3d3c]/25 bg-[#fc3d3c]/10 text-[#7f1d1d]"
         }`}
       >
         {isSuccess ? (
           <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-green-700" />
         ) : (
-          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-700" />
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#fc3d3c]" />
         )}
         <p className="min-w-0 flex-1 text-sm font-medium leading-5">
           {notification.message}

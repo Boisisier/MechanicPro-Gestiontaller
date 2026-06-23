@@ -1,4 +1,4 @@
-ï»¿import { Bell, User, Menu, LogOut } from "lucide-react";
+import { Bell, User, Menu, LogOut } from "lucide-react";
 import { useState } from "react";
 
 interface HeaderProps {
@@ -31,8 +31,8 @@ export default function Header({
           <button
             type="button"
             onClick={onMenuClick}
-            className="rounded-lg border border-gray-200 p-2 text-gray-600 transition-colors hover:bg-gray-50 hover:text-[#0f3a63]"
-            aria-label="Abrir o cerrar menÃº lateral"
+            className="rounded-lg border border-gray-200 p-2 text-gray-600 transition-colors hover:bg-gray-50 hover:text-[#0f4471]"
+            aria-label="Abrir o cerrar menú lateral"
           >
             <Menu className="w-6 h-6" />
           </button>
@@ -41,7 +41,7 @@ export default function Header({
               Bienvenido al sistema
             </h2>
             <p className="text-xs lg:text-sm text-gray-500 hidden sm:block">
-              Gestiona tus vehÃ­culos de manera eficiente
+              Gestiona tus vehículos de manera eficiente
             </p>
           </div>
         </div>
@@ -121,7 +121,7 @@ export default function Header({
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                   >
                     <LogOut className="w-4 h-4" />
-                    Cerrar sesiÃ³n
+                    Cerrar sesión
                   </button>
                 </div>
               )}
@@ -146,7 +146,7 @@ export default function Header({
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                 >
                   <LogOut className="w-4 h-4" />
-                  Cerrar sesiÃ³n
+                  Cerrar sesión
                 </button>
               </div>
             )}

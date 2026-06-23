@@ -3,9 +3,14 @@
 @tailwind utilities;
 
 :root {
-  --accent: #2f6fed;
+  --brand-blue: #0f4471;
+  --brand-red: #fc3d3c;
+  --brand-white: #ffffff;
+  --brand-blue-dark: #0b365c;
+  --brand-red-dark: #df2f2f;
+  --accent: var(--brand-blue);
   --accent-contrast: #ffffff;
-  --accent-soft: #e7efff;
+  --accent-soft: #e7f0f7;
   --surface: #ffffff;
   --bg: #f3f4f8;
   --text: #101828;
@@ -39,6 +44,27 @@ body {
 
 .border-accent {
   border-color: var(--accent);
+}
+
+.btn-danger {
+  background: var(--brand-red);
+  color: var(--brand-white);
+}
+
+.btn-danger:hover {
+  background: var(--brand-red-dark);
+}
+
+.text-danger {
+  color: var(--brand-red);
+}
+
+.border-danger {
+  border-color: color-mix(in srgb, var(--brand-red) 35%, white);
+}
+
+.bg-danger-soft {
+  background-color: color-mix(in srgb, var(--brand-red) 10%, white);
 }
 
 .shadow-sm {

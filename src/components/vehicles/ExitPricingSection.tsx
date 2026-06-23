@@ -58,7 +58,7 @@ export default function ExitPricingSection({
             Completa los valores antes de finalizar la entrega.
           </p>
         </div>
-        <p className="text-xl font-bold text-[#0f3a63]">
+        <p className="text-xl font-bold text-[#0f4471]">
           ${(serviceTotal + inventoryTotal).toLocaleString("es-CL")}
         </p>
       </div>
@@ -89,7 +89,7 @@ export default function ExitPricingSection({
                     ),
                   )
                 }
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#0f3a63] focus:outline-none"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#0f4471] focus:outline-none"
                 placeholder="Valor del servicio"
                 aria-label={`Valor de ${service.name}`}
               />
@@ -122,7 +122,7 @@ export default function ExitPricingSection({
                       ),
                     );
                   }}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#0f3a63] focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#0f4471] focus:outline-none"
                   placeholder="Valor unitario"
                   aria-label={`Valor unitario de ${part.name}`}
                 />
@@ -140,7 +140,7 @@ export default function ExitPricingSection({
           type="button"
           onClick={handleSave}
           disabled={saving || (services.length === 0 && parts.length === 0)}
-          className="rounded-lg bg-[#0f3a63] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b2d4d] disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-[#0f4471] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b365c] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {saving ? "Guardando..." : "Guardar valores"}
         </button>

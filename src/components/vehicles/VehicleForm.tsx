@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, History, RotateCcw, Save, Search, Send, X } from 'lucide-react';
 import { getModelsForBrand, vehicleBrandNames } from '../../features/vehicles/vehicleModelCatalog';
 import { serviceCatalogByCategory } from '../../features/vehicles/serviceCatalog';
@@ -457,7 +457,7 @@ export default function VehicleForm({
         <div className="relative mx-5">
           <div className="absolute left-0 right-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-gray-200">
             <div
-              className="h-full rounded-full bg-[#0f3a63] transition-[width] duration-500 ease-out"
+              className="h-full rounded-full bg-[#0f4471] transition-[width] duration-500 ease-out"
               style={{
                 width: `${(currentStep / (formSteps.length - 1)) * 100}%`,
               }}
@@ -480,9 +480,9 @@ export default function VehicleForm({
                 aria-current={isActive ? 'step' : undefined}
                 className={`flex h-10 w-10 items-center justify-center rounded-full border-2 text-sm font-bold transition-colors ${
                   isActive
-                    ? 'border-[#0f3a63] bg-[#0f3a63] text-white shadow-sm ring-4 ring-[#0f3a63]/15'
+                    ? 'border-[#0f4471] bg-[#0f4471] text-white shadow-sm ring-4 ring-[#0f4471]/15'
                     : isCompleted
-                      ? 'border-[#0f3a63] bg-white text-[#0f3a63]'
+                      ? 'border-[#0f4471] bg-white text-[#0f4471]'
                       : 'border-gray-300 bg-white text-gray-400'
                 } disabled:cursor-not-allowed`}
               >
@@ -498,7 +498,7 @@ export default function VehicleForm({
         <button
           type="button"
           onClick={handleClear}
-          className="pointer-events-auto inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-red-700 focus:ring-4 focus:ring-red-200"
+          className="pointer-events-auto inline-flex items-center justify-center gap-2 rounded-lg bg-[#fc3d3c] px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-[#df2f2f] focus:ring-4 focus:ring-[#fc3d3c]/20"
         >
           <RotateCcw className="w-4 h-4" />
           {editingVehicle ? 'Cancelar edición' : 'Limpiar formulario'}
@@ -516,7 +516,7 @@ export default function VehicleForm({
           type="button"
           onClick={handleSendToReview}
           disabled={isSubmitting}
-          className="pointer-events-auto inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-50"
+          className="pointer-events-auto inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-green-700 focus:ring-4 focus:ring-green-200 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Send className="w-4 h-4" />
           Ingresar Vehículo
@@ -752,7 +752,7 @@ export default function VehicleForm({
               <button
                 type="button"
                 onClick={() => setServiceCatalogOpen((open) => !open)}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0f3a63] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b2d4d]"
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0f4471] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b365c]"
               >
                 <Search className="h-4 w-4" />
                 Buscar servicios
@@ -766,7 +766,7 @@ export default function VehicleForm({
                     key={service}
                     type="button"
                     onClick={() => handleServiceToggle(service)}
-                    className="inline-flex items-center gap-2 rounded-lg border border-[#0f3a63]/20 bg-white px-3 py-1.5 text-xs font-semibold text-[#0f3a63] hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+                    className="inline-flex items-center gap-2 rounded-lg border border-[#0f4471]/20 bg-white px-3 py-1.5 text-xs font-semibold text-[#0f4471] hover:border-[#fc3d3c]/30 hover:bg-[#fc3d3c]/10 hover:text-[#b42318]"
                     title="Quitar servicio"
                   >
                     {service}
@@ -785,7 +785,7 @@ export default function VehicleForm({
                       type="search"
                       value={serviceSearch}
                       onChange={(event) => setServiceSearch(event.target.value)}
-                      className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-[#0f3a63] focus:outline-none"
+                      className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-[#0f4471] focus:outline-none"
                       placeholder="Buscar servicio o sistema"
                     />
                   </div>
@@ -813,7 +813,7 @@ export default function VehicleForm({
                                   onClick={() => handleServiceToggle(service)}
                                   className={`flex min-h-10 items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
                                     selected
-                                      ? 'border-[#0f3a63] bg-[#0f3a63]/5 font-semibold text-[#0f3a63]'
+                                      ? 'border-[#0f4471] bg-[#0f4471]/5 font-semibold text-[#0f4471]'
                                       : 'border-gray-200 text-gray-700 hover:bg-gray-50'
                                   }`}
                                 >
@@ -1046,7 +1046,7 @@ export default function VehicleForm({
                 checked={formData.customer_authorized}
                 onChange={(event) => setFormData((previous) => ({ ...previous, customer_authorized: event.target.checked }))}
                 required
-                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#0f3a63] focus:ring-[#0f3a63]"
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#0f4471] focus:ring-[#0f4471]"
               />
               <span>
                 <span className="block text-sm font-semibold text-gray-800">Autorización del cliente *</span>
@@ -1083,7 +1083,7 @@ export default function VehicleForm({
               key="next-step"
               type="button"
               onClick={handleNextStep}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0f3a63] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#0b2d4d]"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0f4471] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#0b365c]"
             >
               Siguiente
               <ChevronRight className="h-4 w-4" />

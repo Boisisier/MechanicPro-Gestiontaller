@@ -13,18 +13,18 @@ interface ConfirmDialogProps {
 
 const variantStyles = {
   danger: {
-    icon: "bg-red-50 text-red-700",
-    button: "bg-red-600 text-white hover:bg-red-700 focus:ring-red-200",
+    icon: "bg-[#fc3d3c]/10 text-[#fc3d3c]",
+    button: "bg-[#fc3d3c] text-white hover:bg-[#df2f2f] focus:ring-[#fc3d3c]/20",
     Icon: AlertTriangle,
   },
   warning: {
     icon: "bg-amber-50 text-amber-700",
-    button: "bg-[#0f3a63] text-white hover:bg-[#0b2d4d] focus:ring-blue-200",
+    button: "bg-[#0f4471] text-white hover:bg-[#0b365c] focus:ring-[#0f4471]/20",
     Icon: AlertTriangle,
   },
   info: {
-    icon: "bg-blue-50 text-[#0f3a63]",
-    button: "bg-[#0f3a63] text-white hover:bg-[#0b2d4d] focus:ring-blue-200",
+    icon: "bg-[#0f4471]/10 text-[#0f4471]",
+    button: "bg-[#0f4471] text-white hover:bg-[#0b365c] focus:ring-[#0f4471]/20",
     Icon: Info,
   },
 };

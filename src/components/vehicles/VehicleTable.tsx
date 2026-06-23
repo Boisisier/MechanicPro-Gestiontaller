@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 
 import { Edit2, Trash2, Search, AlertCircle, Send, FileDown } from 'lucide-react';
 
@@ -390,9 +390,9 @@ export default function VehicleTable({
 
                               deleteConfirm?.id === vehicle.id
 
-                                ? 'bg-red-100 text-red-700'
+                                ? 'bg-red-100 text-[#b42318]'
 
-                                : 'text-red-600 hover:bg-red-50'
+                                : 'text-[#fc3d3c] hover:bg-[#fc3d3c]/10'
 
                             }`}
 

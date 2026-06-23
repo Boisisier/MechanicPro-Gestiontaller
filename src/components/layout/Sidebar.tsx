@@ -1,6 +1,7 @@
 ﻿import { LayoutDashboard, Car, Package, FileText, Settings, X } from 'lucide-react';
 
 import { Calculator } from 'lucide-react';
+import mechanicProLogo from '../../assets/mechanic-pro-logo.png';
 
 interface SidebarProps {
   activeSection: string;
@@ -57,7 +58,7 @@ export default function Sidebar({
       )}
 
       <aside
-        className={`fixed left-0 top-0 z-50 flex h-dvh max-h-dvh w-[min(18rem,calc(100vw-1.5rem))] flex-col border-r border-blue-900/30 bg-[#0f3a63] shadow-2xl transition-transform duration-300 lg:w-64 lg:shadow-none ${
+        className={`fixed left-0 top-0 z-50 flex h-dvh max-h-dvh w-[min(18rem,calc(100vw-1.5rem))] flex-col border-r border-white/15 bg-[#0f4471] shadow-2xl transition-transform duration-300 lg:w-64 lg:shadow-none ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         } ${
           isDesktopOpen ? 'lg:translate-x-0' : 'lg:-translate-x-full'
@@ -65,15 +66,17 @@ export default function Sidebar({
       >
         <div className="shrink-0 border-b border-white/15 p-4 lg:p-5">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div
-                className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/15 shadow-sm"
-              >
-                <Car className="h-6 w-6 text-white" />
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-white p-1 shadow-sm">
+                <img
+                  src={mechanicProLogo}
+                  alt="Mechanic Pro"
+                  className="h-full w-full object-contain"
+                />
               </div>
               <div className="min-w-0">
-                <h1 className="truncate text-lg font-bold text-white lg:text-xl">MechanicPro</h1>
-                <p className="text-xs text-white">Gestión de taller</p>
+                <h1 className="truncate text-lg font-bold text-white lg:text-xl">Mechanic Pro</h1>
+                <p className="text-xs text-white/85">Gestión de taller</p>
               </div>
             </div>
             <button

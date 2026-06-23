@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+﻿import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 
 import {
   clearAuthToken,
@@ -86,6 +86,7 @@ import {
 import { useNotification } from "./hooks/useNotification";
 
 import InventoryPage from "./features/inventory/InventoryPage";
+import mechanicProLogo from "./assets/mechanic-pro-logo.png";
 
 const roleModules: Record<UserRole, string[]> = {
   "Administrador de Taller": [
@@ -97,7 +98,7 @@ const roleModules: Record<UserRole, string[]> = {
     "Configuración",
   ],
   Administrativo: ["Dashboard", "Vehículos", "Presupuesto", "Reportes"],
-  Mecánico: ["Vehículos", "Reportes"],
+  "Mecánico": ["Vehículos", "Reportes"],
 };
 
 const defaultWorkshopUsers: WorkshopUser[] = [
@@ -135,7 +136,7 @@ function App() {
     useNotification();
 
   const [accentColor, setAccentColor] = useState(
-    () => localStorage.getItem("accentColor") || "#1f3a5f",
+    () => localStorage.getItem("accentColor") || "#0f4471",
   );
 
   const [activeSection, setActiveSection] = useState("vehiculos");
@@ -428,7 +429,7 @@ function App() {
           setSessionRole(null);
           return;
         }
-        showNotification("error", "Error al cargar los vehí­culos");
+        showNotification("error", "Error al cargar los vehículos");
         console.error("Error:", error);
       } finally {
         setLoading(false);
@@ -1169,7 +1170,7 @@ function App() {
           observaciones: reviewNotes,
         },
 
-        statusOverride ? "vehí­culo enviado a salida" : "Servicios guardados",
+        statusOverride ? "vehículo enviado a salida" : "Servicios guardados",
       );
 
       setInventoryItems((prev) =>
@@ -1217,7 +1218,7 @@ function App() {
     } catch (error) {
       console.error("Review update failed", error);
 
-      showNotification("error", "No se pudo actualizar el vehí­culo");
+      showNotification("error", "No se pudo actualizar el vehículo");
     }
   };
 
@@ -1310,7 +1311,7 @@ function App() {
         prev.includes(vehicle.id) ? prev : [...prev, vehicle.id],
       );
 
-      showNotification("success", `vehí­culo ${vehicle.patente} listo`);
+      showNotification("success", `vehículo ${vehicle.patente} listo`);
 
       setVehicleTab("ingreso");
     }, 400);
@@ -1438,7 +1439,7 @@ function App() {
           prev.map((v) => (v.id === updated.id ? updated : v)),
         );
 
-        showNotification("success", "vehí­culo actualizado correctamente");
+        showNotification("success", "vehículo actualizado correctamente");
 
         logAction(
           "Vehiculo actualizado",
@@ -1458,13 +1459,13 @@ function App() {
           `${formData.patente} fue ingresado al taller`,
         );
 
-        showNotification("success", "vehí­culo registrado correctamente");
+        showNotification("success", "vehículo registrado correctamente");
       }
     } catch (error) {
       const message =
         (error as Error & { status?: number }).status === 409
           ? "La patente ya está registrada"
-          : "Error al guardar el vehí­culo";
+          : "Error al guardar el vehículo";
 
       showNotification("error", message);
 
@@ -1880,15 +1881,24 @@ function App() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-10">
         <div className="w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-sm p-8">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Acceso al sistema
-          </h1>
-          <p className="text-sm text-gray-500 mt-2">
-            Ingresa con tu usuario administrador para trabajar con una empresa persistente.
-          </p>
+          <div className="mb-6 text-center">
+            <div className="mx-auto mb-4 flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl border border-gray-200 bg-white p-2 shadow-sm">
+              <img
+                src={mechanicProLogo}
+                alt="Mechanic Pro"
+                className="h-full w-full object-contain"
+              />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Mechanic Pro
+            </h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Acceso al sistema de taller.
+            </p>
+          </div>
 
           {authError && (
-            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="mt-4 rounded-lg border border-[#fc3d3c]/30 bg-[#fc3d3c]/10 px-4 py-3 text-sm text-[#b42318]">
               {authError}
             </div>
           )}
@@ -1911,7 +1921,7 @@ function App() {
                     email: event.target.value,
                   }))
                 }
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-[#0f4471] focus:outline-none"
                 placeholder="usuario@taller.cl"
                 autoComplete="username"
               />
@@ -1934,7 +1944,7 @@ function App() {
                     password: event.target.value,
                   }))
                 }
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-[#0f4471] focus:outline-none"
                 placeholder="Contraseña"
                 autoComplete="current-password"
               />
@@ -2022,11 +2032,11 @@ function App() {
               <div className="sticky top-4 z-20 mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                   {[
-                    { id: "ingreso", label: "Ingreso de vehí­culos" },
+                    { id: "ingreso", label: "Ingreso de vehículos" },
 
                     { id: "taller", label: "En Taller" },
 
-                    { id: "salida", label: "Salida vehí­culos" },
+                    { id: "salida", label: "Salida vehículos" },
                   ]
                     .filter((tab) => canAccessSalida || tab.id !== "salida")
                     .map((tab) => (
@@ -2035,8 +2045,8 @@ function App() {
                       onClick={() => setVehicleTab(tab.id as typeof vehicleTab)}
                       className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
                         vehicleTab === tab.id
-                          ? "bg-[#0f3a63] text-white shadow-sm hover:bg-[#0b2d4d]"
-                          : "border border-[#0f3a63]/30 text-[#0f3a63] hover:bg-[#0f3a63]/10"
+                          ? "bg-[#0f4471] text-white shadow-sm hover:bg-[#0b365c]"
+                          : "border border-[#0f4471]/30 text-[#0f4471] hover:bg-[#0f4471]/10"
                       }`}
                     >
                       {tab.label}
@@ -2061,7 +2071,7 @@ function App() {
                             },
                           })
                         }
-                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-red-700 focus:ring-4 focus:ring-red-200"
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#fc3d3c] px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-[#df2f2f] focus:ring-4 focus:ring-[#fc3d3c]/20"
                       >
                         <RotateCcw className="h-4 w-4" />
                         Limpiar formulario
@@ -2081,7 +2091,7 @@ function App() {
                       <button
                         type="button"
                         onClick={handleClearReviewRecord}
-                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-red-700 focus:ring-4 focus:ring-red-200"
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#fc3d3c] px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-[#df2f2f] focus:ring-4 focus:ring-[#fc3d3c]/20"
                       >
                         <RotateCcw className="h-4 w-4" />
                         Limpiar registro
@@ -2106,12 +2116,12 @@ function App() {
 
                   <div className="hidden">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      vehí­culos en taller
+                      vehículos en taller
                     </h3>
 
                     {vehiclesEnTaller.length === 0 ? (
                       <p className="text-sm text-gray-500">
-                        No hay vehí­culos en taller.
+                        No hay vehículos en taller.
                       </p>
                     ) : (
                       <div className="space-y-3">
@@ -2126,7 +2136,7 @@ function App() {
                               </p>
 
                               <p className="text-sm text-gray-500">
-                                {vehicle.marca} {vehicle.modelo} Â·{" "}
+                                {vehicle.marca} {vehicle.modelo} ·{" "}
                                 {vehicle.customer_name || "Sin cliente"}
                               </p>
                             </div>
@@ -2209,7 +2219,7 @@ function App() {
                             </p>
 
                             <p className="text-xs text-gray-500">
-                              {vehicle.marca} {vehicle.modelo} Â·{" "}
+                              {vehicle.marca} {vehicle.modelo} ·{" "}
                               {vehicle.customer_name || "Sin cliente"}
                             </p>
 
@@ -2222,12 +2232,12 @@ function App() {
                           </button>
                             <div className="mt-3 flex flex-col items-end gap-2">
                               <div className="flex items-center gap-2 text-right">
-                                <Clock className="h-4 w-4 text-[#0f3a63]" />
+                                <Clock className="h-4 w-4 text-[#0f4471]" />
                                 <div>
                                   <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                                     Tiempo de trabajo
                                   </p>
-                                  <p className="text-sm font-bold text-[#0f3a63]">
+                                  <p className="text-sm font-bold text-[#0f4471]">
                                     {formatVehicleWorkTime(vehicle)}
                                   </p>
                                 </div>
@@ -2235,7 +2245,7 @@ function App() {
                               <button
                                 type="button"
                                 onClick={() => handleReturnFromTaller(vehicle)}
-                                className="rounded-md border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+                                className="rounded-md border border-[#fc3d3c]/30 px-2.5 py-1.5 text-xs font-semibold text-[#b42318] hover:bg-[#fc3d3c]/10"
                                 title="Devolver a ingreso"
                               >
                                 Devolver
@@ -2257,7 +2267,7 @@ function App() {
                             </h3>
 
                             <p className="text-sm text-gray-500">
-                              Busca procedimientos, agrí©galos con valor y
+                              Busca procedimientos, agrégalos con valor y
                               guarda el trabajo ejecutado.
                             </p>
                           </div>
@@ -2268,7 +2278,7 @@ function App() {
                               onClick={() =>
                                 setServicePickerOpen((prev) => !prev)
                               }
-                              className="rounded-lg bg-[#0f3a63] px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#0b2d4d]"
+                              className="rounded-lg bg-[#0f4471] px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#0b365c]"
                             >
                               {servicePickerOpen
                                 ? "Cerrar buscador"
@@ -2277,7 +2287,7 @@ function App() {
                             <button
                               type="button"
                               onClick={() => openInventoryPicker("repuesto")}
-                              className="rounded-lg bg-[#0f3a63] px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#0b2d4d]"
+                              className="rounded-lg bg-[#0f4471] px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#0b365c]"
                             >
                               {partPickerOpen && inventoryPickerType === "repuesto"
                                 ? "Cerrar repuestos"
@@ -2286,7 +2296,7 @@ function App() {
                             <button
                               type="button"
                               onClick={() => openInventoryPicker("insumo")}
-                              className="rounded-lg bg-[#0f3a63] px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#0b2d4d]"
+                              className="rounded-lg bg-[#0f4471] px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#0b365c]"
                             >
                               {partPickerOpen && inventoryPickerType === "insumo"
                                 ? "Cerrar insumos"
@@ -2339,7 +2349,7 @@ function App() {
                                   {filteredServiceCatalog.length === 0 ? (
                                     <p className="px-3 py-2 text-sm text-gray-500">
                                       No hay servicios disponibles con esa
-                                      bíºsqueda.
+                                      búsqueda.
                                     </p>
                                   ) : (
                                     filteredServiceCatalogByCategory.map(
@@ -2442,7 +2452,7 @@ function App() {
                                         className={`text-xs font-semibold ${
                                           item.stock > 0
                                             ? "text-emerald-700"
-                                            : "text-red-600"
+                                            : "text-[#fc3d3c]"
                                         }`}
                                       >
                                         Stock {item.stock} {item.unit || ""}
@@ -2458,7 +2468,7 @@ function App() {
                         <div className="mb-6 space-y-3">
                           {reviewServices.length === 0 ? (
                             <p className="rounded-lg border border-dashed border-gray-300 px-4 py-5 text-sm text-gray-500">
-                              No hay servicios seleccionados todaví­a.
+                              No hay servicios seleccionados todavía.
                             </p>
                           ) : (
                             reviewServices.map((service) => (
@@ -2554,7 +2564,7 @@ function App() {
                                                   part.inventoryItemId,
                                                 )
                                               }
-                                              className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
+                                              className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#fc3d3c]/30 text-[#fc3d3c] hover:bg-[#fc3d3c]/10"
                                               title="Eliminar item"
                                             >
                                               <Trash2 className="h-4 w-4" />
@@ -2572,7 +2582,7 @@ function App() {
                                     onClick={() =>
                                       handleRemoveReviewService(service.name)
                                     }
-                                    className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
+                                    className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#fc3d3c]/30 text-[#fc3d3c] hover:bg-[#fc3d3c]/10"
                                     title="Eliminar servicio"
                                   >
                                     <Trash2 className="h-4 w-4" />
@@ -2654,7 +2664,7 @@ function App() {
                                       <button
                                         type="button"
                                         onClick={() => handleRemoveReviewPart(part.inventoryItemId)}
-                                        className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
+                                        className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#fc3d3c]/30 text-[#fc3d3c] hover:bg-[#fc3d3c]/10"
                                         title="Eliminar item"
                                       >
                                         <Trash2 className="h-4 w-4" />
@@ -2668,7 +2678,7 @@ function App() {
                         </div>
 
                         {canEditPrices && (
-                          <div className="mb-6 rounded-xl border border-[#0f3a63]/20 bg-white p-4 shadow-sm">
+                          <div className="mb-6 rounded-xl border border-[#0f4471]/20 bg-white p-4 shadow-sm">
                             <div className="mb-4">
                               <h4 className="text-sm font-semibold text-gray-900">
                                 Valores de la atencion
@@ -2759,7 +2769,7 @@ function App() {
 
                         <div>
                           {canEditPrices && (
-                          <div className="mb-6 rounded-xl border border-[#0f3a63]/20 bg-white p-4 shadow-sm">
+                          <div className="mb-6 rounded-xl border border-[#0f4471]/20 bg-white p-4 shadow-sm">
                             <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                               <div>
                                 <h4 className="text-sm font-semibold text-gray-900">
@@ -2769,7 +2779,7 @@ function App() {
                                   Total actualizado con servicios, repuestos e insumos seleccionados.
                                 </p>
                               </div>
-                              <p className="text-2xl font-bold text-[#0f3a63]">
+                              <p className="text-2xl font-bold text-[#0f4471]">
                                 ${reviewAttentionTotal.toLocaleString("es-CL")}
                               </p>
                             </div>
@@ -2807,11 +2817,11 @@ function App() {
                                   ${(Number(activeReviewVehicle?.customer_advance) || 0).toLocaleString("es-CL")}
                                 </p>
                               </div>
-                              <div className="rounded-lg border border-[#0f3a63]/20 bg-[#0f3a63]/5 px-4 py-3">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-[#0f3a63]">
+                              <div className="rounded-lg border border-[#0f4471]/20 bg-[#0f4471]/5 px-4 py-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-[#0f4471]">
                                   Saldo pendiente
                                 </p>
-                                <p className="mt-1 text-lg font-bold text-[#0f3a63]">
+                                <p className="mt-1 text-lg font-bold text-[#0f4471]">
                                   ${Math.max(
                                     0,
                                     reviewAttentionTotal -
@@ -2878,7 +2888,7 @@ function App() {
                 <div className="space-y-4">
                   {vehiclesEnSalida.length === 0 ? (
                     <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm text-sm text-gray-500">
-                      No hay vehí­culos en salida.
+                      No hay vehículos en salida.
                     </div>
                   ) : (
                     vehiclesEnSalida.map((vehicle) => (
@@ -2919,7 +2929,7 @@ function App() {
 
                               <button
                                 onClick={() => handleSendToParking(vehicle)}
-                                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+                                className="rounded-lg bg-[#fc3d3c] px-4 py-2 text-sm font-semibold text-white hover:bg-[#df2f2f]"
                               >
                                 Pasar a estacionamiento
                               </button>
@@ -2960,11 +2970,11 @@ function App() {
                                   ${(Number(vehicle.customer_advance) || 0).toLocaleString("es-CL")}
                                 </p>
                               </div>
-                              <div className="rounded-lg border border-[#0f3a63]/20 bg-[#0f3a63]/5 px-4 py-3">
+                              <div className="rounded-lg border border-[#0f4471]/20 bg-[#0f4471]/5 px-4 py-3">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                                   Saldo pendiente
                                 </p>
-                                <p className="mt-1 text-lg font-bold text-[#0f3a63]">
+                                <p className="mt-1 text-lg font-bold text-[#0f4471]">
                                   ${Math.max(0, getVehicleWorkTotal(vehicle) - (Number(vehicle.customer_advance) || 0)).toLocaleString("es-CL")}
                                 </p>
                               </div>
@@ -3103,8 +3113,8 @@ function App() {
                             ${weeklySales.toLocaleString("es-CL")}
                           </p>
                         </div>
-                        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#0f3a63]/10">
-                          <TrendingUp className="h-5 w-5 text-[#0f3a63]" />
+                        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#0f4471]/10">
+                          <TrendingUp className="h-5 w-5 text-[#0f4471]" />
                         </div>
                       </div>
                     </div>
@@ -3118,8 +3128,8 @@ function App() {
                             {completedServices.length}
                           </p>
                         </div>
-                        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#0f3a63]/10">
-                          <Wrench className="h-5 w-5 text-[#0f3a63]" />
+                        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#0f4471]/10">
+                          <Wrench className="h-5 w-5 text-[#0f4471]" />
                         </div>
                       </div>
                     </div>
@@ -3132,7 +3142,7 @@ function App() {
                         <h3 className="text-lg font-semibold text-gray-900">Flujo de ventas mensual</h3>
                         <p className="text-sm text-gray-500">Total estimado por servicios realizados</p>
                       </div>
-                      <span className="rounded-lg bg-[#0f3a63]/10 px-3 py-1 text-xs font-semibold text-[#0f3a63]">
+                      <span className="rounded-lg bg-[#0f4471]/10 px-3 py-1 text-xs font-semibold text-[#0f4471]">
                         Últimos 6 meses
                       </span>
                     </div>
@@ -3141,7 +3151,7 @@ function App() {
                         <div key={item.label} className="flex flex-1 flex-col items-center gap-2">
                           <div className="flex h-48 w-full items-end rounded-lg bg-gray-50 px-2">
                             <div
-                              className="w-full rounded-t-lg bg-[#0f3a63]"
+                              className="w-full rounded-t-lg bg-[#0f4471]"
                               style={{ height: `${Math.max(8, (item.total / maxSales) * 100)}%` }}
                               title={`$${item.total.toLocaleString("es-CL")}`}
                             />
@@ -3156,7 +3166,7 @@ function App() {
                   <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
                     <div className="mb-4 flex items-center justify-between">
                       <h3 className="text-lg font-semibold text-gray-900">Historial de mantenciones</h3>
-                      <History className="h-5 w-5 text-[#0f3a63]" />
+                      <History className="h-5 w-5 text-[#0f4471]" />
                     </div>
                     {latestMaintenances.length === 0 ? (
                       <p className="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500">
@@ -3194,7 +3204,7 @@ function App() {
                   <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
                     <div className="mb-4 flex items-center justify-between">
                       <h3 className="text-lg font-semibold text-gray-900">Servicios más solicitados</h3>
-                      <Wrench className="h-5 w-5 text-[#0f3a63]" />
+                      <Wrench className="h-5 w-5 text-[#0f4471]" />
                     </div>
                     {mostRequestedServices.length === 0 ? (
                       <p className="text-sm text-gray-500">Sin servicios registrados.</p>
@@ -3204,11 +3214,11 @@ function App() {
                           <div key={service.name}>
                             <div className="mb-1 flex items-center justify-between gap-3">
                               <p className="truncate text-sm font-medium text-gray-800">{service.name}</p>
-                              <span className="text-xs font-semibold text-[#0f3a63]">{service.count}</span>
+                              <span className="text-xs font-semibold text-[#0f4471]">{service.count}</span>
                             </div>
                             <div className="h-2 rounded-full bg-gray-100">
                               <div
-                                className="h-2 rounded-full bg-[#0f3a63]"
+                                className="h-2 rounded-full bg-[#0f4471]"
                                 style={{ width: `${(service.count / maxRequestedServiceCount) * 100}%` }}
                               />
                             </div>
@@ -3221,7 +3231,7 @@ function App() {
                   <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
                     <div className="mb-4 flex items-center justify-between">
                       <h3 className="text-lg font-semibold text-gray-900">Movimientos de inventario</h3>
-                      <Package className="h-5 w-5 text-[#0f3a63]" />
+                      <Package className="h-5 w-5 text-[#0f4471]" />
                     </div>
                     {inventoryMovements.length === 0 ? (
                       <p className="text-sm text-gray-500">Sin movimientos de repuestos.</p>
@@ -3231,7 +3241,7 @@ function App() {
                           <div key={movement.id} className="rounded-lg bg-gray-50 px-3 py-3">
                             <div className="flex items-center justify-between gap-3">
                               <p className="text-sm font-semibold text-gray-900">{movement.name}</p>
-                              <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-semibold text-red-700">
+                              <span className="rounded-full bg-[#fc3d3c]/10 px-2 py-1 text-xs font-semibold text-[#b42318]">
                                 -{movement.quantity}
                               </span>
                             </div>
@@ -3248,7 +3258,7 @@ function App() {
                     <h3 className="text-lg font-semibold text-gray-900">Estado del taller</h3>
                     <div className="mt-4 space-y-3">
                       {[
-                        { label: "En Taller", value: metrics.entaller, color: "bg-[#0f3a63]" },
+                        { label: "En Taller", value: metrics.entaller, color: "bg-[#0f4471]" },
                         { label: "Ingresado", value: metrics.enTaller, color: "bg-blue-300" },
                         { label: "Entregados", value: metrics.entregados, color: "bg-emerald-500" },
                       ].map((item) => (
@@ -3470,7 +3480,7 @@ function App() {
                         <button
                           type="button"
                           onClick={() => handleRemoveBudgetService(item.id)}
-                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 sm:w-auto"
+                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#fc3d3c]/30 px-3 py-2 text-sm font-semibold text-[#b42318] hover:bg-[#fc3d3c]/10 sm:w-auto"
                         >
                           <Trash2 className="h-4 w-4" />
                           Quitar
@@ -3512,7 +3522,7 @@ function App() {
                       >
                         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                           <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-[#0f3a63]">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-[#0f4471]">
                               {getParkingDays(vehicle)} dias estacionado
                             </p>
                             <h3 className="mt-1 text-lg font-bold uppercase text-gray-900">
@@ -3525,7 +3535,7 @@ function App() {
                           <button
                             type="button"
                             onClick={() => handleReleaseFromParking(vehicle)}
-                            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700"
+                            className="rounded-lg bg-[#fc3d3c] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#df2f2f]"
                           >
                             Sacar del estacionamiento
                           </button>
@@ -3635,12 +3645,12 @@ function App() {
                 <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
 
-                  <p className="text-gray-500 mt-4">Cargando vehí­culos...</p>
+                  <p className="text-gray-500 mt-4">Cargando vehículos...</p>
                 </div>
               ) : (
                 <VehicleTable
                   vehicles={vehicles}
-                  title="Reporte de vehí­culos"
+                  title="Reporte de vehículos"
                   showEdit={false}
                   showDelete={false}
                   onNotify={handleNotify}
@@ -3663,7 +3673,7 @@ function App() {
               </div>
 
               {!isSessionAdmin ? (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm font-semibold text-red-700">
+                <div className="rounded-xl border border-[#fc3d3c]/30 bg-[#fc3d3c]/10 p-6 text-sm font-semibold text-[#b42318]">
                   Solo el Administrador de Taller puede ingresar a este modulo.
                 </div>
               ) : (
@@ -3691,7 +3701,7 @@ function App() {
                             type="date"
                             value={auditDateFrom}
                             onChange={(event) => setAuditDateFrom(event.target.value)}
-                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#0f3a63] focus:outline-none"
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#0f4471] focus:outline-none"
                           />
                         </div>
                         <div>
@@ -3706,7 +3716,7 @@ function App() {
                             type="date"
                             value={auditDateTo}
                             onChange={(event) => setAuditDateTo(event.target.value)}
-                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#0f3a63] focus:outline-none"
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#0f4471] focus:outline-none"
                           />
                         </div>
                         <div className="flex items-end">
@@ -4006,7 +4016,7 @@ function App() {
                           <button
                             type="button"
                             onClick={() => handleDeleteUser(user.id)}
-                            className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50"
+                            className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#fc3d3c]/30 px-3 py-2 text-xs font-semibold text-[#b42318] hover:bg-[#fc3d3c]/10"
                           >
                             <Trash2 className="h-4 w-4" />
                             Eliminar
@@ -4049,7 +4059,7 @@ function App() {
 
                 <button
                   type="button"
-                  onClick={() => setAccentColor("#1f3a5f")}
+                  onClick={() => setAccentColor("#0f4471")}
                   className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
                 >
                   Restaurar color
