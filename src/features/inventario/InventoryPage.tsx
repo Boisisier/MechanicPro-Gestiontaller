@@ -2,8 +2,8 @@ import { ChangeEvent, FormEvent, useState } from "react";
 
 import InventoryForm from "./InventoryForm";
 import InventoryTable from "./InventoryTable";
-import { InventoryItem } from "../../lib/types";
-import { createInventoryItem, updateInventoryItem } from "../../lib/api";
+import { InventoryItem } from "../../shared/lib/types";
+import { createInventoryItem, updateInventoryItem } from "../../shared/lib/api";
 
 interface InventoryPageProps {
   inventoryItems: InventoryItem[];

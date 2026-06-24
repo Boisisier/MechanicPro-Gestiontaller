@@ -30,7 +30,13 @@ const demoUserEmail = process.env.DEMO_USER_EMAIL || 'demo@local';
 const demoUserPassword = process.env.DEMO_USER_PASSWORD || 'demo1234';
 
 const pool = new Pool({
-  connectionString: supabaseUrl,
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
 });
 
 app.use(cors());

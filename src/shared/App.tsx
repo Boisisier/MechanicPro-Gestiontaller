@@ -2,7 +2,6 @@
 
 import {
   clearAuthToken,
-  createBudget,
   createVehicle,
   createAuditLog,
   createParkingRelease,
@@ -25,7 +24,6 @@ import {
 } from "./lib/api";
 
 import type {
-  BudgetServiceItem,
   CatalogService,
   ReviewPartItem,
   ReviewServiceItem,
@@ -56,7 +54,6 @@ import {
   Trash2,
   X,
   Plus,
-  Calculator,
   RotateCcw,
   Send,
   Edit2,
@@ -80,13 +77,13 @@ import { exportVehiclePdf } from "./utils/html";
 
 import {
   serviceCatalogByCategory,
-  serviceCatalog,
-} from "./features/vehicles/serviceCatalog";
+} from "../features/vehiculo/serviceCatalog";
 
 import { useNotification } from "./hooks/useNotification";
 
-import InventoryPage from "./features/inventory/InventoryPage";
+import InventoryPage from "../features/inventario/InventoryPage";
 import mechanicProLogo from "./assets/mechanic-pro-logo.png";
+import PresupuestoPage from "../features/presupuesto/PresupuestoPage";
 
 const roleModules: Record<UserRole, string[]> = {
   "Administrador de Taller": [
@@ -252,21 +249,6 @@ function App() {
   const [readyVehicleIds, setReadyVehicleIds] = useState<string[]>([]);
 
   const [hiddenSalidaIds, setHiddenSalidaIds] = useState<string[]>([]);
-
-  const [budgetForm, setBudgetForm] = useState({
-    customerName: "",
-    customerPhone: "",
-    patente: "",
-    vehicle: "",
-    notes: "",
-  });
-
-  const [budgetService, setBudgetService] = useState({
-    name: "",
-    price: 0,
-  });
-
-  const [budgetItems, setBudgetItems] = useState<BudgetServiceItem[]>([]);
 
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => {
     const raw = localStorage.getItem("auditLogs");
@@ -769,100 +751,6 @@ function App() {
     });
   };
 
-  const handleBudgetFormChange = (
-    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) => {
-    const { name, value } = event.target;
-    setBudgetForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleBudgetServiceChange = (
-    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ) => {
-    const { name, value } = event.target;
-    setBudgetService((prev) => ({
-      ...prev,
-      [name]: name === "price" ? parseInt(value) || 0 : value,
-    }));
-  };
-
-  const handleAddBudgetService = (event: FormEvent) => {
-    event.preventDefault();
-    const name = budgetService.name.trim();
-    if (!name || budgetService.price <= 0) {
-      showNotification("error", "Agrega un servicio y un valor válido");
-      return;
-    }
-
-    setBudgetItems((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        name,
-        price: budgetService.price,
-      },
-    ]);
-    setBudgetService({ name: "", price: 0 });
-    showNotification("success", "Servicio agregado al presupuesto");
-  };
-
-  const handleRemoveBudgetService = (id: string) => {
-    setBudgetItems((prev) => prev.filter((item) => item.id !== id));
-  };
-
-  const performClearBudget = () => {
-    setBudgetForm({
-      customerName: "",
-      customerPhone: "",
-      patente: "",
-      vehicle: "",
-      notes: "",
-    });
-    setBudgetService({ name: "", price: 0 });
-    setBudgetItems([]);
-    showNotification("success", "Presupuesto limpiado");
-  };
-
-  const handleClearBudget = () => {
-    requestConfirmation({
-      title: "Limpiar presupuesto",
-      message: "Se borrarán los datos ingresados y los servicios presupuestados en pantalla.",
-      confirmLabel: "Limpiar presupuesto",
-      variant: "danger",
-      onConfirm: performClearBudget,
-    });
-  };
-
-  const handleSaveBudget = async () => {
-    if (!budgetForm.customerName.trim() || budgetItems.length === 0) {
-      showNotification(
-        "error",
-        "Agrega cliente y al menos un servicio al presupuesto",
-      );
-      return;
-    }
-
-    try {
-      await createBudget({
-        customerName: budgetForm.customerName.trim(),
-        customerPhone: budgetForm.customerPhone.trim(),
-        patente: budgetForm.patente.trim(),
-        vehicle: budgetForm.vehicle.trim(),
-        notes: budgetForm.notes.trim(),
-        items: budgetItems,
-        status: "guardado",
-      });
-      logAction(
-        "Presupuesto guardado",
-        "Presupuesto",
-        `${budgetForm.customerName} - ${budgetItems.length} servicio(s)`,
-      );
-      showNotification("success", "Presupuesto guardado");
-    } catch (error) {
-      console.error("Save budget failed", error);
-      showNotification("error", "No se pudo guardar el presupuesto");
-    }
-  };
   const buildVehiclePayload = (
     vehicle: Vehicle,
     overrides: Partial<Vehicle>,
@@ -1827,8 +1715,6 @@ function App() {
     body: string;
     time: string;
   }>;
-
-  const budgetTotal = budgetItems.reduce((sum, item) => sum + item.price, 0);
 
   const completedServices = vehicles.flatMap((vehicle) =>
     parseStoredReviewServices(vehicle.servicios).map((service) => ({
@@ -3314,206 +3200,7 @@ function App() {
           )}
 
           {activeSection === "presupuesto" && canAccessBudget && (
-            <div className="space-y-6">
-              <div className="flex flex-col gap-2">
-                <h2 className="text-2xl font-bold text-gray-900">
-                  Presupuesto
-                </h2>
-
-                <p className="text-sm text-gray-500">
-                  Arma un presupuesto simple de servicios mecánicos.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm lg:col-span-2">
-                  <div className="mb-6 flex items-center gap-3">
-                    <div className="rounded-lg bg-accent-soft p-3 text-accent">
-                      <Calculator className="h-5 w-5" />
-                    </div>
-
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        Datos del presupuesto
-                      </h3>
-
-                      <p className="text-sm text-gray-500">
-                        Cliente, vehículo y detalle del trabajo solicitado.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input
-                      name="customerName"
-                      value={budgetForm.customerName}
-                      onChange={handleBudgetFormChange}
-                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                      placeholder="Nombre del cliente"
-                    />
-
-                    <input
-                      name="customerPhone"
-                      value={budgetForm.customerPhone}
-                      onChange={handleBudgetFormChange}
-                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                      placeholder="Teléfono"
-                    />
-
-                    <input
-                      name="patente"
-                      value={budgetForm.patente}
-                      onChange={handleBudgetFormChange}
-                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm uppercase focus:border-blue-500 focus:outline-none"
-                      placeholder="Patente"
-                    />
-
-                    <input
-                      name="vehicle"
-                      value={budgetForm.vehicle}
-                      onChange={handleBudgetFormChange}
-                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                      placeholder="Vehículo"
-                    />
-
-                    <textarea
-                      name="notes"
-                      value={budgetForm.notes}
-                      onChange={handleBudgetFormChange}
-                      rows={4}
-                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm resize-none focus:border-blue-500 focus:outline-none md:col-span-2"
-                      placeholder="Observaciones del presupuesto"
-                    />
-                  </div>
-
-                  <form
-                    onSubmit={handleAddBudgetService}
-                    className="mt-6 grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-3"
-                  >
-                    <select
-                      name="name"
-                      value={budgetService.name}
-                      onChange={handleBudgetServiceChange}
-                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                    >
-                      <option value="">Selecciona un servicio</option>
-
-                      {serviceCatalog.map((service) => (
-                        <option key={service} value={service}>
-                          {service}
-                        </option>
-                      ))}
-                    </select>
-
-                    <input
-                      type="number"
-                      name="price"
-                      value={budgetService.price}
-                      onChange={handleBudgetServiceChange}
-                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                      placeholder="Valor"
-                      min="0"
-                    />
-
-                    <button
-                      type="submit"
-                      className="btn-primary rounded-lg px-4 py-2 text-sm font-semibold flex items-center justify-center gap-2"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Agregar
-                    </button>
-                  </form>
-                </div>
-
-                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Resumen
-                  </h3>
-
-                  <div className="mt-4 space-y-3">
-                    <p className="text-sm text-gray-500">Cliente</p>
-
-                    <p className="text-sm font-semibold text-gray-900">
-                      {budgetForm.customerName || "-"}
-                    </p>
-
-                    <p className="text-sm text-gray-500">Vehículo</p>
-
-                    <p className="text-sm font-semibold text-gray-900">
-                      {[budgetForm.patente, budgetForm.vehicle]
-                        .filter(Boolean)
-                        .join(" - ") || "-"}
-                    </p>
-                  </div>
-
-                  <div className="mt-6 border-t border-gray-200 pt-4">
-                    <p className="text-sm text-gray-500">Total estimado</p>
-
-                    <p className="mt-1 text-3xl font-bold text-gray-900">
-                      ${budgetTotal.toLocaleString("es-CL")}
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleSaveBudget}
-                    className="mt-6 w-full rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
-                  >
-                    Guardar presupuesto
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleClearBudget}
-                    className="mt-3 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                  >
-                    Limpiar presupuesto
-                  </button>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-                <div className="border-b border-gray-200 p-6">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Servicios presupuestados
-                  </h3>
-                </div>
-
-                {budgetItems.length === 0 ? (
-                  <div className="p-6 text-sm text-gray-500">
-                    No hay servicios agregados.
-                  </div>
-                ) : (
-                  <div className="divide-y divide-gray-200">
-                    {budgetItems.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">
-                            {item.name}
-                          </p>
-
-                          <p className="text-sm text-gray-500">
-                            ${item.price.toLocaleString("es-CL")}
-                          </p>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveBudgetService(item.id)}
-                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#fc3d3c]/30 px-3 py-2 text-sm font-semibold text-[#b42318] hover:bg-[#fc3d3c]/10 sm:w-auto"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Quitar
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <PresupuestoPage requestConfirmation={requestConfirmation} />
           )}
 
           {activeSection === "estacionamiento" && (

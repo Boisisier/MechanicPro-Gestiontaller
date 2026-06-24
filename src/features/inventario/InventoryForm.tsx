@@ -1,5 +1,5 @@
 import { ChangeEvent, FormEvent } from "react";
-import { InventoryFormData } from "../../lib/types";
+import { InventoryFormData } from "../../shared/lib/types";
 
 interface InventoryFormProps {
   inventoryForm: InventoryFormData;
