@@ -105,6 +105,11 @@ export default function VehicleTable({
 
 
 
+  const getDisplayEstado = (vehicle: Vehicle) =>
+    vehicle.en_estacionamiento_manual ? 'Estacionamiento' : vehicle.estado;
+
+
+
   const getEstadoBadge = (estado: string) => {
 
     const badges = {
@@ -114,6 +119,8 @@ export default function VehicleTable({
       'En Taller': 'bg-amber-100 text-amber-700 border-amber-200',
 
       Entregado: 'bg-green-100 text-green-700 border-green-200',
+
+      Estacionamiento: 'bg-[#0f4471]/10 text-[#0f4471] border-[#0f4471]/25',
 
     };
 
@@ -292,7 +299,11 @@ export default function VehicleTable({
 
             <tbody className="divide-y divide-gray-200">
 
-              {visibleVehicles.map((vehicle) => (
+              {visibleVehicles.map((vehicle) => {
+
+                const displayEstado = getDisplayEstado(vehicle);
+
+                return (
 
                 <tr key={vehicle.id} className="hover:bg-gray-50 transition-colors">
 
@@ -324,13 +335,13 @@ export default function VehicleTable({
 
                       className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getEstadoBadge(
 
-                        vehicle.estado
+                        displayEstado
 
                       )}`}
 
                     >
 
-                      {vehicle.estado}
+                      {displayEstado}
 
                     </span>
 
@@ -352,7 +363,9 @@ export default function VehicleTable({
 
                   <td className="px-6 py-4 text-gray-700">
 
-                    {vehicle.estado === 'Entregado' ? formatDate(vehicle.updated_at) : '-'}
+                    {vehicle.estado === 'Entregado'
+                      ? formatDate(vehicle.fecha_salida_confirmada || vehicle.updated_at)
+                      : '-'}
 
                   </td>
 
@@ -449,8 +462,8 @@ export default function VehicleTable({
                   )}
 
                 </tr>
-
-              ))}
+                );
+              })}
 
             </tbody>
 

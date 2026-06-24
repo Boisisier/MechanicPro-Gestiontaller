@@ -1561,7 +1561,7 @@ function App() {
 
       await updateVehicleRecord(
         vehicle,
-        { en_estacionamiento_manual: false },
+        { estado: "Entregado", en_estacionamiento_manual: false },
         "Vehículo retirado del estacionamiento",
       );
 
@@ -1595,6 +1595,7 @@ function App() {
       await updateVehicleRecord(
         vehicle,
         {
+          estado: "Entregado",
           en_estacionamiento_manual: true,
           fecha_salida_confirmada:
             vehicle.fecha_salida_confirmada || new Date().toISOString(),

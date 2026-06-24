@@ -30,6 +30,9 @@ export const exportVehiclePdf = (vehicle: Vehicle) => {
   const ingreso = formatDate(vehicle.fecha_ingreso);
   const salida = formatDate(vehicle.fecha_salida_confirmada);
   const logoUrl = new URL(mechanicProLogo, window.location.origin).href;
+  const displayEstado = vehicle.en_estacionamiento_manual
+    ? "Estacionamiento"
+    : vehicle.estado;
 
   const serviceItems = parseStoredReviewServices(vehicle.servicios);
   const parts = parseStoredReviewParts(vehicle.servicios);
@@ -206,7 +209,7 @@ export const exportVehiclePdf = (vehicle: Vehicle) => {
               <tr><th>Kilometraje</th><td>${vehicle.kilometraje.toLocaleString("es-CL")}</td></tr>
               <tr><th>Combustible</th><td>${vehicle.cantidad_combustible}%</td></tr>
               <tr><th>Color de ingreso</th><td>${escapeHtml(vehicle.color || "-")}</td></tr>
-              <tr><th>Estado</th><td>${escapeHtml(vehicle.estado)}</td></tr>
+              <tr><th>Estado</th><td>${escapeHtml(displayEstado)}</td></tr>
             </tbody>
           </table>
 
