@@ -6,8 +6,8 @@ import {
   WorkshopUser,
 } from "../../../shared/lib/types";
 import { createAuditLog, createBudget, getAuthToken } from "../../../shared/lib/api";
-import { useNotification } from "../../../hooks/useNotification";
-import { ConfirmDialogOptions } from "../../../hooks/useConfirmDialog";
+import { useNotification } from "../../../shared/hooks/useNotification";
+import { ConfirmDialogOptions } from "../../../shared/hooks/useConfirmDialog";
 
 export default function usePresupuesto(
   requestConfirmation: (options: ConfirmDialogOptions) => void,

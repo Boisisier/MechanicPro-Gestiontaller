@@ -1,7 +1,7 @@
 import { ChangeEvent, FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { BudgetService } from "../types/presupuesto";
-import { serviceCatalog } from "../../features/vehiculos/serviceCatalog";
+import { serviceCatalog } from "../../vehiculo/serviceCatalog";
 
 interface PresupuestoServicioFormProps {
   budgetService: BudgetService;
