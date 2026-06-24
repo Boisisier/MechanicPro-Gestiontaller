@@ -754,7 +754,21 @@ function App() {
   const buildVehiclePayload = (
     vehicle: Vehicle,
     overrides: Partial<Vehicle>,
-  ) => ({
+  ) => {
+    const normalizePayloadDate = (value?: string | null) => {
+      if (!value) {
+        return null;
+      }
+      if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return value;
+      }
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime())
+        ? null
+        : parsed.toISOString().slice(0, 10);
+    };
+
+    return {
     patente: vehicle.patente,
 
     marca: vehicle.marca,
@@ -799,8 +813,6 @@ function App() {
 
     estimated_work_hours: vehicle.estimated_work_hours || 0,
 
-    promised_delivery_date: vehicle.promised_delivery_date || null,
-
     customer_authorized: vehicle.customer_authorized || false,
 
     servicios: vehicle.servicios || [],
@@ -816,7 +828,13 @@ function App() {
     en_estacionamiento_manual: vehicle.en_estacionamiento_manual || false,
 
     ...overrides,
-  });
+
+    promised_delivery_date:
+      "promised_delivery_date" in overrides
+        ? normalizePayloadDate(overrides.promised_delivery_date)
+        : normalizePayloadDate(vehicle.promised_delivery_date),
+    };
+  };
 
   const updateVehicleRecord = async (
     vehicle: Vehicle,

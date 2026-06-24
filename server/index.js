@@ -76,6 +76,30 @@ const normalizePatente = (value = '') => {
   return `${normalized.slice(0, 4)}-${normalized.slice(4)}`;
 };
 
+const allowedAttentionPriorities = new Set(['Baja', 'Normal', 'Alta', 'Urgente']);
+
+const normalizeAttentionPriority = (value) =>
+  allowedAttentionPriorities.has(value) ? value : 'Normal';
+
+const normalizeEstimatedWorkHours = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+};
+
+const normalizeDateOnly = (value) => {
+  if (!value) {
+    return null;
+  }
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed.toISOString().slice(0, 10);
+};
+
 const ensureVehicleColumns = async () => {
   await pool.query('create extension if not exists "pgcrypto"');
   await pool.query(`
@@ -1462,16 +1486,10 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
   const customerAdvanceToPersist = isWorkshopAdminRole(req.user.role)
     ? parsedCustomerAdvance
     : 0;
-  const parsedEstimatedWorkHours = Number(estimated_work_hours);
-  if (
-    !['Baja', 'Normal', 'Alta', 'Urgente'].includes(attention_priority) ||
-    !Number.isFinite(parsedEstimatedWorkHours) ||
-    parsedEstimatedWorkHours < 0 ||
-    (promised_delivery_date && (
-      !/^\d{4}-\d{2}-\d{2}$/.test(promised_delivery_date) ||
-      Number.isNaN(Date.parse(`${promised_delivery_date}T00:00:00Z`))
-    ))
-  ) {
+  const normalizedAttentionPriority = normalizeAttentionPriority(attention_priority);
+  const parsedEstimatedWorkHours = normalizeEstimatedWorkHours(estimated_work_hours);
+  const normalizedPromisedDeliveryDate = normalizeDateOnly(promised_delivery_date);
+  if (promised_delivery_date && !normalizedPromisedDeliveryDate) {
     return res.status(400).json({ error: 'invalid_attention_planning' });
   }
   const customerAuthorized = customer_authorized === true;
@@ -1503,9 +1521,9 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
         normalizeUuid(assigned_mechanic_id),
         assigned_mechanic_name,
         customerAdvanceToPersist,
-        attention_priority,
+        normalizedAttentionPriority,
         parsedEstimatedWorkHours,
-        promised_delivery_date || null,
+        normalizedPromisedDeliveryDate,
         customerAuthorized,
         customerAuthorizedAt,
         patente,
@@ -1620,16 +1638,10 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
       en_estacionamiento_manual = false,
     } = mergedBody;
 
-    const parsedEstimatedWorkHours = Number(estimated_work_hours);
-    if (
-      !['Baja', 'Normal', 'Alta', 'Urgente'].includes(attention_priority) ||
-      !Number.isFinite(parsedEstimatedWorkHours) ||
-      parsedEstimatedWorkHours < 0 ||
-      (promised_delivery_date && (
-        !/^\d{4}-\d{2}-\d{2}$/.test(promised_delivery_date) ||
-        Number.isNaN(Date.parse(`${promised_delivery_date}T00:00:00Z`))
-      ))
-    ) {
+    const normalizedAttentionPriority = normalizeAttentionPriority(attention_priority);
+    const parsedEstimatedWorkHours = normalizeEstimatedWorkHours(estimated_work_hours);
+    const normalizedPromisedDeliveryDate = normalizeDateOnly(promised_delivery_date);
+    if (promised_delivery_date && !normalizedPromisedDeliveryDate) {
       return res.status(400).json({ error: 'invalid_attention_planning' });
     }
     const customerAuthorized = customer_authorized === true;
@@ -1728,9 +1740,9 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
         normalizeUuid(assigned_mechanic_id),
         assigned_mechanic_name,
         customerAdvanceToPersist,
-        attention_priority,
+        normalizedAttentionPriority,
         parsedEstimatedWorkHours,
-        promised_delivery_date || null,
+        normalizedPromisedDeliveryDate,
         customerAuthorized,
         customerAuthorizedAt,
         patente,

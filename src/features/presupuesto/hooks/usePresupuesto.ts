@@ -53,7 +53,7 @@ export default function usePresupuesto(
     : workshopUsers.find((user) => user.role === "Administrador de Taller") ||
       workshopUsers[0];
 
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => {
+  const [, setAuditLogs] = useState<AuditLog[]>(() => {
     const raw = localStorage.getItem("auditLogs");
     return raw ? JSON.parse(raw) : [];
   });
