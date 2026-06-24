@@ -8,7 +8,7 @@ export const parseStoredReviewServices = (
   services
     .filter((service) => !service.startsWith(reviewPartPrefix))
     .map((service) => {
-      const match = service.match(/^(.*ó)(ó:\s+\(\$\s*([^)]+)\))ó$/);
+      const match = service.match(/^(.*?)\s*\(\$\s*([^)]+)\)\s*$/);
       return {
         name: match?.[1]?.trim() || service,
         price: match?.[2]?.replace(/[^\d]/g, "") || "",
@@ -42,9 +42,9 @@ export const parseStoredReviewParts = (
         inventoryItemId,
         name,
         sku,
-        quantity: Math.max(1, parseInt(quantity) || 1),
+        quantity: Math.max(1, parseInt(quantity, 10) || 1),
         unit,
-        unitCost: parseInt(unitCost) || 0,
+        unitCost: parseInt(unitCost, 10) || 0,
         location,
         itemType: (itemType === "insumo" ? "insumo" : "repuesto") as
           | "repuesto"

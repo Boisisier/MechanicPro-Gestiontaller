@@ -125,6 +125,26 @@ const defaultWorkshopUsers: WorkshopUser[] = [
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const auditLogsPageSize = 15;
 
+const apiErrorMessages: Record<string, string> = {
+  invalid_attention_planning:
+    "Revisa la planificación: prioridad, horas estimadas o fecha comprometida.",
+  invalid_customer_advance: "El abono del cliente no es válido.",
+  mechanic_cannot_confirm_exit:
+    "El mecánico puede enviar a salida, pero no confirmar la salida final.",
+  mechanic_cannot_close_vehicle:
+    "El mecánico no puede cerrar económicamente el vehículo.",
+  "Missing customer fields":
+    "Faltan datos del cliente. Revisa nombre, RUT, teléfono, dirección y ciudad.",
+  "Missing field: patente": "Falta la patente del vehículo.",
+  "Invalid patente": "La patente no tiene un formato válido.",
+  "Invalid estado": "El estado del vehículo no es válido.",
+};
+
+const getFriendlyApiError = (error: unknown, fallback: string) => {
+  const message = error instanceof Error ? error.message : "";
+  return apiErrorMessages[message] || message || fallback;
+};
+
 function App() {
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
 
@@ -1218,7 +1238,10 @@ function App() {
     } catch (error) {
       console.error("Review update failed", error);
 
-      showNotification("error", "No se pudo actualizar el vehículo");
+      showNotification(
+        "error",
+        getFriendlyApiError(error, "No se pudo actualizar el vehículo"),
+      );
     }
   };
 

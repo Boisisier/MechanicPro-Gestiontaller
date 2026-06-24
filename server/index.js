@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -281,6 +281,21 @@ const ensureVehicleColumns = async () => {
     alter table workshop_users
       add column if not exists rut text not null default '',
       add column if not exists password_hash text not null default ''
+  `);
+  await pool.query(`
+    update roles
+    set name = 'Mecánico',
+        modules = array_replace(array_replace(modules, 'VehÃ­culos', 'Vehículos'), 'ConfiguraciÃ³n', 'Configuración'),
+        updated_at = now()
+    where name = 'MecÃ¡nico'
+       or 'VehÃ­culos' = any(modules)
+       or 'ConfiguraciÃ³n' = any(modules)
+  `);
+  await pool.query(`
+    update workshop_users
+    set role_name = 'Mecánico',
+        updated_at = now()
+    where role_name = 'MecÃ¡nico'
   `);
   await pool.query(`
     alter table inventory_items
