@@ -52,7 +52,7 @@ export default function ExitPricingSection({
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h4 className="text-sm font-semibold text-gray-900">
-            Valores de la atencion
+            Valores de la atención
           </h4>
           <p className="mt-1 text-xs text-gray-500">
             Completa los valores antes de finalizar la entrega.

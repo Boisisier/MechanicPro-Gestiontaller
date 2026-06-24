@@ -34,7 +34,7 @@ export default function Toast({ notification, onClose }: ToastProps) {
           type="button"
           onClick={onClose}
           className="rounded p-1 opacity-70 hover:bg-white/70 hover:opacity-100"
-          aria-label="Cerrar notificacion"
+          aria-label="Cerrar notificaci?n"
         >
           <X className="h-4 w-4" />
         </button>

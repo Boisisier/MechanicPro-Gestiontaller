@@ -148,9 +148,9 @@ export default function VehicleTable({
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
       <ConfirmDialog
         open={Boolean(deleteConfirm)}
-        title="Eliminar vehiculo"
-        message={`Se eliminara ${deleteConfirm?.patente || 'este vehiculo'} del registro. Esta accion no se puede deshacer desde la pantalla actual.`}
-        confirmLabel="Eliminar vehiculo"
+        title="Eliminar vehículo"
+        message={`Se eliminará ${deleteConfirm?.patente || 'este vehículo'} del registro. Esta acción no se puede deshacer desde la pantalla actual.`}
+        confirmLabel="Eliminar vehículo"
         variant="danger"
         onConfirm={() => {
           if (deleteConfirm && onDelete) {

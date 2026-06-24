@@ -440,7 +440,7 @@ export default function VehicleForm({
       <ConfirmDialog
         open={sendConfirmOpen}
         title="Enviar a En Taller"
-        message="El vehiculo ingresara al submodulo En Taller para que el mecanico pueda registrar trabajos, repuestos y observaciones."
+        message="El vehículo ingresar? al submódulo En Taller para que el mecánico pueda registrar trabajos, repuestos y observaciones."
         confirmLabel="Enviar a En Taller"
         variant="info"
         onConfirm={performSendToReview}
@@ -1035,7 +1035,7 @@ export default function VehicleForm({
                   placeholder="Monto abonado"
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  Se descontara del total final de la atencion.
+                  Se descontar? del total final de la atención.
                 </p>
               </div>
             )}

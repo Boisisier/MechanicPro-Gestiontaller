@@ -240,6 +240,7 @@ const ensureVehicleColumns = async () => {
       add column if not exists codigo_vin text,
       add column if not exists codigo_motor text,
       add column if not exists color text default '',
+      add column if not exists customer_city text not null default 'Sin ciudad',
       add column if not exists customer_email text default '',
       add column if not exists assigned_mechanic_id uuid,
       add column if not exists assigned_mechanic_name text default '',
@@ -1531,52 +1532,11 @@ app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
 
 app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
-  req.body.patente = normalizePatente(req.body.patente);
-
-  const errorMessage = validateVehicle(req.body);
-  if (errorMessage) {
-    return res.status(400).json({ error: errorMessage });
-  }
-
   const { id } = req.params;
-  const {
-    patente,
-    marca,
-    modelo,
-    ano,
-    tipo_vehiculo = 'Auto',
-    codigo_vin = '',
-    codigo_motor = '',
-    color = '',
-    kilometraje = 0,
-    cantidad_combustible = 0,
-    estado,
-    customer_name = '',
-    customer_rut = '',
-    customer_phone = '',
-    customer_address = '',
-    customer_city = '',
-    customer_email = '',
-    assigned_mechanic_id = null,
-    assigned_mechanic_name = '',
-    customer_advance = 0,
-    attention_priority = 'Normal',
-    estimated_work_hours = 0,
-    promised_delivery_date = null,
-    customer_authorized = false,
-    servicios = [],
-    observaciones = '',
-    comentario_tecnico = '',
-    salida_confirmada = false,
-    fecha_salida_confirmada = null,
-    en_estacionamiento_manual = false,
-  } = req.body;
 
   try {
     const existingResult = await pool.query(
-      `select customer_advance, servicios, estado, assigned_mechanic_id,
-              customer_authorized, customer_authorized_at,
-              work_timer_started_at, work_elapsed_seconds
+      `select *
        from vehicles
        where id = $1 and company_id = $2`,
       [id, companyId]
@@ -1585,6 +1545,59 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
       return res.status(404).json({ error: 'not_found' });
     }
     const existingVehicle = existingResult.rows[0];
+    const mergedBody = {
+      ...existingVehicle,
+      ...req.body,
+      patente: normalizePatente(req.body.patente || existingVehicle.patente),
+      customer_name: req.body.customer_name || existingVehicle.customer_name || 'Sin cliente',
+      customer_rut: req.body.customer_rut || existingVehicle.customer_rut || 'Sin RUT',
+      customer_phone: req.body.customer_phone || existingVehicle.customer_phone || 'Sin telefono',
+      customer_address: req.body.customer_address || existingVehicle.customer_address || 'Sin direccion',
+      customer_city: req.body.customer_city || existingVehicle.customer_city || 'Sin ciudad',
+      servicios: Array.isArray(req.body.servicios)
+        ? req.body.servicios
+        : Array.isArray(existingVehicle.servicios)
+          ? existingVehicle.servicios
+          : [],
+    };
+
+    const errorMessage = validateVehicle(mergedBody);
+    if (errorMessage) {
+      return res.status(400).json({ error: errorMessage });
+    }
+
+    const {
+      patente,
+      marca,
+      modelo,
+      ano,
+      tipo_vehiculo = 'Auto',
+      codigo_vin = '',
+      codigo_motor = '',
+      color = '',
+      kilometraje = 0,
+      cantidad_combustible = 0,
+      estado,
+      customer_name = '',
+      customer_rut = '',
+      customer_phone = '',
+      customer_address = '',
+      customer_city = '',
+      customer_email = '',
+      assigned_mechanic_id = null,
+      assigned_mechanic_name = '',
+      customer_advance = 0,
+      attention_priority = 'Normal',
+      estimated_work_hours = 0,
+      promised_delivery_date = null,
+      customer_authorized = false,
+      servicios = [],
+      observaciones = '',
+      comentario_tecnico = '',
+      salida_confirmada = false,
+      fecha_salida_confirmada = null,
+      en_estacionamiento_manual = false,
+    } = mergedBody;
 
     const parsedEstimatedWorkHours = Number(estimated_work_hours);
     if (

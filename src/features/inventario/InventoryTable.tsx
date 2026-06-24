@@ -67,21 +67,21 @@ export default function InventoryTable({
             Inventario sincronizado
           </h3>
           <p className="mt-1 text-sm text-gray-500">
-            Los repuestos e insumos registrados aqui quedan disponibles en el submodulo En Taller.
+            Los repuestos e insumos registrados aquí quedan disponibles en el submódulo En Taller.
           </p>
         </div>
 
         <div className="space-y-6">
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
             <h3 className="mb-4 text-lg font-semibold text-gray-900">
-              Ingreso por codigo
+              Ingreso por código
             </h3>
             <form onSubmit={handleBarcodeSubmit} className="space-y-3">
               <input
                 value={barcodeInput}
                 onChange={(event) => setBarcodeInput(event.target.value)}
                 className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                placeholder="Escanear codigo o SKU"
+                placeholder="Escanear código o SKU"
               />
               <button
                 type="submit"

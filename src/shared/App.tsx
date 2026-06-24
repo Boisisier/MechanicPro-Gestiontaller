@@ -512,10 +512,10 @@ function App() {
         email: session.user?.email || "",
         role: session.role || "member",
       });
-      showNotification("success", "Sesion iniciada");
+      showNotification("success", "Sesión iniciada");
     } catch (error) {
       console.error("Login failed", error);
-      setAuthError("Usuario o contrasena incorrectos");
+      setAuthError("Usuario o contraseña incorrectos");
     } finally {
       setLoginLoading(false);
     }
@@ -530,9 +530,9 @@ function App() {
 
   const handleLogout = () => {
     requestConfirmation({
-      title: "Cerrar sesion",
-      message: "Se cerrara la sesion actual y volveras a la pantalla de acceso.",
-      confirmLabel: "Cerrar sesion",
+      title: "Cerrar sesión",
+      message: "Se cerrará la sesión actual y volverás a la pantalla de acceso.",
+      confirmLabel: "Cerrar sesión",
       variant: "warning",
       onConfirm: performLogout,
     });
@@ -561,7 +561,7 @@ function App() {
     }
 
     if (!emailRegex.test(email)) {
-      showNotification("error", "Ingresa un correo electronico valido");
+      showNotification("error", "Ingresa un correo electrónico válido");
       return;
     }
 
@@ -664,7 +664,7 @@ function App() {
     setEditingUserId(null);
     logAction(
       wasEditing ? "Usuario actualizado" : "Usuario creado",
-      "Configuracion",
+      "Configuración",
       `${name} fue ${wasEditing ? "actualizado" : "creado"} con perfil ${userForm.role}`,
     );
     showNotification(
@@ -714,7 +714,7 @@ function App() {
     }
     logAction(
       "Usuario eliminado",
-      "Configuracion",
+      "Configuración",
       deletedUser ? `${deletedUser.name} fue eliminado` : `Usuario ${id} eliminado`,
     );
     showNotification("success", "Usuario eliminado");
@@ -724,13 +724,110 @@ function App() {
     const user = workshopUsers.find((item) => item.id === id);
     requestConfirmation({
       title: "Eliminar usuario",
-      message: `Se eliminara ${user?.name || "este usuario"} del mantenedor. Esta accion no se puede deshacer desde la pantalla actual.`,
+      message: `Se eliminará ${user?.name || "este usuario"} del mantenedor. Esta acción no se puede deshacer desde la pantalla actual.`,
       confirmLabel: "Eliminar usuario",
       variant: "danger",
       onConfirm: () => performDeleteUser(id),
     });
   };
 
+<<<<<<< HEAD:src/shared/App.tsx
+=======
+  const handleBudgetFormChange = (
+    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    const { name, value } = event.target;
+    setBudgetForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleBudgetServiceChange = (
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
+    const { name, value } = event.target;
+    setBudgetService((prev) => ({
+      ...prev,
+      [name]: name === "price" ? parseInt(value) || 0 : value,
+    }));
+  };
+
+  const handleAddBudgetService = (event: FormEvent) => {
+    event.preventDefault();
+    const name = budgetService.name.trim();
+    if (!name || budgetService.price <= 0) {
+      showNotification("error", "Agrega un servicio y un valor válido");
+      return;
+    }
+
+    setBudgetItems((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        name,
+        price: budgetService.price,
+      },
+    ]);
+    setBudgetService({ name: "", price: 0 });
+    showNotification("success", "Servicio agregado al presupuesto");
+  };
+
+  const handleRemoveBudgetService = (id: string) => {
+    setBudgetItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const performClearBudget = () => {
+    setBudgetForm({
+      customerName: "",
+      customerPhone: "",
+      patente: "",
+      vehicle: "",
+      notes: "",
+    });
+    setBudgetService({ name: "", price: 0 });
+    setBudgetItems([]);
+    showNotification("success", "Presupuesto limpiado");
+  };
+
+  const handleClearBudget = () => {
+    requestConfirmation({
+      title: "Limpiar presupuesto",
+      message: "Se borrarán los datos ingresados y los servicios presupuestados en pantalla.",
+      confirmLabel: "Limpiar presupuesto",
+      variant: "danger",
+      onConfirm: performClearBudget,
+    });
+  };
+
+  const handleSaveBudget = async () => {
+    if (!budgetForm.customerName.trim() || budgetItems.length === 0) {
+      showNotification(
+        "error",
+        "Agrega cliente y al menos un servicio al presupuesto",
+      );
+      return;
+    }
+
+    try {
+      await createBudget({
+        customerName: budgetForm.customerName.trim(),
+        customerPhone: budgetForm.customerPhone.trim(),
+        patente: budgetForm.patente.trim(),
+        vehicle: budgetForm.vehicle.trim(),
+        notes: budgetForm.notes.trim(),
+        items: budgetItems,
+        status: "guardado",
+      });
+      logAction(
+        "Presupuesto guardado",
+        "Presupuesto",
+        `${budgetForm.customerName} - ${budgetItems.length} servicio(s)`,
+      );
+      showNotification("success", "Presupuesto guardado");
+    } catch (error) {
+      console.error("Save budget failed", error);
+      showNotification("error", "No se pudo guardar el presupuesto");
+    }
+  };
+>>>>>>> d07bdfb5526cbd3d9fd52669a2716c9ef3b332f2:src/App.tsx
   const buildVehiclePayload = (
     vehicle: Vehicle,
     overrides: Partial<Vehicle>,
@@ -971,7 +1068,7 @@ function App() {
   const handleClearReviewRecord = () => {
     requestConfirmation({
       title: "Limpiar registro",
-      message: "Se limpiaran los servicios, repuestos y detalle del trabajo actual en taller.",
+      message: "Se limpiarán los servicios, repuestos y detalle del trabajo actual en taller.",
       confirmLabel: "Limpiar registro",
       variant: "danger",
       onConfirm: performClearReviewRecord,
@@ -980,7 +1077,7 @@ function App() {
 
   const handleSaveReview = async (statusOverride?: Vehicle["estado"]) => {
     if (statusOverride === "Entregado" && !canSendToSalida) {
-      showNotification("error", "Tu perfil no puede enviar vehiculos a salida");
+      showNotification("error", "Tu perfil no puede enviar vehículos a salida");
       return;
     }
 
@@ -1115,7 +1212,7 @@ function App() {
       await updateVehicleRecord(
         vehicle,
         { estado: "En Taller" },
-        "Vehiculo enviado a En Taller",
+        "Vehículo enviado a En Taller",
       );
 
       setVehicleTab("taller");
@@ -1130,7 +1227,7 @@ function App() {
 
       logAction(
         "Enviado a En Taller",
-        "Vehiculos",
+        "Vehículos",
         `${vehicle.patente} fue enviado a En Taller`,
       );
     } catch (error) {
@@ -1169,7 +1266,7 @@ function App() {
   const handleReturnFromTaller = (vehicle: Vehicle) => {
     requestConfirmation({
       title: "Devolver a ingreso",
-      message: `El vehiculo ${vehicle.patente} volvera al ingreso y saldra del listado En Taller.`,
+      message: `El vehículo ${vehicle.patente} volverá al ingreso y saldrá del listado En Taller.`,
       confirmLabel: "Devolver",
       variant: "warning",
       onConfirm: () => performReturnFromTaller(vehicle),
@@ -1189,7 +1286,7 @@ function App() {
         fecha_salida_confirmada: new Date().toISOString(),
         en_estacionamiento_manual: false,
       },
-      `Vehiculo ${vehicle.patente} listo`,
+      `Vehículo ${vehicle.patente} listo`,
     );
 
     setManualParkingIds((prev) => prev.filter((id) => id !== vehicle.id));
@@ -1206,7 +1303,7 @@ function App() {
     } catch (error) {
       setReadyVehicleIds((prev) => prev.filter((id) => id !== vehicle.id));
       console.error("Vehicle ready failed", error);
-      showNotification("error", "No se pudo marcar el vehiculo como listo");
+      showNotification("error", "No se pudo marcar el vehículo como listo");
     }
   };
 
@@ -1221,14 +1318,14 @@ function App() {
     if (hasServicesWithoutValue || hasItemsWithoutValue) {
       showNotification(
         "error",
-        "Completa los valores de todos los servicios, repuestos e insumos antes de marcar el vehiculo listo",
+        "Completa los valores de todos los servicios, repuestos e insumos antes de marcar el vehículo listo",
       );
       return;
     }
 
     requestConfirmation({
-      title: "Marcar vehiculo listo",
-      message: `El vehiculo ${vehicle.patente} se ocultara de salida y quedara marcado como listo.`,
+      title: "Marcar vehículo listo",
+      message: `El vehículo ${vehicle.patente} se ocultará de salida y quedará marcado como listo.`,
       confirmLabel: "Marcar listo",
       variant: "info",
       onConfirm: () => performVehicleReady(vehicle),
@@ -1245,7 +1342,7 @@ function App() {
           fecha_salida_confirmada: null,
           en_estacionamiento_manual: false,
         },
-        `Vehiculo ${vehicle.patente} devuelto a En Taller`,
+        `Vehículo ${vehicle.patente} devuelto a En Taller`,
       );
       if (authToken && sessionRole === "member") {
         await deleteParkingRelease(vehicle.id).catch((error) => {
@@ -1269,14 +1366,14 @@ function App() {
       );
     } catch (error) {
       console.error("Return to workshop from salida failed", error);
-      showNotification("error", "No se pudo devolver el vehiculo a En Taller");
+      showNotification("error", "No se pudo devolver el vehículo a En Taller");
     }
   };
 
   const handleReturnToTallerFromSalida = (vehicle: Vehicle) => {
     requestConfirmation({
       title: "Devolver a Taller",
-      message: `El vehiculo ${vehicle.patente} volvera a En Taller con sus servicios, repuestos, insumos y observaciones actuales para seguir editando el trabajo.`,
+      message: `El vehículo ${vehicle.patente} volverá a En Taller con sus servicios, repuestos, insumos y observaciones actuales para seguir editando el trabajo.`,
       confirmLabel: "Devolver a Taller",
       variant: "warning",
       onConfirm: () => performReturnToTallerFromSalida(vehicle),
@@ -1304,7 +1401,7 @@ function App() {
         "Salida",
         `${vehicle.patente} - ${services.length} servicio(s), ${parts.length} item(s) valorizados`,
       );
-      showNotification("success", "Valores de la atencion guardados");
+      showNotification("success", "Valores de la atención guardados");
     } catch (error) {
       console.error("Exit pricing update failed", error);
       showNotification("error", "No se pudieron guardar los valores");
@@ -1330,8 +1427,8 @@ function App() {
         showNotification("success", "vehículo actualizado correctamente");
 
         logAction(
-          "Vehiculo actualizado",
-          "Vehiculos",
+          "Vehículo actualizado",
+          "Vehículos",
           `${formData.patente} fue actualizado`,
         );
 
@@ -1342,8 +1439,8 @@ function App() {
         setVehicles((prev) => [created, ...prev]);
 
         logAction(
-          "Vehiculo registrado",
-          "Vehiculos",
+          "Vehículo registrado",
+          "Vehículos",
           `${formData.patente} fue ingresado al taller`,
         );
 
@@ -1521,7 +1618,7 @@ function App() {
       await updateVehicleRecord(
         vehicle,
         { en_estacionamiento_manual: false },
-        "Vehiculo retirado del estacionamiento",
+        "Vehículo retirado del estacionamiento",
       );
 
       setReleasedParkingIds((prev) =>
@@ -1542,7 +1639,7 @@ function App() {
   const handleReleaseFromParking = (vehicle: Vehicle) => {
     requestConfirmation({
       title: "Sacar del estacionamiento",
-      message: `El vehiculo ${vehicle.patente} dejara de aparecer como pendiente en Estacionamiento.`,
+      message: `El vehículo ${vehicle.patente} dejará de aparecer como pendiente en Estacionamiento.`,
       confirmLabel: "Sacar",
       variant: "danger",
       onConfirm: () => performReleaseFromParking(vehicle),
@@ -1558,7 +1655,7 @@ function App() {
           fecha_salida_confirmada:
             vehicle.fecha_salida_confirmada || new Date().toISOString(),
         },
-        "Vehiculo enviado a estacionamiento",
+        "Vehículo enviado a estacionamiento",
       );
       if (authToken && sessionRole === "member") {
         await deleteParkingRelease(vehicle.id).catch((error) => {
@@ -1590,7 +1687,7 @@ function App() {
   const handleSendToParking = (vehicle: Vehicle) => {
     requestConfirmation({
       title: "Pasar a estacionamiento",
-      message: `El vehiculo ${vehicle.patente} se movera desde Salida al modulo Estacionamiento.`,
+      message: `El vehículo ${vehicle.patente} se moverá desde Salida al módulo Estacionamiento.`,
       confirmLabel: "Pasar a estacionamiento",
       variant: "danger",
       onConfirm: () => performSendToParking(vehicle),
@@ -1667,7 +1764,7 @@ function App() {
       ? {
           id: "taller",
 
-          title: "Vehiculos En Taller",
+          title: "Vehículos En Taller",
 
           body: `${vehiclesEntaller.length} trabajos en curso.`,
 
@@ -1681,7 +1778,7 @@ function App() {
 
           title: "Estacionamiento",
 
-          body: `${parkedVehicles.length} vehiculo(s) llevan mas de 1 semana.`,
+          body: `${parkedVehicles.length} vehículo(s) llevan más de 1 semana.`,
 
           time: "Hoy",
         }
@@ -1947,7 +2044,7 @@ function App() {
                           requestConfirmation({
                             title: "Limpiar formulario",
                             message:
-                              "Se borraran los datos cargados del ingreso de vehiculo actual.",
+                              "Se borrarán los datos cargados del ingreso de vehículo actual.",
                             confirmLabel: "Limpiar formulario",
                             variant: "danger",
                             onConfirm: () => {
@@ -2072,7 +2169,7 @@ function App() {
 
                     <div className="mb-4 flex items-center justify-between gap-3">
                       <h4 className="text-sm font-semibold text-gray-900">
-                        Vehiculos En Taller
+                        Vehículos En Taller
                       </h4>
 
                       <span className="text-xs text-gray-500">
@@ -2082,7 +2179,7 @@ function App() {
 
                     {vehiclesEntaller.length === 0 ? (
                       <p className="text-sm text-gray-500">
-                        No hay vehiculos En Taller.
+                        No hay vehículos En Taller.
                       </p>
                     ) : (
                       <div className="space-y-3 max-h-[32rem] overflow-y-auto pr-1">
@@ -2284,7 +2381,7 @@ function App() {
                                   setPartSearch(event.target.value)
                                 }
                                 className="w-full rounded-lg border border-gray-300 bg-white py-3 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none"
-                                placeholder={`Buscar ${inventoryPickerType === "insumo" ? "insumo" : "repuesto"} por nombre, SKU, codigo o ubicacion...`}
+                                placeholder={`Buscar ${inventoryPickerType === "insumo" ? "insumo" : "repuesto"} por nombre, SKU, código o ubicación...`}
                               />
                             </div>
 
@@ -2384,7 +2481,7 @@ function App() {
 
                                   {reviewParts.length === 0 ? (
                                     <p className="rounded-lg border border-dashed border-gray-300 px-4 py-5 text-sm text-gray-500">
-                                      No hay repuestos ni insumos seleccionados todavia.
+                                      No hay repuestos ni insumos seleccionados todavía.
                                     </p>
                                   ) : (
                                     reviewParts.map((part) => {
@@ -2567,7 +2664,7 @@ function App() {
                           <div className="mb-6 rounded-xl border border-[#0f4471]/20 bg-white p-4 shadow-sm">
                             <div className="mb-4">
                               <h4 className="text-sm font-semibold text-gray-900">
-                                Valores de la atencion
+                                Valores de la atención
                               </h4>
                               <p className="mt-1 text-xs text-gray-500">
                                 Completa los valores de servicios, repuestos e insumos antes de finalizar.
@@ -2748,7 +2845,7 @@ function App() {
                                 requestConfirmation({
                                   title: "Enviar a salida",
                                   message:
-                                    "El vehiculo pasara a Salida y se guardaran los servicios y repuestos registrados.",
+                                    "El vehículo pasará a Salida y se guardarán los servicios y repuestos registrados.",
                                   confirmLabel: "Enviar a salida",
                                   variant: "info",
                                   onConfirm: () => handleSaveReview("Entregado"),
@@ -2763,7 +2860,7 @@ function App() {
                       </>
                     ) : (
                       <p className="text-sm text-gray-500">
-                        Envia un vehiculo a En Taller para registrar servicios.
+                        Envia un vehículo a En Taller para registrar servicios.
                       </p>
                     )}
                   </div>
@@ -2842,7 +2939,7 @@ function App() {
                             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                               <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                  Total atencion
+                                  Total atención
                                 </p>
                                 <p className="mt-1 text-lg font-bold text-gray-900">
                                   ${getVehicleWorkTotal(vehicle).toLocaleString("es-CL")}
@@ -3187,13 +3284,13 @@ function App() {
                   Estacionamiento
                 </h2>
                 <p className="text-sm text-gray-500">
-                  Vehiculos entregados que llevan mas de una semana en el taller.
+                  Vehículos entregados que llevan más de una semana en el taller.
                 </p>
               </div>
 
               {parkedVehicles.length === 0 ? (
                 <div className="rounded-xl border border-gray-200 bg-white p-8 text-sm text-gray-500 shadow-sm">
-                  No hay vehiculos pendientes en estacionamiento.
+                  No hay vehículos pendientes en estacionamiento.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
@@ -3248,7 +3345,7 @@ function App() {
                               Usuario
                             </p>
                             <p className="mt-2 text-sm font-semibold text-gray-900">
-                              {vehicle.assigned_mechanic_name || "Sin mecanico asignado"}
+                              {vehicle.assigned_mechanic_name || "Sin mecánico asignado"}
                             </p>
                             <p className="text-xs text-gray-500">
                               Salida: {getVehicleExitDate(vehicle).toLocaleDateString("es-CL")}
@@ -3361,7 +3458,7 @@ function App() {
 
               {!isSessionAdmin ? (
                 <div className="rounded-xl border border-[#fc3d3c]/30 bg-[#fc3d3c]/10 p-6 text-sm font-semibold text-[#b42318]">
-                  Solo el Administrador de Taller puede ingresar a este modulo.
+                  Solo el Administrador de Taller puede ingresar a este módulo.
                 </div>
               ) : (
                 <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -3369,7 +3466,7 @@ function App() {
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                       <div>
                         <p className="text-sm font-semibold text-gray-900">
-                          {filteredAuditLogs.length} accion(es) encontradas
+                          {filteredAuditLogs.length} acción(es) encontradas
                         </p>
                         <p className="mt-1 text-xs text-gray-500">
                           Total almacenado: {auditLogs.length} registro(s)
@@ -3442,7 +3539,7 @@ function App() {
                                 Modulo
                               </th>
                               <th className="px-4 py-3 text-left font-semibold text-gray-700">
-                                Accion
+                                Acción
                               </th>
                               <th className="px-4 py-3 text-left font-semibold text-gray-700">
                                 Detalle
@@ -3520,7 +3617,7 @@ function App() {
                 </h3>
                 <p className="text-sm text-gray-500">
                   {editingUserId
-                    ? "Edita los datos del usuario. La contrasena solo cambia si escribes una nueva."
+                    ? "Edita los datos del usuario. La contraseña solo cambia si escribes una nueva."
                     : "Crea usuarios y asigna perfiles de acceso por rol."}
                 </p>
               </div>
