@@ -1,4 +1,4 @@
-export type VehicleStatus = "Ingresado" | "Entregado" | "En Taller";
+﻿export type VehicleStatus = "Ingresado" | "Entregado" | "En Taller";
 
 export interface Vehicle {
   id: string;

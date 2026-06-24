@@ -138,7 +138,7 @@ export default function InventoryPage({
         prev.map((item) => (item.id === savedItem.id ? savedItem : item)),
       );
       setBarcodeInput("");
-      showNotification("success", "Stock actualizado por codigo");
+      showNotification("success", "Stock actualizado por código");
     } catch (error) {
       console.error("Barcode stock update failed", error);
       showNotification("error", "No se pudo actualizar el stock");

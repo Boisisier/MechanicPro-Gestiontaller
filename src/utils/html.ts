@@ -165,7 +165,7 @@ export const exportVehiclePdf = (vehicle: Vehicle) => {
 
 
 
-                              {vehicle.tipo_vehiculo} Â· {vehicle.ano}
+                              {vehicle.tipo_vehiculo} · {vehicle.ano}
 
 
 
@@ -213,13 +213,13 @@ ${
     : `<ul>${parts.map((part) => `<li>${escapeHtml(`${part.itemType === "insumo" ? "Insumo" : "Repuesto"}: ${part.name} x${part.quantity} ${part.unit} - $${(part.quantity * (part.unitCost || 0)).toLocaleString("es-CL")}`)}</li>`).join("")}</ul>`
 }
 
-<h2>Resumen de atencion</h2>
+<h2>Resumen de atención</h2>
 
 <div class="summary">
   <div class="summary-row"><span>Servicios</span><strong>$${serviceTotal.toLocaleString("es-CL")}</strong></div>
   <div class="summary-row"><span>Repuestos</span><strong>$${partsTotal.toLocaleString("es-CL")}</strong></div>
   <div class="summary-row"><span>Insumos</span><strong>$${suppliesTotal.toLocaleString("es-CL")}</strong></div>
-  <div class="summary-row"><span>Total atencion</span><strong>$${attentionTotal.toLocaleString("es-CL")}</strong></div>
+  <div class="summary-row"><span>Total atención</span><strong>$${attentionTotal.toLocaleString("es-CL")}</strong></div>
   <div class="summary-row"><span>Abono cliente</span><strong>-$${customerAdvance.toLocaleString("es-CL")}</strong></div>
   <div class="summary-row summary-total"><span>Saldo pendiente</span><strong>$${pendingBalance.toLocaleString("es-CL")}</strong></div>
   ${advanceCredit > 0 ? `<div class="summary-row"><span>Saldo a favor</span><strong>$${advanceCredit.toLocaleString("es-CL")}</strong></div>` : ""}
@@ -233,9 +233,9 @@ ${
 
 <p>${escapeHtml(vehicle.observaciones || "Sin observaciones")}</p>
 
-<h2>Comentario tecnico</h2>
+<h2>Comentario técnico</h2>
 
-<p>${escapeHtml(vehicle.comentario_tecnico || "Sin comentario tecnico")}</p>
+<p>${escapeHtml(vehicle.comentario_tecnico || "Sin comentario técnico")}</p>
 
 
 
