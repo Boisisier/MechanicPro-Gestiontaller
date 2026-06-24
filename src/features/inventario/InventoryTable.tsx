@@ -1,5 +1,5 @@
 import { FormEvent } from "react";
-import { InventoryItem } from "../../lib/types";
+import { InventoryItem } from "../../shared/lib/types";
 
 interface InventoryTableProps {
   inventoryItems: InventoryItem[];

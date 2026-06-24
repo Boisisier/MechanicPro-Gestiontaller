@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, History, RotateCcw, Save, Search, Send, X } from 'lucide-react';
-import { getModelsForBrand, vehicleBrandNames } from '../../features/vehicles/vehicleModelCatalog';
-import { serviceCatalogByCategory } from '../../features/vehicles/serviceCatalog';
+import { getModelsForBrand, vehicleBrandNames } from '../../features/vehiculo/vehicleModelCatalog';
+import { serviceCatalogByCategory } from '../../features/vehiculo/serviceCatalog';
 import ConfirmDialog from '../ui/ConfirmDialog';
 
 type PreviousVehicleData = Omit<Partial<VehicleFormData>, 'promised_delivery_date'> & {

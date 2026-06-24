@@ -4,7 +4,7 @@ import type { ReviewPartItem, ReviewServiceItem, Vehicle } from "../../lib/types
 import {
   parseStoredReviewParts,
   parseStoredReviewServices,
-} from "../../utils/reviewParsers";
+} from "../../shared/utils/reviewParsers";
 
 interface ExitPricingSectionProps {
   vehicle: Vehicle;
