@@ -50,11 +50,11 @@ const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[
 const defaultRoles = [
   {
     name: 'Administrador de Taller',
-    modules: ['Dashboard', 'Vehículos', 'Presupuesto', 'Inventario', 'Reportes', 'Configuración'],
+    modules: ['Dashboard', 'Vehículos', 'Presupuesto', 'Inventario', 'Estacionamiento', 'Reportes', 'Configuración', 'Registro de acciones'],
   },
   {
     name: 'Administrativo',
-    modules: ['Dashboard', 'Vehículos', 'Presupuesto', 'Reportes'],
+    modules: ['Dashboard', 'Vehículos', 'Presupuesto', 'Estacionamiento', 'Reportes'],
   },
   {
     name: 'Mecánico',
@@ -470,6 +470,13 @@ const isMechanicRole = (role = '') => role === 'Mecánico';
 const isWorkshopAdminRole = (role = '') =>
   role === 'admin' || role === 'Administrador de Taller';
 
+const denyMechanicAccess = (req, res, next) => {
+  if (isMechanicRole(req.user?.role)) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+  return next();
+};
+
 const splitServicePrice = (service = '') => {
   const match = String(service).match(/^(.*?)\s*\(\$\s*([^)]+)\)\s*$/);
   return {
@@ -862,7 +869,7 @@ app.get('/roles', authRequired, async (req, res) => {
   }
 });
 
-app.get('/workshop-users', authRequired, async (req, res) => {
+app.get('/workshop-users', authRequired, denyMechanicAccess, async (req, res) => {
   const { company_id: companyId } = req.user;
   try {
     const { rows } = await pool.query(
@@ -881,7 +888,7 @@ app.get('/workshop-users', authRequired, async (req, res) => {
   }
 });
 
-app.post('/workshop-users', authRequired, ensureWritable, async (req, res) => {
+app.post('/workshop-users', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   const name = String(req.body.name || '').trim();
   const rut = String(req.body.rut || '').trim();
@@ -921,7 +928,7 @@ app.post('/workshop-users', authRequired, ensureWritable, async (req, res) => {
   }
 });
 
-app.put('/workshop-users/:id', authRequired, ensureWritable, async (req, res) => {
+app.put('/workshop-users/:id', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   const name = String(req.body.name || '').trim();
   const rut = String(req.body.rut || '').trim();
@@ -984,7 +991,7 @@ app.put('/workshop-users/:id', authRequired, ensureWritable, async (req, res) =>
   }
 });
 
-app.delete('/workshop-users/:id', authRequired, ensureWritable, async (req, res) => {
+app.delete('/workshop-users/:id', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   try {
     const { rows } = await pool.query(
@@ -1001,7 +1008,7 @@ app.delete('/workshop-users/:id', authRequired, ensureWritable, async (req, res)
   }
 });
 
-app.get('/inventory-items', authRequired, async (req, res) => {
+app.get('/inventory-items', authRequired, denyMechanicAccess, async (req, res) => {
   const { company_id: companyId } = req.user;
   try {
     const { rows } = await pool.query(
@@ -1023,7 +1030,7 @@ app.get('/inventory-items', authRequired, async (req, res) => {
   }
 });
 
-app.post('/inventory-items', authRequired, ensureWritable, async (req, res) => {
+app.post('/inventory-items', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   const name = String(req.body.name || '').trim();
   const itemType = req.body.item_type === 'insumo' ? 'insumo' : 'repuesto';
@@ -1078,7 +1085,7 @@ app.post('/inventory-items', authRequired, ensureWritable, async (req, res) => {
   }
 });
 
-app.put('/inventory-items/:id', authRequired, ensureWritable, async (req, res) => {
+app.put('/inventory-items/:id', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   const name = String(req.body.name || '').trim();
   const itemType = req.body.item_type === 'insumo' ? 'insumo' : 'repuesto';
@@ -1123,7 +1130,7 @@ app.put('/inventory-items/:id', authRequired, ensureWritable, async (req, res) =
   }
 });
 
-app.delete('/inventory-items/:id', authRequired, ensureWritable, async (req, res) => {
+app.delete('/inventory-items/:id', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   try {
     const { rows } = await pool.query(
@@ -1285,7 +1292,7 @@ app.delete('/budgets/:id', authRequired, ensureWritable, async (req, res) => {
   }
 });
 
-app.get('/audit-logs', authRequired, async (req, res) => {
+app.get('/audit-logs', authRequired, denyMechanicAccess, async (req, res) => {
   const { company_id: companyId } = req.user;
   const dateFrom = String(req.query.date_from || '').trim();
   const dateTo = String(req.query.date_to || '').trim();
@@ -1327,7 +1334,7 @@ app.get('/audit-logs', authRequired, async (req, res) => {
   }
 });
 
-app.post('/audit-logs', authRequired, ensureWritable, async (req, res) => {
+app.post('/audit-logs', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   const userName = String(req.body.user_name || req.body.user || '').trim();
   const moduleName = String(req.body.module || '').trim();
@@ -1352,7 +1359,7 @@ app.post('/audit-logs', authRequired, ensureWritable, async (req, res) => {
   }
 });
 
-app.get('/parking-releases', authRequired, async (req, res) => {
+app.get('/parking-releases', authRequired, denyMechanicAccess, async (req, res) => {
   const { company_id: companyId } = req.user;
   try {
     const { rows } = await pool.query(
@@ -1369,7 +1376,7 @@ app.get('/parking-releases', authRequired, async (req, res) => {
   }
 });
 
-app.post('/parking-releases', authRequired, ensureWritable, async (req, res) => {
+app.post('/parking-releases', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   const vehicleId = String(req.body.vehicle_id || req.body.vehicleId || '').trim();
   const releasedBy = String(req.body.released_by || req.body.releasedBy || '').trim();
@@ -1395,7 +1402,7 @@ app.post('/parking-releases', authRequired, ensureWritable, async (req, res) => 
   }
 });
 
-app.delete('/parking-releases/:vehicleId', authRequired, ensureWritable, async (req, res) => {
+app.delete('/parking-releases/:vehicleId', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   try {
     const { rows } = await pool.query(

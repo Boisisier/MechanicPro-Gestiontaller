@@ -91,10 +91,18 @@ const roleModules: Record<UserRole, string[]> = {
     "Vehículos",
     "Presupuesto",
     "Inventario",
+    "Estacionamiento",
     "Reportes",
     "Configuración",
+    "Registro de acciones",
   ],
-  Administrativo: ["Dashboard", "Vehículos", "Presupuesto", "Reportes"],
+  Administrativo: [
+    "Dashboard",
+    "Vehículos",
+    "Presupuesto",
+    "Estacionamiento",
+    "Reportes",
+  ],
   "Mecánico": ["Vehículos", "Reportes"],
 };
 
@@ -121,6 +129,14 @@ const defaultWorkshopUsers: WorkshopUser[] = [
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const auditLogsPageSize = 15;
+const mechanicHiddenSections = [
+  "dashboard",
+  "presupuesto",
+  "inventario",
+  "estacionamiento",
+  "configuracion",
+  "registro_acciones",
+];
 
 const apiErrorMessages: Record<string, string> = {
   invalid_attention_planning:
@@ -305,11 +321,11 @@ function App() {
   useEffect(() => {
     if (
       isMechanicSession &&
-      (activeSection === "dashboard" || activeSection === "presupuesto")
+      mechanicHiddenSections.includes(activeSection)
     ) {
       setActiveSection("vehiculos");
     }
-  }, [activeSection, isMechanicSession]);
+  }, [activeSection, isMechanicSession, mechanicHiddenSections]);
 
   useEffect(() => {
     if (!canAccessSalida && vehicleTab === "salida") {
@@ -442,7 +458,7 @@ function App() {
   }, [authToken, sessionRole]);
 
   useEffect(() => {
-    if (!authToken || sessionRole !== "member") {
+    if (!authToken || sessionRole !== "member" || isMechanicSession) {
       return;
     }
 
@@ -466,10 +482,10 @@ function App() {
         setReleasedParkingIds(rows.map((item: { vehicle_id: string }) => item.vehicle_id)),
       )
       .catch((error) => console.error("Parking releases load failed", error));
-  }, [authToken, sessionRole]);
+  }, [authToken, sessionRole, isMechanicSession]);
 
   useEffect(() => {
-    if (!authToken || sessionRole !== "member") {
+    if (!authToken || sessionRole !== "member" || isMechanicSession) {
       return;
     }
 
@@ -479,7 +495,7 @@ function App() {
     })
       .then((rows) => setAuditLogs(rows))
       .catch((error) => console.error("Audit logs load failed", error));
-  }, [authToken, sessionRole, auditDateFrom, auditDateTo]);
+  }, [authToken, sessionRole, isMechanicSession, auditDateFrom, auditDateTo]);
 
   useEffect(() => {
     if (
@@ -1923,9 +1939,7 @@ function App() {
         onSectionChange={setActiveSection}
         isOpen={sidebarOpen}
         isDesktopOpen={desktopSidebarOpen}
-        hiddenSections={
-          isMechanicSession ? ["dashboard", "presupuesto"] : []
-        }
+        hiddenSections={isMechanicSession ? mechanicHiddenSections : []}
         onClose={() => setSidebarOpen(false)}
       />
 
@@ -3210,7 +3224,7 @@ function App() {
             </div>
           )}
 
-          {activeSection === "inventario" && (
+          {activeSection === "inventario" && !isMechanicSession && (
             <InventoryPage
               inventoryItems={inventoryItems}
               setInventoryItems={setInventoryItems}
@@ -3222,7 +3236,7 @@ function App() {
             <PresupuestoPage requestConfirmation={requestConfirmation} />
           )}
 
-          {activeSection === "estacionamiento" && (
+          {activeSection === "estacionamiento" && !isMechanicSession && (
             <div className="space-y-6">
               <div className="flex flex-col gap-2">
                 <h2 className="text-2xl font-bold text-gray-900">
@@ -3390,7 +3404,7 @@ function App() {
             </>
           )}
 
-          {activeSection === "registro_acciones" && (
+          {activeSection === "registro_acciones" && !isMechanicSession && (
             <div className="space-y-6">
               <div className="flex flex-col gap-2">
                 <h2 className="text-2xl font-bold text-gray-900">
@@ -3554,7 +3568,7 @@ function App() {
             </div>
           )}
 
-          {activeSection === "configuracion" && (
+          {activeSection === "configuracion" && !isMechanicSession && (
             <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-6">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">
