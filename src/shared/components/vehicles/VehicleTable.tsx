@@ -27,6 +27,8 @@ interface VehicleTableProps {
 
   pageSize?: number;
 
+  enableDateFilter?: boolean;
+
 }
 
 
@@ -51,9 +53,15 @@ export default function VehicleTable({
 
   pageSize,
 
+  enableDateFilter = false,
+
 }: VehicleTableProps) {
 
   const [searchTerm, setSearchTerm] = useState('');
+
+  const [dateFrom, setDateFrom] = useState('');
+
+  const [dateTo, setDateTo] = useState('');
 
   const [deleteConfirm, setDeleteConfirm] = useState<Vehicle | null>(null);
 
@@ -61,19 +69,43 @@ export default function VehicleTable({
 
 
 
-  const filteredvehicles = vehicles.filter((vehicle) =>
+  const fromTime = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
+  const toTime = dateTo ? new Date(`${dateTo}T23:59:59.999`).getTime() : null;
 
-    vehicle.patente.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredvehicles = vehicles.filter((vehicle) => {
 
-    vehicle.marca.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch =
+      vehicle.patente.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      vehicle.marca.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      vehicle.modelo.toLowerCase().includes(searchTerm.toLowerCase());
 
-    vehicle.modelo.toLowerCase().includes(searchTerm.toLowerCase())
+    if (!matchesSearch) {
+      return false;
+    }
 
-  );
+    if (!enableDateFilter || (fromTime === null && toTime === null)) {
+      return true;
+    }
+
+    const vehicleTime = new Date(vehicle.fecha_ingreso).getTime();
+    if (Number.isNaN(vehicleTime)) {
+      return false;
+    }
+
+    if (fromTime !== null && vehicleTime < fromTime) {
+      return false;
+    }
+
+    if (toTime !== null && vehicleTime > toTime) {
+      return false;
+    }
+
+    return true;
+  });
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, vehicles.length, pageSize]);
+  }, [searchTerm, dateFrom, dateTo, vehicles.length, pageSize]);
 
   const paginationEnabled = Boolean(pageSize && pageSize > 0);
   const totalPages = paginationEnabled
@@ -203,6 +235,43 @@ export default function VehicleTable({
           />
 
         </div>
+
+        {enableDateFilter && (
+          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Fecha de ingreso desde
+              </label>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(event) => setDateFrom(event.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#0f4471] focus:outline-none focus:ring-2 focus:ring-[#0f4471]/15"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Fecha de ingreso hasta
+              </label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(event) => setDateTo(event.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#0f4471] focus:outline-none focus:ring-2 focus:ring-[#0f4471]/15"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setDateFrom('');
+                setDateTo('');
+              }}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              Limpiar fechas
+            </button>
+          </div>
+        )}
 
       </div>
 

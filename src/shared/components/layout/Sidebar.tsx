@@ -91,16 +91,23 @@ export default function Sidebar({
         </div>
 
         <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.45)_transparent]">
-          <div className="space-y-5 pb-2">
-            {menuSections.map((section) => (
-              <div key={section.title}>
+          <div className="space-y-2 pb-2">
+            {menuSections.map((section) => {
+              const visibleItems = section.items.filter(
+                (item) => !hiddenSections.includes(item.id),
+              );
+
+              if (visibleItems.length === 0) {
+                return null;
+              }
+
+              return (
+                <div key={section.title}>
                 <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wide text-white/75">
                   {section.title}
                 </p>
                 <ul className="space-y-1.5">
-                  {section.items
-                    .filter((item) => !hiddenSections.includes(item.id))
-                    .map((item) => {
+                  {visibleItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = activeSection === item.id;
 
@@ -122,7 +129,8 @@ export default function Sidebar({
                   })}
                 </ul>
               </div>
-            ))}
+              );
+            })}
           </div>
         </nav>
 

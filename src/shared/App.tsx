@@ -325,13 +325,17 @@ function App() {
     ) {
       setActiveSection("vehiculos");
     }
-  }, [activeSection, isMechanicSession, mechanicHiddenSections]);
+  }, [activeSection, isMechanicSession]);
 
   useEffect(() => {
+    if (isMechanicSession && vehicleTab !== "taller") {
+      setVehicleTab("taller");
+      return;
+    }
     if (!canAccessSalida && vehicleTab === "salida") {
       setVehicleTab("taller");
     }
-  }, [canAccessSalida, vehicleTab]);
+  }, [canAccessSalida, isMechanicSession, vehicleTab]);
 
   const requestConfirmation = (options: {
     title: string;
@@ -385,7 +389,7 @@ function App() {
           email: session.user?.email || "",
           role: session.role || "member",
         });
-      } catch (error) {
+      } catch {
         clearAuthToken();
         setAuthTokenState(null);
         setSessionRole(null);
@@ -455,7 +459,7 @@ function App() {
     };
     setLoading(true);
     load();
-  }, [authToken, sessionRole]);
+  }, [authToken, sessionRole, showNotification]);
 
   useEffect(() => {
     if (!authToken || sessionRole !== "member" || isMechanicSession) {
@@ -905,7 +909,23 @@ function App() {
     );
   };
 
+  const isStoredReviewService = (serviceName: string) =>
+    Boolean(
+      activeReviewVehicle &&
+        parseStoredReviewServices(activeReviewVehicle.servicios).some(
+          (service) => service.name === serviceName,
+        ),
+    );
+
   const handleRemoveReviewService = (serviceName: string) => {
+    if (isMechanicSession && isStoredReviewService(serviceName)) {
+      showNotification(
+        "error",
+        "El mecánico no puede eliminar servicios ya ingresados",
+      );
+      return;
+    }
+
     setReviewServices((prev) =>
       prev.filter((item) => item.name !== serviceName),
     );
@@ -1012,7 +1032,11 @@ function App() {
   };
 
   const performClearReviewRecord = () => {
-    setReviewServices([]);
+    setReviewServices(
+      isMechanicSession && activeReviewVehicle
+        ? parseStoredReviewServices(activeReviewVehicle.servicios)
+        : [],
+    );
     setReviewParts([]);
     setReviewNotes("");
     setServiceSearch("");
@@ -1501,6 +1525,17 @@ function App() {
     return `${hours} h ${minutes.toString().padStart(2, "0")} min`;
   };
 
+  const formatPromisedDeliveryDate = (value?: string | null) => {
+    if (!value) {
+      return "Sin fecha";
+    }
+    const date = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(date.getTime())) {
+      return "Sin fecha";
+    }
+    return date.toLocaleDateString("es-CL");
+  };
+
   const getVehicleWorkTotal = (vehicle: Vehicle) => {
     const serviceTotal = parseStoredReviewServices(vehicle.servicios).reduce(
       (sum, service) => sum + (parseInt(service.price || "0", 10) || 0),
@@ -1980,6 +2015,7 @@ function App() {
 
                     { id: "salida", label: "Salida vehículos" },
                   ]
+                    .filter((tab) => !isMechanicSession || tab.id === "taller")
                     .filter((tab) => canAccessSalida || tab.id !== "salida")
                     .map((tab) => (
                     <button
@@ -2100,36 +2136,10 @@ function App() {
               {vehicleTab === "taller" && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      En Taller
-                    </h3>
-
-                    {activeReviewVehicle && (
-                      <div className="mb-6 rounded-lg border border-blue-500 bg-blue-50 px-4 py-3">
-                        <p className="text-sm font-semibold text-gray-900 uppercase">
-                          {activeReviewVehicle.patente}
-                        </p>
-
-                        <p className="mt-1 text-xs text-gray-600">
-                          {activeReviewVehicle.marca}{" "}
-                          {activeReviewVehicle.modelo} ·{" "}
-                          {activeReviewVehicle.customer_name || "Sin cliente"}
-                        </p>
-                        <p className="mt-1 text-xs font-semibold text-blue-800">
-                          Mecánico: {activeReviewVehicle.assigned_mechanic_name || "Sin asignar"}
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600">
-                          <span>Prioridad: <strong>{activeReviewVehicle.attention_priority || "Normal"}</strong></span>
-                          <span>Plan: <strong>{Number(activeReviewVehicle.estimated_work_hours) || 0} h</strong></span>
-                          <span>Entrega: <strong>{activeReviewVehicle.promised_delivery_date ? new Date(`${activeReviewVehicle.promised_delivery_date}T00:00:00`).toLocaleDateString("es-CL") : "Sin fecha"}</strong></span>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="mb-4 flex items-center justify-between gap-3">
-                      <h4 className="text-sm font-semibold text-gray-900">
-                        Vehículos En Taller
-                      </h4>
+                    <div className="mb-5 flex items-center justify-between gap-3">
+                      <h3 className="text-2xl font-bold text-gray-900">
+                        Vehículos en Taller
+                      </h3>
 
                       <span className="text-xs text-gray-500">
                         {vehiclesEntaller.length} activos
@@ -2164,13 +2174,24 @@ function App() {
                               {vehicle.marca} {vehicle.modelo} ·{" "}
                               {vehicle.customer_name || "Sin cliente"}
                             </p>
+                            <p className="mt-1 text-xs font-semibold text-blue-800">
+                              Mecánico: {vehicle.assigned_mechanic_name || "Sin asignar"}
+                            </p>
 
                             <p className="mt-2 text-xs font-semibold text-gray-500">
                               Sigue En Taller hasta pasar a salida
                             </p>
-                            <p className="mt-1 text-xs text-gray-500">
-                              {vehicle.attention_priority || "Normal"} · {Number(vehicle.estimated_work_hours) || 0} h estimadas
-                            </p>
+                            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600">
+                              <span>
+                                Prioridad: <strong>{vehicle.attention_priority || "Normal"}</strong>
+                              </span>
+                              <span>
+                                Plan: <strong>{Number(vehicle.estimated_work_hours) || 0} h</strong>
+                              </span>
+                              <span>
+                                Entrega: <strong>{formatPromisedDeliveryDate(vehicle.promised_delivery_date)}</strong>
+                              </span>
+                            </div>
                           </button>
                             <div className="mt-3 flex flex-col items-end gap-2">
                               <div className="flex items-center gap-2 text-right">
@@ -2184,14 +2205,16 @@ function App() {
                                   </p>
                                 </div>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => handleReturnFromTaller(vehicle)}
-                                className="rounded-md border border-[#fc3d3c]/30 px-2.5 py-1.5 text-xs font-semibold text-[#b42318] hover:bg-[#fc3d3c]/10"
-                                title="Devolver a ingreso"
-                              >
-                                Devolver
-                              </button>
+                              {!isMechanicSession && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleReturnFromTaller(vehicle)}
+                                  className="rounded-md border border-[#fc3d3c]/30 px-2.5 py-1.5 text-xs font-semibold text-[#b42318] hover:bg-[#fc3d3c]/10"
+                                  title="Devolver a ingreso"
+                                >
+                                  Devolver
+                                </button>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -2519,16 +2542,19 @@ function App() {
                                 </div>
 
                                 <div className="flex items-end">
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleRemoveReviewService(service.name)
-                                    }
-                                    className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#fc3d3c]/30 text-[#fc3d3c] hover:bg-[#fc3d3c]/10"
-                                    title="Eliminar servicio"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
+                                  {(!isMechanicSession ||
+                                    !isStoredReviewService(service.name)) && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleRemoveReviewService(service.name)
+                                      }
+                                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#fc3d3c]/30 text-[#fc3d3c] hover:bg-[#fc3d3c]/10"
+                                      title="Eliminar servicio"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             ))
@@ -3274,6 +3300,14 @@ function App() {
                             <p className="text-sm text-gray-600">
                               {vehicle.marca} {vehicle.modelo} · {vehicle.ano}
                             </p>
+                            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                              <span>
+                                Ingreso: {new Date(vehicle.fecha_ingreso).toLocaleDateString("es-CL")}
+                              </span>
+                              <span>
+                                Salida: {getVehicleExitDate(vehicle).toLocaleDateString("es-CL")}
+                              </span>
+                            </div>
                           </div>
                           <button
                             type="button"
@@ -3305,6 +3339,9 @@ function App() {
                             </p>
                             <p className="mt-2 text-sm font-semibold text-gray-900">
                               {vehicle.assigned_mechanic_name || "Sin mecánico asignado"}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Ingreso: {new Date(vehicle.fecha_ingreso).toLocaleDateString("es-CL")}
                             </p>
                             <p className="text-xs text-gray-500">
                               Salida: {getVehicleExitDate(vehicle).toLocaleDateString("es-CL")}
@@ -3399,6 +3436,7 @@ function App() {
                   onNotify={handleNotify}
                   onExportPdf={canViewPrices ? exportVehiclePdf : undefined}
                   pageSize={8}
+                  enableDateFilter
                 />
               )}
             </>

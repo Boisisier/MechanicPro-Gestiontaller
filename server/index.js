@@ -501,6 +501,7 @@ const sanitizeServicesForMechanic = (services = []) =>
 const mergeMechanicServicesWithStoredPrices = (storedServices = [], incomingServices = []) => {
   const servicePrices = new Map();
   const partPrices = new Map();
+  const storedServiceTexts = new Map();
 
   storedServices.forEach((service) => {
     const text = String(service);
@@ -512,12 +513,16 @@ const mergeMechanicServicesWithStoredPrices = (storedServices = [], incomingServ
       return;
     }
     const parsed = splitServicePrice(text);
+    if (parsed.name) {
+      storedServiceTexts.set(parsed.name, text);
+    }
     if (parsed.name && parsed.price) {
       servicePrices.set(parsed.name, parsed.price);
     }
   });
 
-  return incomingServices.map((service) => {
+  const incomingServiceNames = new Set();
+  const mergedServices = incomingServices.map((service) => {
     const text = String(service);
     if (text.startsWith('[REPUESTO]')) {
       const parts = text.replace('[REPUESTO]', '').trim().split('|');
@@ -528,9 +533,20 @@ const mergeMechanicServicesWithStoredPrices = (storedServices = [], incomingServ
       return `[REPUESTO] ${parts.join('|')}`;
     }
     const parsed = splitServicePrice(text);
+    if (parsed.name) {
+      incomingServiceNames.add(parsed.name);
+    }
     const price = servicePrices.get(parsed.name);
     return price ? `${parsed.name} ($${price})` : parsed.name;
   });
+
+  storedServiceTexts.forEach((storedText, serviceName) => {
+    if (!incomingServiceNames.has(serviceName)) {
+      mergedServices.push(storedText);
+    }
+  });
+
+  return mergedServices;
 };
 
 const sanitizeVehicleForRole = (vehicle, role) => {
@@ -1434,7 +1450,7 @@ app.get('/vehicles', authRequired, async (req, res) => {
   }
 });
 
-app.post('/vehicles', authRequired, ensureWritable, async (req, res) => {
+app.post('/vehicles', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
 
   if (!req.body.estado) {
@@ -1660,6 +1676,9 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
 
     let customerAdvanceToPersist = Number(customer_advance);
     let servicesToPersist = servicios;
+    if (isMechanicRole(req.user.role) && estado === 'Ingresado') {
+      return res.status(403).json({ error: 'forbidden' });
+    }
     if (isMechanicRole(req.user.role) && Boolean(salida_confirmada)) {
       return res.status(403).json({ error: 'mechanic_cannot_confirm_exit' });
     }

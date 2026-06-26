@@ -207,7 +207,7 @@ export default function VehicleForm({
 
   useEffect(() => {
     if (editingVehicle) {
-      const { id, ...data } = editingVehicle;
+      const data = editingVehicle;
       setFormData({
         ...initialFormData,
         ...data,
