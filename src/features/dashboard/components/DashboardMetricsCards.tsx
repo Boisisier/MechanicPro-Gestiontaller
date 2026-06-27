@@ -1,31 +1,36 @@
-﻿import { Car, CheckCircle, Clock, Wrench } from 'lucide-react';
+﻿import { Car, CheckCircle, Clock, Wrench } from "lucide-react";
 
-interface MetricsCardsProps {
+interface DashboardMetricsCardsProps {
   totalvehicles: number;
   ingresados: number;
   entregados: number;
   enTaller: number;
 }
 
-export default function MetricsCards({ totalvehicles, ingresados, entregados, enTaller }: MetricsCardsProps) {
+export default function DashboardMetricsCards({
+  totalvehicles,
+  ingresados,
+  entregados,
+  enTaller,
+}: DashboardMetricsCardsProps) {
   const metrics = [
     {
-      label: 'Total vehículos',
+      label: "Total vehículos",
       value: totalvehicles,
       icon: Car,
     },
     {
-      label: 'Ingresados',
+      label: "Ingresados",
       value: ingresados,
       icon: Wrench,
     },
     {
-      label: 'Entregados',
+      label: "Entregados",
       value: entregados,
       icon: CheckCircle,
     },
     {
-      label: 'En Taller',
+      label: "En Taller",
       value: enTaller,
       icon: Clock,
     },
@@ -44,8 +49,12 @@ export default function MetricsCards({ totalvehicles, ingresados, entregados, en
               <Icon className="h-5 w-5 text-accent" />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-xs font-medium text-gray-500">{metric.label}</p>
-              <p className="mt-0.5 text-2xl font-bold leading-none text-gray-900">{metric.value}</p>
+              <p className="truncate text-xs font-medium text-gray-500">
+                {metric.label}
+              </p>
+              <p className="mt-0.5 text-2xl font-bold leading-none text-gray-900">
+                {metric.value}
+              </p>
             </div>
           </div>
         );

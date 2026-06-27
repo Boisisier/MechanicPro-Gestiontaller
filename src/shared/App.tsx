@@ -38,7 +38,6 @@ import Sidebar from "./components/layout/Sidebar";
 
 import Header from "./components/layout/Header";
 
-import MetricsCards from "./components/dashboard/MetricsCards";
 
 import VehicleForm, {
   VehicleFormData,
@@ -57,10 +56,6 @@ import {
   RotateCcw,
   Send,
   Edit2,
-  TrendingUp,
-  History,
-  Package,
-  Wrench,
   Clock,
 } from "lucide-react";
 
@@ -75,15 +70,14 @@ import {
 
 import { exportVehiclePdf } from "./utils/html";
 
-import {
-  serviceCatalogByCategory,
-} from "../features/vehiculo/serviceCatalog";
+import { serviceCatalogByCategory } from "../features/vehiculo/serviceCatalog";
 
 import { useNotification } from "./hooks/useNotification";
 
 import InventoryPage from "../features/inventario/InventoryPage";
 import mechanicProLogo from "./assets/mechanic-pro-logo.png";
 import PresupuestoPage from "../features/presupuesto/PresupuestoPage";
+import Dashboard from "../features/dashboard/DashboardPage";
 
 const roleModules: Record<UserRole, string[]> = {
   "Administrador de Taller": [
@@ -103,7 +97,7 @@ const roleModules: Record<UserRole, string[]> = {
     "Estacionamiento",
     "Reportes",
   ],
-  "Mecánico": ["Vehículos", "Reportes"],
+  Mecánico: ["Vehículos", "Reportes"],
 };
 
 const defaultWorkshopUsers: WorkshopUser[] = [
@@ -237,9 +231,9 @@ function App() {
   });
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
 
-  const [vehicleTab, setVehicleTab] = useState<
-    "ingreso" | "taller" | "salida"
-  >("ingreso");
+  const [vehicleTab, setVehicleTab] = useState<"ingreso" | "taller" | "salida">(
+    "ingreso",
+  );
 
   const [reviewVehicleId, setReviewVehicleId] = useState<string | null>(null);
 
@@ -284,16 +278,15 @@ function App() {
     return raw ? JSON.parse(raw) : [];
   });
 
-  const currentAuditUser =
-    sessionUser
-      ? {
-          id: "session-user",
-          name: sessionUser.name,
-          email: sessionUser.email,
-          role: sessionUser.role as UserRole,
-        }
-      : (workshopUsers.find((user) => user.role === "Administrador de Taller") ||
-          workshopUsers[0]);
+  const currentAuditUser = sessionUser
+    ? {
+        id: "session-user",
+        name: sessionUser.name,
+        email: sessionUser.email,
+        role: sessionUser.role as UserRole,
+      }
+    : workshopUsers.find((user) => user.role === "Administrador de Taller") ||
+      workshopUsers[0];
 
   const isSessionAdmin =
     sessionUser?.role === "admin" ||
@@ -319,10 +312,7 @@ function App() {
   };
 
   useEffect(() => {
-    if (
-      isMechanicSession &&
-      mechanicHiddenSections.includes(activeSection)
-    ) {
+    if (isMechanicSession && mechanicHiddenSections.includes(activeSection)) {
       setActiveSection("vehiculos");
     }
   }, [activeSection, isMechanicSession]);
@@ -426,7 +416,10 @@ function App() {
   }, [auditDateFrom, auditDateTo]);
 
   useEffect(() => {
-    localStorage.setItem("releasedParkingIds", JSON.stringify(releasedParkingIds));
+    localStorage.setItem(
+      "releasedParkingIds",
+      JSON.stringify(releasedParkingIds),
+    );
   }, [releasedParkingIds]);
 
   useEffect(() => {
@@ -483,7 +476,9 @@ function App() {
 
     getParkingReleases()
       .then((rows) =>
-        setReleasedParkingIds(rows.map((item: { vehicle_id: string }) => item.vehicle_id)),
+        setReleasedParkingIds(
+          rows.map((item: { vehicle_id: string }) => item.vehicle_id),
+        ),
       )
       .catch((error) => console.error("Parking releases load failed", error));
   }, [authToken, sessionRole, isMechanicSession]);
@@ -571,7 +566,8 @@ function App() {
   const handleLogout = () => {
     requestConfirmation({
       title: "Cerrar sesión",
-      message: "Se cerrará la sesión actual y volverás a la pantalla de acceso.",
+      message:
+        "Se cerrará la sesión actual y volverás a la pantalla de acceso.",
       confirmLabel: "Cerrar sesión",
       variant: "warning",
       onConfirm: performLogout,
@@ -641,7 +637,8 @@ function App() {
                     name: savedUser.name,
                     rut: savedUser.rut,
                     email: savedUser.email,
-                    role: savedUser.role_name || savedUser.role || userForm.role,
+                    role:
+                      savedUser.role_name || savedUser.role || userForm.role,
                   }
                 : user,
             ),
@@ -755,7 +752,9 @@ function App() {
     logAction(
       "Usuario eliminado",
       "Configuración",
-      deletedUser ? `${deletedUser.name} fue eliminado` : `Usuario ${id} eliminado`,
+      deletedUser
+        ? `${deletedUser.name} fue eliminado`
+        : `Usuario ${id} eliminado`,
     );
     showNotification("success", "Usuario eliminado");
   };
@@ -789,70 +788,70 @@ function App() {
     };
 
     return {
-    patente: vehicle.patente,
+      patente: vehicle.patente,
 
-    marca: vehicle.marca,
+      marca: vehicle.marca,
 
-    modelo: vehicle.modelo,
+      modelo: vehicle.modelo,
 
-    ano: vehicle.ano,
+      ano: vehicle.ano,
 
-    tipo_vehiculo: vehicle.tipo_vehiculo,
+      tipo_vehiculo: vehicle.tipo_vehiculo,
 
-    codigo_vin: vehicle.codigo_vin || "",
+      codigo_vin: vehicle.codigo_vin || "",
 
-    codigo_motor: vehicle.codigo_motor || "",
+      codigo_motor: vehicle.codigo_motor || "",
 
-    color: vehicle.color || "",
+      color: vehicle.color || "",
 
-    kilometraje: vehicle.kilometraje,
+      kilometraje: vehicle.kilometraje,
 
-    cantidad_combustible: vehicle.cantidad_combustible,
+      cantidad_combustible: vehicle.cantidad_combustible,
 
-    estado: vehicle.estado,
+      estado: vehicle.estado,
 
-    customer_name: vehicle.customer_name || "",
+      customer_name: vehicle.customer_name || "",
 
-    customer_rut: vehicle.customer_rut || "",
+      customer_rut: vehicle.customer_rut || "",
 
-    customer_phone: vehicle.customer_phone || "",
+      customer_phone: vehicle.customer_phone || "",
 
-    customer_address: vehicle.customer_address || "",
+      customer_address: vehicle.customer_address || "",
 
-    customer_city: vehicle.customer_city || "",
+      customer_city: vehicle.customer_city || "",
 
-    customer_email: vehicle.customer_email || "",
+      customer_email: vehicle.customer_email || "",
 
-    assigned_mechanic_id: vehicle.assigned_mechanic_id || "",
+      assigned_mechanic_id: vehicle.assigned_mechanic_id || "",
 
-    assigned_mechanic_name: vehicle.assigned_mechanic_name || "",
+      assigned_mechanic_name: vehicle.assigned_mechanic_name || "",
 
-    customer_advance: vehicle.customer_advance || 0,
+      customer_advance: vehicle.customer_advance || 0,
 
-    attention_priority: vehicle.attention_priority || "Normal",
+      attention_priority: vehicle.attention_priority || "Normal",
 
-    estimated_work_hours: vehicle.estimated_work_hours || 0,
+      estimated_work_hours: vehicle.estimated_work_hours || 0,
 
-    customer_authorized: vehicle.customer_authorized || false,
+      customer_authorized: vehicle.customer_authorized || false,
 
-    servicios: vehicle.servicios || [],
+      servicios: vehicle.servicios || [],
 
-    observaciones: vehicle.observaciones || "",
+      observaciones: vehicle.observaciones || "",
 
-    comentario_tecnico: vehicle.comentario_tecnico || "",
+      comentario_tecnico: vehicle.comentario_tecnico || "",
 
-    salida_confirmada: vehicle.salida_confirmada || false,
+      salida_confirmada: vehicle.salida_confirmada || false,
 
-    fecha_salida_confirmada: vehicle.fecha_salida_confirmada || null,
+      fecha_salida_confirmada: vehicle.fecha_salida_confirmada || null,
 
-    en_estacionamiento_manual: vehicle.en_estacionamiento_manual || false,
+      en_estacionamiento_manual: vehicle.en_estacionamiento_manual || false,
 
-    ...overrides,
+      ...overrides,
 
-    promised_delivery_date:
-      "promised_delivery_date" in overrides
-        ? normalizePayloadDate(overrides.promised_delivery_date)
-        : normalizePayloadDate(vehicle.promised_delivery_date),
+      promised_delivery_date:
+        "promised_delivery_date" in overrides
+          ? normalizePayloadDate(overrides.promised_delivery_date)
+          : normalizePayloadDate(vehicle.promised_delivery_date),
     };
   };
 
@@ -912,9 +911,9 @@ function App() {
   const isStoredReviewService = (serviceName: string) =>
     Boolean(
       activeReviewVehicle &&
-        parseStoredReviewServices(activeReviewVehicle.servicios).some(
-          (service) => service.name === serviceName,
-        ),
+      parseStoredReviewServices(activeReviewVehicle.servicios).some(
+        (service) => service.name === serviceName,
+      ),
     );
 
   const handleRemoveReviewService = (serviceName: string) => {
@@ -1049,7 +1048,8 @@ function App() {
   const handleClearReviewRecord = () => {
     requestConfirmation({
       title: "Limpiar registro",
-      message: "Se limpiarán los servicios, repuestos y detalle del trabajo actual en taller.",
+      message:
+        "Se limpiarán los servicios, repuestos y detalle del trabajo actual en taller.",
       confirmLabel: "Limpiar registro",
       variant: "danger",
       onConfirm: performClearReviewRecord,
@@ -1263,27 +1263,27 @@ function App() {
     );
 
     try {
-    await updateVehicleRecord(
-      vehicle,
-      {
-        salida_confirmada: true,
-        fecha_salida_confirmada: new Date().toISOString(),
-        en_estacionamiento_manual: false,
-      },
-      `Vehículo ${vehicle.patente} listo`,
-    );
-
-    setManualParkingIds((prev) => prev.filter((id) => id !== vehicle.id));
-
-    setTimeout(() => {
-      setHiddenSalidaIds((prev) =>
-        prev.includes(vehicle.id) ? prev : [...prev, vehicle.id],
+      await updateVehicleRecord(
+        vehicle,
+        {
+          salida_confirmada: true,
+          fecha_salida_confirmada: new Date().toISOString(),
+          en_estacionamiento_manual: false,
+        },
+        `Vehículo ${vehicle.patente} listo`,
       );
 
-      showNotification("success", `vehículo ${vehicle.patente} listo`);
+      setManualParkingIds((prev) => prev.filter((id) => id !== vehicle.id));
 
-      setVehicleTab("ingreso");
-    }, 400);
+      setTimeout(() => {
+        setHiddenSalidaIds((prev) =>
+          prev.includes(vehicle.id) ? prev : [...prev, vehicle.id],
+        );
+
+        showNotification("success", `vehículo ${vehicle.patente} listo`);
+
+        setVehicleTab("ingreso");
+      }, 400);
     } catch (error) {
       setReadyVehicleIds((prev) => prev.filter((id) => id !== vehicle.id));
       console.error("Vehicle ready failed", error);
@@ -1453,16 +1453,6 @@ function App() {
   //   window.scrollTo({ top: 0, behavior: 'smooth' });
   // };
 
-  const metrics = {
-    total: vehicles.length,
-
-    enTaller: vehicles.filter((v) => v.estado === "Ingresado").length,
-
-    entregados: vehicles.filter((v) => v.estado === "Entregado").length,
-
-    entaller: vehicles.filter((v) => v.estado === "En Taller").length,
-  };
-
   const vehiclesEnTaller = vehicles.filter(
     (vehicle) => vehicle.estado === "Ingresado",
   );
@@ -1477,7 +1467,9 @@ function App() {
 
   const getVehicleExitDate = (vehicle: Vehicle) =>
     new Date(
-      vehicle.fecha_salida_confirmada || vehicle.updated_at || vehicle.fecha_ingreso,
+      vehicle.fecha_salida_confirmada ||
+        vehicle.updated_at ||
+        vehicle.fecha_ingreso,
     );
 
   const getParkingDays = (vehicle: Vehicle) => {
@@ -1515,7 +1507,9 @@ function App() {
     if (Number.isNaN(startedAt)) {
       return accumulated;
     }
-    return accumulated + Math.max(0, Math.floor((workClockNow - startedAt) / 1000));
+    return (
+      accumulated + Math.max(0, Math.floor((workClockNow - startedAt) / 1000))
+    );
   };
 
   const formatVehicleWorkTime = (vehicle: Vehicle) => {
@@ -1627,7 +1621,10 @@ function App() {
       );
     } catch (error) {
       console.error("Parking release failed", error);
-      showNotification("error", "No se pudo guardar la salida de estacionamiento");
+      showNotification(
+        "error",
+        "No se pudo guardar la salida de estacionamiento",
+      );
     }
   };
 
@@ -1786,75 +1783,7 @@ function App() {
     time: string;
   }>;
 
-  const completedServices = vehicles.flatMap((vehicle) =>
-    parseStoredReviewServices(vehicle.servicios).map((service) => ({
-      ...service,
-      vehicle,
-      priceValue: parseInt(service.price || "0", 10) || 0,
-    })),
-  );
-
-  const salesByMonth = Array.from({ length: 6 }, (_, index) => {
-    const date = new Date();
-    date.setMonth(date.getMonth() - (5 - index));
-    const month = date.getMonth();
-    const year = date.getFullYear();
-    const total = vehicles
-      .filter((vehicle) => {
-        const vehicleDate = new Date(vehicle.updated_at || vehicle.fecha_ingreso);
-        return vehicleDate.getMonth() === month && vehicleDate.getFullYear() === year;
-      })
-      .flatMap((vehicle) => parseStoredReviewServices(vehicle.servicios))
-      .reduce((sum, service) => sum + (parseInt(service.price || "0", 10) || 0), 0);
-    return {
-      label: date.toLocaleDateString("es-CL", { month: "short" }).replace(".", ""),
-      total,
-    };
-  });
-
-  const maxSales = Math.max(...salesByMonth.map((item) => item.total), 1);
-  const weeklySales = vehicles
-    .filter((vehicle) => {
-      const vehicleDate = new Date(vehicle.updated_at || vehicle.fecha_ingreso);
-      const now = new Date();
-      const diffMs = now.getTime() - vehicleDate.getTime();
-      return diffMs >= 0 && diffMs <= 7 * 24 * 60 * 60 * 1000;
-    })
-    .flatMap((vehicle) => parseStoredReviewServices(vehicle.servicios))
-    .reduce((sum, service) => sum + (parseInt(service.price || "0", 10) || 0), 0);
-
-  const mostRequestedServices = Object.entries(
-    completedServices.reduce<Record<string, number>>((acc, service) => {
-      acc[service.name] = (acc[service.name] || 0) + 1;
-      return acc;
-    }, {}),
-  )
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
-  const maxRequestedServiceCount = Math.max(...mostRequestedServices.map((item) => item.count), 1);
-
-  const latestMaintenances = vehicles
-    .filter((vehicle) => parseStoredReviewServices(vehicle.servicios).length > 0)
-    .sort(
-      (a, b) =>
-        new Date(b.updated_at || b.fecha_ingreso).getTime() -
-        new Date(a.updated_at || a.fecha_ingreso).getTime(),
-    )
-    .slice(0, 5);
-
-  const inventoryMovements = vehicles
-    .flatMap((vehicle) =>
-      parseStoredReviewParts(vehicle.servicios).map((part) => ({
-        id: `${vehicle.id}-${part.inventoryItemId}`,
-        name: part.name,
-        quantity: part.quantity,
-        vehicle,
-        date: vehicle.updated_at || vehicle.fecha_ingreso,
-      })),
-    )
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 5);
+  
 
   if (!authToken) {
     return (
@@ -1868,9 +1797,7 @@ function App() {
                 className="h-full w-full object-contain"
               />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Mechanic Pro
-            </h1>
+            <h1 className="text-2xl font-bold text-gray-900">Mechanic Pro</h1>
             <p className="mt-1 text-sm text-gray-500">
               Acceso al sistema de taller.
             </p>
@@ -2018,17 +1945,19 @@ function App() {
                     .filter((tab) => !isMechanicSession || tab.id === "taller")
                     .filter((tab) => canAccessSalida || tab.id !== "salida")
                     .map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setVehicleTab(tab.id as typeof vehicleTab)}
-                      className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                        vehicleTab === tab.id
-                          ? "bg-[#0f4471] text-white shadow-sm hover:bg-[#0b365c]"
-                          : "border border-[#0f4471]/30 text-[#0f4471] hover:bg-[#0f4471]/10"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
+                      <button
+                        key={tab.id}
+                        onClick={() =>
+                          setVehicleTab(tab.id as typeof vehicleTab)
+                        }
+                        className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                          vehicleTab === tab.id
+                            ? "bg-[#0f4471] text-white shadow-sm hover:bg-[#0b365c]"
+                            : "border border-[#0f4471]/30 text-[#0f4471] hover:bg-[#0f4471]/10"
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
                     ))}
 
                   {vehicleTab === "ingreso" && (
@@ -2166,33 +2095,47 @@ function App() {
                               onClick={() => handleReviewSelect(vehicle)}
                               className="w-full text-left"
                             >
-                            <p className="text-sm font-semibold text-gray-900 uppercase">
-                              {vehicle.patente}
-                            </p>
+                              <p className="text-sm font-semibold text-gray-900 uppercase">
+                                {vehicle.patente}
+                              </p>
 
-                            <p className="text-xs text-gray-500">
-                              {vehicle.marca} {vehicle.modelo} ·{" "}
-                              {vehicle.customer_name || "Sin cliente"}
-                            </p>
-                            <p className="mt-1 text-xs font-semibold text-blue-800">
-                              Mecánico: {vehicle.assigned_mechanic_name || "Sin asignar"}
-                            </p>
+                              <p className="text-xs text-gray-500">
+                                {vehicle.marca} {vehicle.modelo} ·{" "}
+                                {vehicle.customer_name || "Sin cliente"}
+                              </p>
+                              <p className="mt-1 text-xs font-semibold text-blue-800">
+                                Mecánico:{" "}
+                                {vehicle.assigned_mechanic_name ||
+                                  "Sin asignar"}
+                              </p>
 
-                            <p className="mt-2 text-xs font-semibold text-gray-500">
-                              Sigue En Taller hasta pasar a salida
-                            </p>
-                            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600">
-                              <span>
-                                Prioridad: <strong>{vehicle.attention_priority || "Normal"}</strong>
-                              </span>
-                              <span>
-                                Plan: <strong>{Number(vehicle.estimated_work_hours) || 0} h</strong>
-                              </span>
-                              <span>
-                                Entrega: <strong>{formatPromisedDeliveryDate(vehicle.promised_delivery_date)}</strong>
-                              </span>
-                            </div>
-                          </button>
+                              <p className="mt-2 text-xs font-semibold text-gray-500">
+                                Sigue En Taller hasta pasar a salida
+                              </p>
+                              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600">
+                                <span>
+                                  Prioridad:{" "}
+                                  <strong>
+                                    {vehicle.attention_priority || "Normal"}
+                                  </strong>
+                                </span>
+                                <span>
+                                  Plan:{" "}
+                                  <strong>
+                                    {Number(vehicle.estimated_work_hours) || 0}{" "}
+                                    h
+                                  </strong>
+                                </span>
+                                <span>
+                                  Entrega:{" "}
+                                  <strong>
+                                    {formatPromisedDeliveryDate(
+                                      vehicle.promised_delivery_date,
+                                    )}
+                                  </strong>
+                                </span>
+                              </div>
+                            </button>
                             <div className="mt-3 flex flex-col items-end gap-2">
                               <div className="flex items-center gap-2 text-right">
                                 <Clock className="h-4 w-4 text-[#0f4471]" />
@@ -2208,7 +2151,9 @@ function App() {
                               {!isMechanicSession && (
                                 <button
                                   type="button"
-                                  onClick={() => handleReturnFromTaller(vehicle)}
+                                  onClick={() =>
+                                    handleReturnFromTaller(vehicle)
+                                  }
                                   className="rounded-md border border-[#fc3d3c]/30 px-2.5 py-1.5 text-xs font-semibold text-[#b42318] hover:bg-[#fc3d3c]/10"
                                   title="Devolver a ingreso"
                                 >
@@ -2232,8 +2177,8 @@ function App() {
                             </h3>
 
                             <p className="text-sm text-gray-500">
-                              Busca procedimientos, agrégalos con valor y
-                              guarda el trabajo ejecutado.
+                              Busca procedimientos, agrégalos con valor y guarda
+                              el trabajo ejecutado.
                             </p>
                           </div>
 
@@ -2254,7 +2199,8 @@ function App() {
                               onClick={() => openInventoryPicker("repuesto")}
                               className="rounded-lg bg-[#0f4471] px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#0b365c]"
                             >
-                              {partPickerOpen && inventoryPickerType === "repuesto"
+                              {partPickerOpen &&
+                              inventoryPickerType === "repuesto"
                                 ? "Cerrar repuestos"
                                 : "Buscar repuestos"}
                             </button>
@@ -2263,18 +2209,13 @@ function App() {
                               onClick={() => openInventoryPicker("insumo")}
                               className="rounded-lg bg-[#0f4471] px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#0b365c]"
                             >
-                              {partPickerOpen && inventoryPickerType === "insumo"
+                              {partPickerOpen &&
+                              inventoryPickerType === "insumo"
                                 ? "Cerrar insumos"
                                 : "Buscar insumos"}
                             </button>
                           </div>
                         </div>
-
-
-
-
-
-
 
                         <div className="relative mb-6">
                           <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
@@ -2385,8 +2326,11 @@ function App() {
                               <div className="max-h-72 overflow-y-auto p-2">
                                 {filteredInventoryParts.length === 0 ? (
                                   <p className="px-3 py-2 text-sm text-gray-500">
-                                    No hay {inventoryPickerType === "insumo" ? "insumos" : "repuestos"} disponibles con esa
-                                    busqueda.
+                                    No hay{" "}
+                                    {inventoryPickerType === "insumo"
+                                      ? "insumos"
+                                      : "repuestos"}{" "}
+                                    disponibles con esa busqueda.
                                   </p>
                                 ) : (
                                   filteredInventoryParts.map((item) => (
@@ -2400,12 +2344,16 @@ function App() {
                                         <span className="block font-semibold text-gray-900">
                                           {item.name}
                                         </span>
-                                        <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                                          item.item_type === "insumo"
-                                            ? "bg-emerald-50 text-emerald-700"
-                                            : "bg-blue-50 text-blue-700"
-                                        }`}>
-                                          {item.item_type === "insumo" ? "Insumo" : "Repuesto"}
+                                        <span
+                                          className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                            item.item_type === "insumo"
+                                              ? "bg-emerald-50 text-emerald-700"
+                                              : "bg-blue-50 text-blue-700"
+                                          }`}
+                                        >
+                                          {item.item_type === "insumo"
+                                            ? "Insumo"
+                                            : "Repuesto"}
                                         </span>
                                         <span className="block text-xs text-gray-500">
                                           {item.category} · SKU:{" "}
@@ -2463,7 +2411,8 @@ function App() {
 
                                   {reviewParts.length === 0 ? (
                                     <p className="rounded-lg border border-dashed border-gray-300 px-4 py-5 text-sm text-gray-500">
-                                      No hay repuestos ni insumos seleccionados todavía.
+                                      No hay repuestos ni insumos seleccionados
+                                      todavía.
                                     </p>
                                   ) : (
                                     reviewParts.map((part) => {
@@ -2582,11 +2531,15 @@ function App() {
                                   (item) => item.id === part.inventoryItemId,
                                 );
                                 const savedQuantity =
-                                  parseStoredReviewParts(activeReviewVehicle.servicios).find(
+                                  parseStoredReviewParts(
+                                    activeReviewVehicle.servicios,
+                                  ).find(
                                     (savedPart) =>
-                                      savedPart.inventoryItemId === part.inventoryItemId,
+                                      savedPart.inventoryItemId ===
+                                      part.inventoryItemId,
                                   )?.quantity || 0;
-                                const availableQuantity = (inventoryItem?.stock || 0) + savedQuantity;
+                                const availableQuantity =
+                                  (inventoryItem?.stock || 0) + savedQuantity;
 
                                 return (
                                   <div
@@ -2598,16 +2551,23 @@ function App() {
                                         <p className="text-sm font-semibold text-gray-900">
                                           {part.name}
                                         </p>
-                                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                                          part.itemType === "insumo"
-                                            ? "bg-emerald-50 text-emerald-700"
-                                            : "bg-blue-50 text-blue-700"
-                                        }`}>
-                                          {part.itemType === "insumo" ? "Insumo" : "Repuesto"}
+                                        <span
+                                          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                            part.itemType === "insumo"
+                                              ? "bg-emerald-50 text-emerald-700"
+                                              : "bg-blue-50 text-blue-700"
+                                          }`}
+                                        >
+                                          {part.itemType === "insumo"
+                                            ? "Insumo"
+                                            : "Repuesto"}
                                         </span>
                                       </div>
                                       <p className="text-xs text-gray-500">
-                                        SKU: {part.sku || "-"} · Bodega: {part.location || "-"} · Stock disponible: {availableQuantity} {part.unit}
+                                        SKU: {part.sku || "-"} · Bodega:{" "}
+                                        {part.location || "-"} · Stock
+                                        disponible: {availableQuantity}{" "}
+                                        {part.unit}
                                       </p>
                                     </div>
                                     <div>
@@ -2622,7 +2582,8 @@ function App() {
                                         onChange={(event) =>
                                           handleReviewPartQuantityChange(
                                             part.inventoryItemId,
-                                            parseInt(event.target.value, 10) || 1,
+                                            parseInt(event.target.value, 10) ||
+                                              1,
                                           )
                                         }
                                         className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
@@ -2631,7 +2592,11 @@ function App() {
                                     <div className="flex items-end">
                                       <button
                                         type="button"
-                                        onClick={() => handleRemoveReviewPart(part.inventoryItemId)}
+                                        onClick={() =>
+                                          handleRemoveReviewPart(
+                                            part.inventoryItemId,
+                                          )
+                                        }
                                         className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#fc3d3c]/30 text-[#fc3d3c] hover:bg-[#fc3d3c]/10"
                                         title="Eliminar item"
                                       >
@@ -2652,13 +2617,16 @@ function App() {
                                 Valores de la atención
                               </h4>
                               <p className="mt-1 text-xs text-gray-500">
-                                Completa los valores de servicios, repuestos e insumos antes de finalizar.
+                                Completa los valores de servicios, repuestos e
+                                insumos antes de finalizar.
                               </p>
                             </div>
 
-                            {reviewServices.length === 0 && reviewParts.length === 0 ? (
+                            {reviewServices.length === 0 &&
+                            reviewParts.length === 0 ? (
                               <p className="rounded-lg border border-dashed border-gray-300 px-4 py-5 text-sm text-gray-500">
-                                Agrega servicios o items de inventario para completar sus valores.
+                                Agrega servicios o items de inventario para
+                                completar sus valores.
                               </p>
                             ) : (
                               <div className="divide-y divide-gray-200 rounded-lg border border-gray-200">
@@ -2671,7 +2639,9 @@ function App() {
                                       <p className="text-sm font-semibold text-gray-900">
                                         {service.name}
                                       </p>
-                                      <p className="text-xs text-gray-500">Servicio</p>
+                                      <p className="text-xs text-gray-500">
+                                        Servicio
+                                      </p>
                                     </div>
                                     <div>
                                       <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -2704,7 +2674,10 @@ function App() {
                                         {part.name}
                                       </p>
                                       <p className="text-xs text-gray-500">
-                                        {part.itemType === "insumo" ? "Insumo" : "Repuesto"} · Cantidad {part.quantity}
+                                        {part.itemType === "insumo"
+                                          ? "Insumo"
+                                          : "Repuesto"}{" "}
+                                        · Cantidad {part.quantity}
                                       </p>
                                     </div>
                                     <div>
@@ -2725,7 +2698,10 @@ function App() {
                                         placeholder="0"
                                       />
                                       <p className="mt-1 text-xs font-semibold text-gray-500">
-                                        Subtotal: ${(part.quantity * (part.unitCost || 0)).toLocaleString("es-CL")}
+                                        Subtotal: $
+                                        {(
+                                          part.quantity * (part.unitCost || 0)
+                                        ).toLocaleString("es-CL")}
                                       </p>
                                     </div>
                                   </div>
@@ -2737,68 +2713,79 @@ function App() {
 
                         <div>
                           {canEditPrices && (
-                          <div className="mb-6 rounded-xl border border-[#0f4471]/20 bg-white p-4 shadow-sm">
-                            <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                              <div>
-                                <h4 className="text-sm font-semibold text-gray-900">
-                                  Resumen de atención
-                                </h4>
-                                <p className="text-xs text-gray-500">
-                                  Total actualizado con servicios, repuestos e insumos seleccionados.
+                            <div className="mb-6 rounded-xl border border-[#0f4471]/20 bg-white p-4 shadow-sm">
+                              <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                  <h4 className="text-sm font-semibold text-gray-900">
+                                    Resumen de atención
+                                  </h4>
+                                  <p className="text-xs text-gray-500">
+                                    Total actualizado con servicios, repuestos e
+                                    insumos seleccionados.
+                                  </p>
+                                </div>
+                                <p className="text-2xl font-bold text-[#0f4471]">
+                                  $
+                                  {reviewAttentionTotal.toLocaleString("es-CL")}
                                 </p>
                               </div>
-                              <p className="text-2xl font-bold text-[#0f4471]">
-                                ${reviewAttentionTotal.toLocaleString("es-CL")}
-                              </p>
-                            </div>
 
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                  Servicios
-                                </p>
-                                <p className="mt-1 text-lg font-bold text-gray-900">
-                                  ${reviewServiceTotal.toLocaleString("es-CL")}
-                                </p>
-                              </div>
-                              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                  Repuestos
-                                </p>
-                                <p className="mt-1 text-lg font-bold text-gray-900">
-                                  ${reviewPartTotal.toLocaleString("es-CL")}
-                                </p>
-                              </div>
-                              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                  Insumos
-                                </p>
-                                <p className="mt-1 text-lg font-bold text-gray-900">
-                                  ${reviewSupplyTotal.toLocaleString("es-CL")}
-                                </p>
-                              </div>
-                              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                                  Abono cliente
-                                </p>
-                                <p className="mt-1 text-lg font-bold text-emerald-800">
-                                  ${(Number(activeReviewVehicle?.customer_advance) || 0).toLocaleString("es-CL")}
-                                </p>
-                              </div>
-                              <div className="rounded-lg border border-[#0f4471]/20 bg-[#0f4471]/5 px-4 py-3">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-[#0f4471]">
-                                  Saldo pendiente
-                                </p>
-                                <p className="mt-1 text-lg font-bold text-[#0f4471]">
-                                  ${Math.max(
-                                    0,
-                                    reviewAttentionTotal -
-                                      (Number(activeReviewVehicle?.customer_advance) || 0),
-                                  ).toLocaleString("es-CL")}
-                                </p>
+                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                                <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                    Servicios
+                                  </p>
+                                  <p className="mt-1 text-lg font-bold text-gray-900">
+                                    $
+                                    {reviewServiceTotal.toLocaleString("es-CL")}
+                                  </p>
+                                </div>
+                                <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                    Repuestos
+                                  </p>
+                                  <p className="mt-1 text-lg font-bold text-gray-900">
+                                    ${reviewPartTotal.toLocaleString("es-CL")}
+                                  </p>
+                                </div>
+                                <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                    Insumos
+                                  </p>
+                                  <p className="mt-1 text-lg font-bold text-gray-900">
+                                    ${reviewSupplyTotal.toLocaleString("es-CL")}
+                                  </p>
+                                </div>
+                                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                                    Abono cliente
+                                  </p>
+                                  <p className="mt-1 text-lg font-bold text-emerald-800">
+                                    $
+                                    {(
+                                      Number(
+                                        activeReviewVehicle?.customer_advance,
+                                      ) || 0
+                                    ).toLocaleString("es-CL")}
+                                  </p>
+                                </div>
+                                <div className="rounded-lg border border-[#0f4471]/20 bg-[#0f4471]/5 px-4 py-3">
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-[#0f4471]">
+                                    Saldo pendiente
+                                  </p>
+                                  <p className="mt-1 text-lg font-bold text-[#0f4471]">
+                                    $
+                                    {Math.max(
+                                      0,
+                                      reviewAttentionTotal -
+                                        (Number(
+                                          activeReviewVehicle?.customer_advance,
+                                        ) || 0),
+                                    ).toLocaleString("es-CL")}
+                                  </p>
+                                </div>
                               </div>
                             </div>
-                          </div>
                           )}
 
                           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2821,7 +2808,9 @@ function App() {
                             onClick={() => handleSaveReview()}
                             className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
                           >
-                            {canEditPrices ? "Guardar selección" : "Guardar trabajo"}
+                            {canEditPrices
+                              ? "Guardar selección"
+                              : "Guardar trabajo"}
                           </button>
 
                           {canSendToSalida && (
@@ -2833,7 +2822,8 @@ function App() {
                                     "El vehículo pasará a Salida y se guardarán los servicios y repuestos registrados.",
                                   confirmLabel: "Enviar a salida",
                                   variant: "info",
-                                  onConfirm: () => handleSaveReview("Entregado"),
+                                  onConfirm: () =>
+                                    handleSaveReview("Entregado"),
                                 })
                               }
                               className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-green-700 focus:ring-4 focus:ring-green-200"
@@ -2860,200 +2850,211 @@ function App() {
                     </div>
                   ) : (
                     vehiclesEnSalida.map((vehicle) => (
-                        <div
-                          key={vehicle.id}
-                          className={`bg-white rounded-xl border border-gray-200 p-6 shadow-sm fade-item ${
-                            readyVehicleIds.includes(vehicle.id)
-                              ? "fade-out"
-                              : ""
-                          }`}
-                        >
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                              <h3 className="text-lg font-semibold text-gray-900 uppercase">
-                                {vehicle.patente}
-                              </h3>
+                      <div
+                        key={vehicle.id}
+                        className={`bg-white rounded-xl border border-gray-200 p-6 shadow-sm fade-item ${
+                          readyVehicleIds.includes(vehicle.id) ? "fade-out" : ""
+                        }`}
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900 uppercase">
+                              {vehicle.patente}
+                            </h3>
 
-                              <p className="text-sm text-gray-500">
-                                {vehicle.marca} {vehicle.modelo} ·{" "}
-                                {vehicle.customer_name || "Sin cliente"}
-                              </p>
-                            </div>
-
-                            <div className="flex flex-col gap-2 sm:flex-row">
-                              <button
-                                onClick={() => exportVehiclePdf(vehicle)}
-                                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                              >
-                                Exportar PDF
-                              </button>
-
-                              <button
-                                onClick={() => handleReturnToTallerFromSalida(vehicle)}
-                                className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700"
-                              >
-                                Devolver a Taller
-                              </button>
-
-                              <button
-                                onClick={() => handleSendToParking(vehicle)}
-                                className="rounded-lg bg-[#fc3d3c] px-4 py-2 text-sm font-semibold text-white hover:bg-[#df2f2f]"
-                              >
-                                Pasar a estacionamiento
-                              </button>
-
-                              <button
-                                onClick={() => handleVehicleReady(vehicle)}
-                                className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
-                              >
-                                vehículo listo
-                              </button>
-                            </div>
+                            <p className="text-sm text-gray-500">
+                              {vehicle.marca} {vehicle.modelo} ·{" "}
+                              {vehicle.customer_name || "Sin cliente"}
+                            </p>
                           </div>
 
-                          {canEditPrices && (
-                            <ExitPricingSection
-                              vehicle={vehicle}
-                              onSave={(services, parts) =>
-                                handleSaveExitPricing(vehicle, services, parts)
+                          <div className="flex flex-col gap-2 sm:flex-row">
+                            <button
+                              onClick={() => exportVehiclePdf(vehicle)}
+                              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                            >
+                              Exportar PDF
+                            </button>
+
+                            <button
+                              onClick={() =>
+                                handleReturnToTallerFromSalida(vehicle)
                               }
-                            />
-                          )}
+                              className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700"
+                            >
+                              Devolver a Taller
+                            </button>
 
-                          {isSessionAdmin && (
-                            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                  Total atención
-                                </p>
-                                <p className="mt-1 text-lg font-bold text-gray-900">
-                                  ${getVehicleWorkTotal(vehicle).toLocaleString("es-CL")}
-                                </p>
-                              </div>
-                              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                  Abono cliente
-                                </p>
-                                <p className="mt-1 text-lg font-bold text-green-700">
-                                  ${(Number(vehicle.customer_advance) || 0).toLocaleString("es-CL")}
-                                </p>
-                              </div>
-                              <div className="rounded-lg border border-[#0f4471]/20 bg-[#0f4471]/5 px-4 py-3">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                  Saldo pendiente
-                                </p>
-                                <p className="mt-1 text-lg font-bold text-[#0f4471]">
-                                  ${Math.max(0, getVehicleWorkTotal(vehicle) - (Number(vehicle.customer_advance) || 0)).toLocaleString("es-CL")}
-                                </p>
-                              </div>
-                            </div>
-                          )}
+                            <button
+                              onClick={() => handleSendToParking(vehicle)}
+                              className="rounded-lg bg-[#fc3d3c] px-4 py-2 text-sm font-semibold text-white hover:bg-[#df2f2f]"
+                            >
+                              Pasar a estacionamiento
+                            </button>
 
-                          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-                            <div className="rounded-lg border border-gray-200 p-4">
-                              <p className="text-xs uppercase tracking-wide text-gray-500">
-                                Cliente
+                            <button
+                              onClick={() => handleVehicleReady(vehicle)}
+                              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+                            >
+                              vehículo listo
+                            </button>
+                          </div>
+                        </div>
+
+                        {canEditPrices && (
+                          <ExitPricingSection
+                            vehicle={vehicle}
+                            onSave={(services, parts) =>
+                              handleSaveExitPricing(vehicle, services, parts)
+                            }
+                          />
+                        )}
+
+                        {isSessionAdmin && (
+                          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                Total atención
                               </p>
-
-                              <p className="text-sm font-semibold text-gray-900">
-                                {vehicle.customer_name || "Sin cliente"}
-                              </p>
-
-                              <p className="text-xs text-gray-500">
-                                {vehicle.customer_rut || "-"}
-                              </p>
-
-                              <p className="text-xs text-gray-500">
-                                {vehicle.customer_phone || "-"}
-                              </p>
-
-                              <p className="text-xs text-gray-500">
-                                {vehicle.customer_address || "-"}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                {vehicle.customer_city || "-"}
+                              <p className="mt-1 text-lg font-bold text-gray-900">
+                                $
+                                {getVehicleWorkTotal(vehicle).toLocaleString(
+                                  "es-CL",
+                                )}
                               </p>
                             </div>
-
-                            <div className="rounded-lg border border-gray-200 p-4">
-                              <p className="text-xs uppercase tracking-wide text-gray-500">
-                                vehículo
+                            <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                Abono cliente
                               </p>
-
-                              <p className="text-sm text-gray-700">
-                                {vehicle.tipo_vehiculo} · {vehicle.ano}
-                              </p>
-
-                              <p className="text-xs text-gray-500">
-                                KM: {vehicle.kilometraje} · Combustible:{" "}
-                                {vehicle.cantidad_combustible}%
-                              </p>
-
-                              <p className="text-xs text-gray-500">
-                                Color ingreso: {vehicle.color || "-"}
-                              </p>
-
-                              <p className="text-xs text-gray-500">
-                                Estado: {vehicle.estado}
+                              <p className="mt-1 text-lg font-bold text-green-700">
+                                $
+                                {(
+                                  Number(vehicle.customer_advance) || 0
+                                ).toLocaleString("es-CL")}
                               </p>
                             </div>
-
-                            <div className="rounded-lg border border-gray-200 p-4">
-                              <p className="text-xs uppercase tracking-wide text-gray-500">
-                                Servicios
+                            <div className="rounded-lg border border-[#0f4471]/20 bg-[#0f4471]/5 px-4 py-3">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                Saldo pendiente
                               </p>
-
-                              {parseStoredReviewServices(vehicle.servicios)
-                                .length > 0 ? (
-                                <ul className="text-xs text-gray-700 list-disc pl-4 mt-2 space-y-1">
-                                  {parseStoredReviewServices(
-                                    vehicle.servicios,
-                                  ).map((service) => (
-                                    <li key={service.name}>
-                                      {serializeReviewService(service)}
-                                    </li>
-                                  ))}
-                                </ul>
-                              ) : (
-                                <p className="text-xs text-gray-500 mt-2">
-                                  Sin servicios registrados.
-                                </p>
-                              )}
-
-                              <p className="mt-4 text-xs uppercase tracking-wide text-gray-500">
-                                Repuestos
+                              <p className="mt-1 text-lg font-bold text-[#0f4471]">
+                                $
+                                {Math.max(
+                                  0,
+                                  getVehicleWorkTotal(vehicle) -
+                                    (Number(vehicle.customer_advance) || 0),
+                                ).toLocaleString("es-CL")}
                               </p>
+                            </div>
+                          </div>
+                        )}
 
-                              {parseStoredReviewParts(vehicle.servicios)
-                                .length > 0 ? (
-                                <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-gray-700">
-                                  {parseStoredReviewParts(
-                                    vehicle.servicios,
-                                  ).map((part) => (
+                        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+                          <div className="rounded-lg border border-gray-200 p-4">
+                            <p className="text-xs uppercase tracking-wide text-gray-500">
+                              Cliente
+                            </p>
+
+                            <p className="text-sm font-semibold text-gray-900">
+                              {vehicle.customer_name || "Sin cliente"}
+                            </p>
+
+                            <p className="text-xs text-gray-500">
+                              {vehicle.customer_rut || "-"}
+                            </p>
+
+                            <p className="text-xs text-gray-500">
+                              {vehicle.customer_phone || "-"}
+                            </p>
+
+                            <p className="text-xs text-gray-500">
+                              {vehicle.customer_address || "-"}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {vehicle.customer_city || "-"}
+                            </p>
+                          </div>
+
+                          <div className="rounded-lg border border-gray-200 p-4">
+                            <p className="text-xs uppercase tracking-wide text-gray-500">
+                              vehículo
+                            </p>
+
+                            <p className="text-sm text-gray-700">
+                              {vehicle.tipo_vehiculo} · {vehicle.ano}
+                            </p>
+
+                            <p className="text-xs text-gray-500">
+                              KM: {vehicle.kilometraje} · Combustible:{" "}
+                              {vehicle.cantidad_combustible}%
+                            </p>
+
+                            <p className="text-xs text-gray-500">
+                              Color ingreso: {vehicle.color || "-"}
+                            </p>
+
+                            <p className="text-xs text-gray-500">
+                              Estado: {vehicle.estado}
+                            </p>
+                          </div>
+
+                          <div className="rounded-lg border border-gray-200 p-4">
+                            <p className="text-xs uppercase tracking-wide text-gray-500">
+                              Servicios
+                            </p>
+
+                            {parseStoredReviewServices(vehicle.servicios)
+                              .length > 0 ? (
+                              <ul className="text-xs text-gray-700 list-disc pl-4 mt-2 space-y-1">
+                                {parseStoredReviewServices(
+                                  vehicle.servicios,
+                                ).map((service) => (
+                                  <li key={service.name}>
+                                    {serializeReviewService(service)}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-xs text-gray-500 mt-2">
+                                Sin servicios registrados.
+                              </p>
+                            )}
+
+                            <p className="mt-4 text-xs uppercase tracking-wide text-gray-500">
+                              Repuestos
+                            </p>
+
+                            {parseStoredReviewParts(vehicle.servicios).length >
+                            0 ? (
+                              <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-gray-700">
+                                {parseStoredReviewParts(vehicle.servicios).map(
+                                  (part) => (
                                     <li key={part.inventoryItemId}>
                                       {part.name} x{part.quantity} {part.unit}
                                     </li>
-                                  ))}
-                                </ul>
-                              ) : (
-                                <p className="mt-2 text-xs text-gray-500">
-                                  Sin repuestos registrados.
-                                </p>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="mt-4 rounded-lg border border-gray-200 p-4">
-                            <p className="text-xs uppercase tracking-wide text-gray-500">
-                              Detalle del trabajo
-                            </p>
-
-                            <p className="text-sm text-gray-700 mt-2">
-                              {vehicle.observaciones || "Sin observaciones."}
-                            </p>
+                                  ),
+                                )}
+                              </ul>
+                            ) : (
+                              <p className="mt-2 text-xs text-gray-500">
+                                Sin repuestos registrados.
+                              </p>
+                            )}
                           </div>
                         </div>
-                      ))
+
+                        <div className="mt-4 rounded-lg border border-gray-200 p-4">
+                          <p className="text-xs uppercase tracking-wide text-gray-500">
+                            Detalle del trabajo
+                          </p>
+
+                          <p className="text-sm text-gray-700 mt-2">
+                            {vehicle.observaciones || "Sin observaciones."}
+                          </p>
+                        </div>
+                      </div>
+                    ))
                   )}
                 </div>
               )}
@@ -3061,193 +3062,10 @@ function App() {
           )}
 
           {activeSection === "dashboard" && !isMechanicSession && (
-            <div className="space-y-6">
-              <MetricsCards
-                totalvehicles={metrics.total}
-                ingresados={metrics.enTaller}
-                entregados={metrics.entregados}
-                enTaller={metrics.entaller}
-              />
-
-              <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-                <div className="space-y-6 xl:col-span-2">
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    {canViewPrices && (
-                    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-gray-500">Flujo semanal</p>
-                          <p className="mt-1 text-2xl font-bold text-gray-900">
-                            ${weeklySales.toLocaleString("es-CL")}
-                          </p>
-                        </div>
-                        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#0f4471]/10">
-                          <TrendingUp className="h-5 w-5 text-[#0f4471]" />
-                        </div>
-                      </div>
-                    </div>
-                    )}
-
-                    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-gray-500">Mantenciones registradas</p>
-                          <p className="mt-1 text-2xl font-bold text-gray-900">
-                            {completedServices.length}
-                          </p>
-                        </div>
-                        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#0f4471]/10">
-                          <Wrench className="h-5 w-5 text-[#0f4471]" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {canViewPrices && (
-                  <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                    <div className="mb-6 flex items-center justify-between">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900">Flujo de ventas mensual</h3>
-                        <p className="text-sm text-gray-500">Total estimado por servicios realizados</p>
-                      </div>
-                      <span className="rounded-lg bg-[#0f4471]/10 px-3 py-1 text-xs font-semibold text-[#0f4471]">
-                        Últimos 6 meses
-                      </span>
-                    </div>
-                    <div className="flex h-64 items-end gap-4 border-b border-gray-200 pb-4">
-                      {salesByMonth.map((item) => (
-                        <div key={item.label} className="flex flex-1 flex-col items-center gap-2">
-                          <div className="flex h-48 w-full items-end rounded-lg bg-gray-50 px-2">
-                            <div
-                              className="w-full rounded-t-lg bg-[#0f4471]"
-                              style={{ height: `${Math.max(8, (item.total / maxSales) * 100)}%` }}
-                              title={`$${item.total.toLocaleString("es-CL")}`}
-                            />
-                          </div>
-                          <p className="text-xs font-semibold capitalize text-gray-500">{item.label}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  )}
-
-                  <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                    <div className="mb-4 flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-gray-900">Historial de mantenciones</h3>
-                      <History className="h-5 w-5 text-[#0f4471]" />
-                    </div>
-                    {latestMaintenances.length === 0 ? (
-                      <p className="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500">
-                        No hay mantenciones registradas.
-                      </p>
-                    ) : (
-                      <div className="divide-y divide-gray-100">
-                        {latestMaintenances.map((vehicle) => {
-                          const services = parseStoredReviewServices(vehicle.servicios);
-                          return (
-                            <div key={vehicle.id} className="py-3">
-                              <div className="flex items-start justify-between gap-3">
-                                <div>
-                                  <p className="text-sm font-semibold uppercase text-gray-900">{vehicle.patente}</p>
-                                  <p className="text-xs text-gray-500">
-                                    {vehicle.marca} {vehicle.modelo} · {vehicle.customer_name || "Sin cliente"}
-                                  </p>
-                                </div>
-                                <span className="text-xs text-gray-500">
-                                  {new Date(vehicle.updated_at || vehicle.fecha_ingreso).toLocaleDateString("es-CL")}
-                                </span>
-                              </div>
-                              <p className="mt-2 text-sm text-gray-700">
-                                {services.map((service) => service.name).slice(0, 3).join(", ")}
-                              </p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-6">
-                  <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                    <div className="mb-4 flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-gray-900">Servicios más solicitados</h3>
-                      <Wrench className="h-5 w-5 text-[#0f4471]" />
-                    </div>
-                    {mostRequestedServices.length === 0 ? (
-                      <p className="text-sm text-gray-500">Sin servicios registrados.</p>
-                    ) : (
-                      <div className="space-y-4">
-                        {mostRequestedServices.map((service) => (
-                          <div key={service.name}>
-                            <div className="mb-1 flex items-center justify-between gap-3">
-                              <p className="truncate text-sm font-medium text-gray-800">{service.name}</p>
-                              <span className="text-xs font-semibold text-[#0f4471]">{service.count}</span>
-                            </div>
-                            <div className="h-2 rounded-full bg-gray-100">
-                              <div
-                                className="h-2 rounded-full bg-[#0f4471]"
-                                style={{ width: `${(service.count / maxRequestedServiceCount) * 100}%` }}
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                    <div className="mb-4 flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-gray-900">Movimientos de inventario</h3>
-                      <Package className="h-5 w-5 text-[#0f4471]" />
-                    </div>
-                    {inventoryMovements.length === 0 ? (
-                      <p className="text-sm text-gray-500">Sin movimientos de repuestos.</p>
-                    ) : (
-                      <div className="space-y-3">
-                        {inventoryMovements.map((movement) => (
-                          <div key={movement.id} className="rounded-lg bg-gray-50 px-3 py-3">
-                            <div className="flex items-center justify-between gap-3">
-                              <p className="text-sm font-semibold text-gray-900">{movement.name}</p>
-                              <span className="rounded-full bg-[#fc3d3c]/10 px-2 py-1 text-xs font-semibold text-[#b42318]">
-                                -{movement.quantity}
-                              </span>
-                            </div>
-                            <p className="mt-1 text-xs text-gray-500">
-                              {movement.vehicle.patente} · {new Date(movement.date).toLocaleDateString("es-CL")}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                    <h3 className="text-lg font-semibold text-gray-900">Estado del taller</h3>
-                    <div className="mt-4 space-y-3">
-                      {[
-                        { label: "En Taller", value: metrics.entaller, color: "bg-[#0f4471]" },
-                        { label: "Ingresado", value: metrics.enTaller, color: "bg-blue-300" },
-                        { label: "Entregados", value: metrics.entregados, color: "bg-emerald-500" },
-                      ].map((item) => (
-                        <div key={item.label}>
-                          <div className="mb-1 flex items-center justify-between">
-                            <span className="text-sm text-gray-600">{item.label}</span>
-                            <span className="text-sm font-semibold text-gray-900">{item.value}</span>
-                          </div>
-                          <div className="h-2 rounded-full bg-gray-100">
-                            <div
-                              className={`h-2 rounded-full ${item.color}`}
-                              style={{ width: `${metrics.total ? (item.value / metrics.total) * 100 : 0}%` }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <Dashboard
+              vehicles={vehicles}
+              canViewPrices={canViewPrices}
+            />
           )}
 
           {activeSection === "inventario" && !isMechanicSession && (
@@ -3269,7 +3087,8 @@ function App() {
                   Estacionamiento
                 </h2>
                 <p className="text-sm text-gray-500">
-                  Vehículos entregados que llevan más de una semana en el taller.
+                  Vehículos entregados que llevan más de una semana en el
+                  taller.
                 </p>
               </div>
 
@@ -3280,7 +3099,9 @@ function App() {
               ) : (
                 <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
                   {parkedVehicles.map((vehicle) => {
-                    const services = parseStoredReviewServices(vehicle.servicios);
+                    const services = parseStoredReviewServices(
+                      vehicle.servicios,
+                    );
                     const parts = parseStoredReviewParts(vehicle.servicios);
                     const total = getVehicleWorkTotal(vehicle);
 
@@ -3302,10 +3123,16 @@ function App() {
                             </p>
                             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
                               <span>
-                                Ingreso: {new Date(vehicle.fecha_ingreso).toLocaleDateString("es-CL")}
+                                Ingreso:{" "}
+                                {new Date(
+                                  vehicle.fecha_ingreso,
+                                ).toLocaleDateString("es-CL")}
                               </span>
                               <span>
-                                Salida: {getVehicleExitDate(vehicle).toLocaleDateString("es-CL")}
+                                Salida:{" "}
+                                {getVehicleExitDate(vehicle).toLocaleDateString(
+                                  "es-CL",
+                                )}
                               </span>
                             </div>
                           </div>
@@ -3320,17 +3147,23 @@ function App() {
 
                         <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
                           {canViewPrices && (
-                          <div className="rounded-lg border border-gray-200 p-4">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                              Cliente
-                            </p>
-                            <p className="mt-2 text-sm font-semibold text-gray-900">
-                              {vehicle.customer_name || "Sin cliente"}
-                            </p>
-                            <p className="text-xs text-gray-500">{vehicle.customer_rut || "-"}</p>
-                            <p className="text-xs text-gray-500">{vehicle.customer_phone || "-"}</p>
-                            <p className="text-xs text-gray-500">{vehicle.customer_city || "-"}</p>
-                          </div>
+                            <div className="rounded-lg border border-gray-200 p-4">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                Cliente
+                              </p>
+                              <p className="mt-2 text-sm font-semibold text-gray-900">
+                                {vehicle.customer_name || "Sin cliente"}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {vehicle.customer_rut || "-"}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {vehicle.customer_phone || "-"}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {vehicle.customer_city || "-"}
+                              </p>
+                            </div>
                           )}
 
                           <div className="rounded-lg border border-gray-200 p-4">
@@ -3338,13 +3171,20 @@ function App() {
                               Usuario
                             </p>
                             <p className="mt-2 text-sm font-semibold text-gray-900">
-                              {vehicle.assigned_mechanic_name || "Sin mecánico asignado"}
+                              {vehicle.assigned_mechanic_name ||
+                                "Sin mecánico asignado"}
                             </p>
                             <p className="text-xs text-gray-500">
-                              Ingreso: {new Date(vehicle.fecha_ingreso).toLocaleDateString("es-CL")}
+                              Ingreso:{" "}
+                              {new Date(
+                                vehicle.fecha_ingreso,
+                              ).toLocaleDateString("es-CL")}
                             </p>
                             <p className="text-xs text-gray-500">
-                              Salida: {getVehicleExitDate(vehicle).toLocaleDateString("es-CL")}
+                              Salida:{" "}
+                              {getVehicleExitDate(vehicle).toLocaleDateString(
+                                "es-CL",
+                              )}
                             </p>
                           </div>
 
@@ -3372,11 +3212,18 @@ function App() {
                             ) : (
                               <ul className="mt-2 space-y-1 text-sm text-gray-700">
                                 {services.map((service) => (
-                                  <li key={service.name} className="flex justify-between gap-3">
+                                  <li
+                                    key={service.name}
+                                    className="flex justify-between gap-3"
+                                  >
                                     <span>{service.name}</span>
                                     {canViewPrices && (
                                       <span className="font-semibold">
-                                        ${(parseInt(service.price || "0", 10) || 0).toLocaleString("es-CL")}
+                                        $
+                                        {(
+                                          parseInt(service.price || "0", 10) ||
+                                          0
+                                        ).toLocaleString("es-CL")}
                                       </span>
                                     )}
                                   </li>
@@ -3396,13 +3243,19 @@ function App() {
                             ) : (
                               <ul className="mt-2 space-y-1 text-sm text-gray-700">
                                 {parts.map((part) => (
-                                  <li key={part.inventoryItemId} className="flex justify-between gap-3">
+                                  <li
+                                    key={part.inventoryItemId}
+                                    className="flex justify-between gap-3"
+                                  >
                                     <span>
                                       {part.name} x{part.quantity} {part.unit}
                                     </span>
                                     {canViewPrices && (
                                       <span className="font-semibold">
-                                        ${(part.quantity * (part.unitCost || 0)).toLocaleString("es-CL")}
+                                        $
+                                        {(
+                                          part.quantity * (part.unitCost || 0)
+                                        ).toLocaleString("es-CL")}
                                       </span>
                                     )}
                                   </li>
@@ -3481,7 +3334,9 @@ function App() {
                             id="audit-date-from"
                             type="date"
                             value={auditDateFrom}
-                            onChange={(event) => setAuditDateFrom(event.target.value)}
+                            onChange={(event) =>
+                              setAuditDateFrom(event.target.value)
+                            }
                             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#0f4471] focus:outline-none"
                           />
                         </div>
@@ -3496,7 +3351,9 @@ function App() {
                             id="audit-date-to"
                             type="date"
                             value={auditDateTo}
-                            onChange={(event) => setAuditDateTo(event.target.value)}
+                            onChange={(event) =>
+                              setAuditDateTo(event.target.value)
+                            }
                             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#0f4471] focus:outline-none"
                           />
                         </div>
@@ -3547,7 +3404,9 @@ function App() {
                             {paginatedAuditLogs.map((entry) => (
                               <tr key={entry.id}>
                                 <td className="whitespace-nowrap px-4 py-3 text-gray-600">
-                                  {new Date(entry.created_at).toLocaleString("es-CL")}
+                                  {new Date(entry.created_at).toLocaleString(
+                                    "es-CL",
+                                  )}
                                 </td>
                                 <td className="px-4 py-3 font-semibold text-gray-900">
                                   {entry.user_name}
@@ -3601,7 +3460,7 @@ function App() {
                       </div>
                     </>
                   )}
-                    </div>
+                </div>
               )}
             </div>
           )}
@@ -3794,14 +3653,14 @@ function App() {
                               <Edit2 className="h-4 w-4" />
                               Editar
                             </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteUser(user.id)}
-                            className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#fc3d3c]/30 px-3 py-2 text-xs font-semibold text-[#b42318] hover:bg-[#fc3d3c]/10"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            Eliminar
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteUser(user.id)}
+                              className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#fc3d3c]/30 px-3 py-2 text-xs font-semibold text-[#b42318] hover:bg-[#fc3d3c]/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Eliminar
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -3846,7 +3705,6 @@ function App() {
                   Restaurar color
                 </button>
               </div>
-
             </div>
           )}
         </main>
@@ -3856,5 +3714,3 @@ function App() {
 }
 
 export default App;
-
-
