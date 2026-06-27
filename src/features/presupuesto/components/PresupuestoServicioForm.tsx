@@ -1,7 +1,7 @@
 import { ChangeEvent, FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { BudgetService } from "../types/presupuesto";
-import { serviceCatalog } from "../../vehiculo/serviceCatalog";
+import type { CatalogService } from "../../../shared/lib/types";
 
 interface PresupuestoServicioFormProps {
   budgetService: BudgetService;
@@ -9,12 +9,16 @@ interface PresupuestoServicioFormProps {
   onChange: (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
 
   onSubmit: (event: FormEvent) => void;
+  catalog: CatalogService[];
+  onServiceSelect: (name: string) => void;
 }
 
 export default function PresupuestoServicioForm({
   budgetService,
   onChange,
   onSubmit,
+  catalog,
+  onServiceSelect,
 }: PresupuestoServicioFormProps) {
   return (
     <form
@@ -24,14 +28,14 @@ export default function PresupuestoServicioForm({
       <select
         name="name"
         value={budgetService.name}
-        onChange={onChange}
+        onChange={(event) => onServiceSelect(event.target.value)}
         className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
       >
         <option value="">Selecciona un servicio</option>
 
-        {serviceCatalog.map((service) => (
-          <option key={service} value={service}>
-            {service}
+        {catalog.map((service) => (
+          <option key={service.id || service.name} value={service.name}>
+            {service.name}
           </option>
         ))}
       </select>

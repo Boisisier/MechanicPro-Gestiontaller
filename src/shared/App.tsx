@@ -1,5 +1,7 @@
 ﻿import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 
+import { useCallback } from "react";
+
 import {
   clearAuthToken,
   createVehicle,
@@ -21,6 +23,8 @@ import {
   updateWorkshopUser,
   updateInventoryItem,
   updateVehicle,
+  getServiceCatalog,
+  getServiceCategories,
 } from "./lib/api";
 
 import type {
@@ -32,6 +36,7 @@ import type {
   Vehicle,
   WorkshopUser,
   AuditLog,
+  ServiceCategory,
 } from "./lib/types";
 
 import Sidebar from "./components/layout/Sidebar";
@@ -70,14 +75,15 @@ import {
 
 import { exportVehiclePdf } from "./utils/html";
 
-import { serviceCatalogByCategory } from "../features/vehiculo/serviceCatalog";
+import {
+  serviceCatalogByCategory,
+} from "../features/vehiculo/serviceCatalog";
 
 import { useNotification } from "./hooks/useNotification";
 
 import InventoryPage from "../features/inventario/InventoryPage";
 import mechanicProLogo from "./assets/mechanic-pro-logo.png";
 import PresupuestoPage from "../features/presupuesto/PresupuestoPage";
-import Dashboard from "../features/dashboard/DashboardPage";
 
 const roleModules: Record<UserRole, string[]> = {
   "Administrador de Taller": [
@@ -169,6 +175,8 @@ function App() {
   const [activeSection, setActiveSection] = useState("vehiculos");
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [catalogServices, setCatalogServices] = useState<CatalogService[]>([]);
+  const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
 
   const [editingVehicle, setEditingVehicle] = useState<
     (VehicleFormData & { id: string }) | null
@@ -453,6 +461,24 @@ function App() {
     setLoading(true);
     load();
   }, [authToken, sessionRole, showNotification]);
+
+  const loadServiceCatalog = useCallback(async () => {
+    if (!authToken || sessionRole !== "member") return;
+    const [services, categories] = await Promise.all([
+      getServiceCatalog(isSessionAdmin),
+      getServiceCategories(),
+    ]);
+    setCatalogServices(services);
+    setServiceCategories(categories);
+  }, [authToken, sessionRole, isSessionAdmin]);
+
+  useEffect(() => {
+    if (!authToken || sessionRole !== "member") return;
+    loadServiceCatalog().catch((error) => {
+      console.error("Service catalog load failed", error);
+      showNotification("error", "No se pudo cargar el catálogo de servicios");
+    });
+  }, [authToken, sessionRole, loadServiceCatalog, showNotification]);
 
   useEffect(() => {
     if (!authToken || sessionRole !== "member" || isMechanicSession) {
@@ -884,10 +910,19 @@ function App() {
   };
 
   const handleAddReviewService = (serviceName: string) => {
+    const catalogService = catalogServices.find(
+      (service) => service.name === serviceName,
+    );
     setReviewServices((prev) =>
       prev.some((item) => item.name === serviceName)
         ? prev
-        : [...prev, { name: serviceName, price: "" }],
+        : [
+            ...prev,
+            {
+              name: serviceName,
+              price: String(catalogService?.base_price || 0),
+            },
+          ],
     );
 
     setServiceSearch("");
@@ -1400,9 +1435,31 @@ function App() {
   };
 
   const handleSubmit = async (formData: VehicleFormData) => {
+    const selectedCatalogItems = formData.servicios.map((serviceText) => {
+      const parsed = parseStoredReviewServices([serviceText])[0];
+      const name = parsed?.name || serviceText;
+      const catalogItem = catalogServices.find((service) => service.name === name);
+      return {
+        name,
+        price: String(catalogItem?.base_price ?? parsed?.price ?? 0),
+        estimatedHours: Number(catalogItem?.estimated_hours) || 0,
+      };
+    });
+    const catalogHours = selectedCatalogItems.reduce(
+      (sum, service) => sum + service.estimatedHours,
+      0,
+    );
+    const payload = {
+      ...formData,
+      servicios: selectedCatalogItems.map(({ name, price }) =>
+        serializeReviewService({ name, price }),
+      ),
+      estimated_work_hours:
+        catalogHours > 0 ? catalogHours : formData.estimated_work_hours,
+    };
     try {
       if (editingVehicle) {
-        const updated = await updateVehicle(editingVehicle.id, formData);
+        const updated = await updateVehicle(editingVehicle.id, payload);
 
         setVehicles((prev) =>
           prev.map((v) => (v.id === updated.id ? updated : v)),
@@ -1418,7 +1475,7 @@ function App() {
 
         setEditingVehicle(null);
       } else {
-        const created = await createVehicle(formData);
+        const created = await createVehicle(payload);
 
         setVehicles((prev) => [created, ...prev]);
 
@@ -1692,21 +1749,18 @@ function App() {
     vehiclesEntaller[0] ||
     null;
 
-  const filteredServiceCatalog = serviceCatalogByCategory.flatMap(
-    ({ category, services }) =>
-      services
+  const filteredServiceCatalog = catalogServices
+        .filter((service) => service.active !== false)
         .filter((service) => {
           const normalizedSearch = serviceSearch.toLowerCase();
           const matchesSearch =
-            service.toLowerCase().includes(normalizedSearch) ||
-            category.toLowerCase().includes(normalizedSearch);
+            service.name.toLowerCase().includes(normalizedSearch) ||
+            service.category.toLowerCase().includes(normalizedSearch);
           const alreadySelected = reviewServices.some(
-            (item) => item.name === service,
+            (item) => item.name === service.name,
           );
           return matchesSearch && !alreadySelected;
-        })
-        .map((service) => ({ category, name: service })),
-  );
+        });
 
   const filteredServiceCatalogByCategory = filteredServiceCatalog.reduce<
     Array<{ category: string; services: CatalogService[] }>
@@ -2018,6 +2072,9 @@ function App() {
                       existingVehicles={vehicles}
                       mechanics={mechanicOptions}
                       canManageAdvance={isSessionAdmin}
+                      serviceCatalog={catalogServices.filter(
+                        (service) => service.active !== false,
+                      )}
                     />
                   </div>
 
@@ -3077,7 +3134,12 @@ function App() {
           )}
 
           {activeSection === "presupuesto" && canAccessBudget && (
-            <PresupuestoPage requestConfirmation={requestConfirmation} />
+            <PresupuestoPage
+              requestConfirmation={requestConfirmation}
+              serviceCatalog={catalogServices.filter(
+                (service) => service.active !== false,
+              )}
+            />
           )}
 
           {activeSection === "estacionamiento" && !isMechanicSession && (
@@ -3668,6 +3730,18 @@ function App() {
                   </tbody>
                 </table>
               </div>
+
+              {isSessionAdmin && (
+                <ServiceCatalogManager
+                  categories={serviceCategories}
+                  services={catalogServices}
+                  onChanged={loadServiceCatalog}
+                  onNotify={showNotification}
+                  onAudit={(action, detail) =>
+                    logAction(action, "Configuración", detail)
+                  }
+                />
+              )}
 
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">

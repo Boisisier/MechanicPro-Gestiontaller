@@ -245,3 +245,54 @@ export const deleteParkingRelease = async (vehicleId: string) =>
       headers: withAuthHeader(),
     })
   );
+
+export const getServiceCategories = async () =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/service-categories`, {
+      headers: withAuthHeader(),
+    }),
+  );
+
+export const createServiceCategory = async (body: unknown) =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/service-categories`, {
+      method: "POST",
+      headers: withAuthHeader({ "Content-Type": "application/json" }),
+      body: JSON.stringify(body),
+    }),
+  );
+
+export const updateServiceCategory = async (id: string, body: unknown) =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/service-categories/${id}`, {
+      method: "PUT",
+      headers: withAuthHeader({ "Content-Type": "application/json" }),
+      body: JSON.stringify(body),
+    }),
+  );
+
+export const getServiceCatalog = async (includeInactive = false) =>
+  handleResponse(
+    await fetch(
+      `${apiBaseUrl}/service-catalog${includeInactive ? "?include_inactive=true" : ""}`,
+      { headers: withAuthHeader() },
+    ),
+  );
+
+export const createServiceCatalogItem = async (body: unknown) =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/service-catalog`, {
+      method: "POST",
+      headers: withAuthHeader({ "Content-Type": "application/json" }),
+      body: JSON.stringify(body),
+    }),
+  );
+
+export const updateServiceCatalogItem = async (id: string, body: unknown) =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/service-catalog/${id}`, {
+      method: "PUT",
+      headers: withAuthHeader({ "Content-Type": "application/json" }),
+      body: JSON.stringify(body),
+    }),
+  );

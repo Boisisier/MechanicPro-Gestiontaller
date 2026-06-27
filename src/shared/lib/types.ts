@@ -68,8 +68,25 @@ export interface BudgetServiceItem {
 }
 
 export interface CatalogService {
+  id?: string;
   category: string;
   name: string;
+  code?: string;
+  description?: string;
+  base_price?: number;
+  estimated_hours?: number;
+  active?: boolean;
+  category_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ServiceCategory {
+  id: string;
+  name: string;
+  active: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export type UserRole =
