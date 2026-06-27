@@ -75,15 +75,13 @@ import {
 
 import { exportVehiclePdf } from "./utils/html";
 
-import {
-  serviceCatalogByCategory,
-} from "../features/vehiculo/serviceCatalog";
-
 import { useNotification } from "./hooks/useNotification";
 
 import InventoryPage from "../features/inventario/InventoryPage";
 import mechanicProLogo from "./assets/mechanic-pro-logo.png";
 import PresupuestoPage from "../features/presupuesto/PresupuestoPage";
+import DashboardPage from "../features/dashboard/DashboardPage";
+import ServiceCatalogManager from "./components/settings/ServiceCatalogManager";
 
 const roleModules: Record<UserRole, string[]> = {
   "Administrador de Taller": [
@@ -3119,7 +3117,7 @@ function App() {
           )}
 
           {activeSection === "dashboard" && !isMechanicSession && (
-            <Dashboard
+            <DashboardPage
               vehicles={vehicles}
               canViewPrices={canViewPrices}
             />
