@@ -4,12 +4,15 @@ import PresupuestoResumen from "./components/PresupuestoResumen";
 import PresupuestoServicioForm from "./components/PresupuestoServicioForm";
 import PresupuestoServicioList from "./components/PresupuestoServicioList";
 import usePresupuesto from "./hooks/usePresupuesto";
+import type { CatalogService } from "../../shared/lib/types";
 
 interface PresupuestoPageProps {
   requestConfirmation: (options: ConfirmDialogOptions) => void;
+  serviceCatalog: CatalogService[];
 }
 export default function PresupuestoPage({
   requestConfirmation,
+  serviceCatalog,
 }: PresupuestoPageProps) {
   const {
     budgetForm,
@@ -18,6 +21,7 @@ export default function PresupuestoPage({
     budgetTotal,
     handleBudgetFormChange,
     handleBudgetServiceChange,
+    handleCatalogServiceSelect,
     handleAddBudgetService,
     handleRemoveBudgetService,
     handleSaveBudget,
@@ -44,6 +48,10 @@ export default function PresupuestoPage({
             budgetService={budgetService}
             onChange={handleBudgetServiceChange}
             onSubmit={handleAddBudgetService}
+            catalog={serviceCatalog}
+            onServiceSelect={(name) =>
+              handleCatalogServiceSelect(name, serviceCatalog)
+            }
           />
         </div>
 

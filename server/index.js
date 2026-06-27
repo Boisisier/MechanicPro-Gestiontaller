@@ -62,6 +62,37 @@ const defaultRoles = [
   },
 ];
 
+const defaultServiceCatalog = [
+  ['DIAG', 'Diagnóstico e inspección', 'Diagnóstico general', 20000, 1],
+  ['SCAN', 'Diagnóstico e inspección', 'Escaneo computarizado', 20000, 0.5],
+  ['PRECOMP', 'Diagnóstico e inspección', 'Revisión precompra', 45000, 2],
+  ['ACE-MOT', 'Mantenimiento preventivo', 'Cambio de aceite de motor', 35000, 0.75],
+  ['FIL-ACE', 'Mantenimiento preventivo', 'Cambio de filtro de aceite', 12000, 0.25],
+  ['FIL-AIR', 'Mantenimiento preventivo', 'Cambio de filtro de aire', 10000, 0.25],
+  ['FIL-CAB', 'Mantenimiento preventivo', 'Cambio de filtro de cabina', 12000, 0.4],
+  ['BUJIAS', 'Mantenimiento preventivo', 'Cambio de bujías', 35000, 1.5],
+  ['DIST', 'Motor', 'Cambio de kit de distribución', 180000, 5],
+  ['INYEC', 'Motor', 'Limpieza de inyectores', 60000, 2],
+  ['REFRIG', 'Refrigeración', 'Cambio de líquido refrigerante', 30000, 1],
+  ['RAD', 'Refrigeración', 'Cambio de radiador', 85000, 3],
+  ['PAST', 'Frenos', 'Cambio de pastillas de freno', 50000, 1.5],
+  ['DISC', 'Frenos', 'Cambio de discos de freno', 90000, 2],
+  ['RECT-DISC', 'Frenos', 'Rectificado de discos', 45000, 2],
+  ['LIQ-FRE', 'Frenos', 'Cambio de líquido de frenos', 30000, 1],
+  ['ALIN', 'Dirección y neumáticos', 'Alineación', 25000, 0.75],
+  ['BAL', 'Dirección y neumáticos', 'Balanceo', 20000, 0.75],
+  ['NEUM', 'Dirección y neumáticos', 'Cambio de neumáticos', 30000, 1],
+  ['AMORT', 'Suspensión', 'Cambio de amortiguadores', 120000, 4],
+  ['BANDEJA', 'Suspensión', 'Cambio de bandeja de suspensión', 65000, 2],
+  ['BAT', 'Electricidad', 'Cambio de batería', 15000, 0.5],
+  ['ALT', 'Electricidad', 'Cambio de alternador', 70000, 2.5],
+  ['ARR', 'Electricidad', 'Cambio de motor de arranque', 70000, 2.5],
+  ['EMB', 'Transmisión y embrague', 'Cambio de kit de embrague', 220000, 7],
+  ['ACE-CAJA', 'Transmisión y embrague', 'Cambio de aceite de caja', 45000, 1.5],
+  ['AACC', 'Climatización', 'Carga de aire acondicionado', 45000, 1],
+  ['ESC', 'Escape', 'Reparación de sistema de escape', 60000, 2],
+];
+
 const normalizePatente = (value = '') => {
   const normalized = String(value).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
   if (normalized.length <= 2) {
@@ -266,6 +297,51 @@ const ensureVehicleColumns = async () => {
     )
   `);
   await pool.query(`
+    create table if not exists service_categories (
+      id uuid primary key default gen_random_uuid(),
+      company_id uuid not null references companies(id) on delete cascade,
+      name text not null,
+      active boolean not null default true,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      unique (company_id, name)
+    )
+  `);
+  await pool.query(`
+    create table if not exists service_catalog (
+      id uuid primary key default gen_random_uuid(),
+      company_id uuid not null references companies(id) on delete cascade,
+      category_id uuid not null references service_categories(id) on delete restrict,
+      code text not null,
+      name text not null,
+      description text not null default '',
+      base_price numeric(12,2) not null check (base_price >= 0),
+      estimated_hours numeric(8,2) not null default 0 check (estimated_hours >= 0),
+      active boolean not null default true,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      unique (company_id, code),
+      unique (company_id, name)
+    )
+  `);
+  await pool.query(`
+    create table if not exists vehicle_services (
+      id uuid primary key default gen_random_uuid(),
+      company_id uuid not null references companies(id) on delete cascade,
+      vehicle_id uuid not null references vehicles(id) on delete cascade,
+      service_id uuid references service_catalog(id) on delete set null,
+      service_name_snapshot text not null,
+      unit_price_snapshot numeric(12,2) not null default 0 check (unit_price_snapshot >= 0),
+      estimated_hours_snapshot numeric(8,2) not null default 0 check (estimated_hours_snapshot >= 0),
+      quantity numeric(8,2) not null default 1 check (quantity > 0),
+      status text not null default 'Pendiente',
+      added_by text not null default '',
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      unique (vehicle_id, service_name_snapshot)
+    )
+  `);
+  await pool.query(`
     alter table vehicles
       add column if not exists codigo_vin text,
       add column if not exists codigo_motor text,
@@ -362,6 +438,9 @@ const ensureVehicleColumns = async () => {
   await pool.query('create index if not exists idx_budget_quotes_company_id on budget_quotes(company_id)');
   await pool.query('create index if not exists idx_audit_logs_company_created_at on audit_logs(company_id, created_at desc)');
   await pool.query('create index if not exists idx_parking_releases_company_vehicle on parking_releases(company_id, vehicle_id)');
+  await pool.query('create index if not exists idx_service_categories_company on service_categories(company_id, active, name)');
+  await pool.query('create index if not exists idx_service_catalog_company on service_catalog(company_id, active, name)');
+  await pool.query('create index if not exists idx_vehicle_services_vehicle on vehicle_services(vehicle_id)');
 };
 
 const normalizeUuid = (value) => {
@@ -379,6 +458,32 @@ const seedDefaultRoles = async (client, companyId) => {
        values ($1, $2, $3)
        on conflict (company_id, name) do update set modules = excluded.modules, updated_at = now()`,
       [companyId, role.name, role.modules]
+    );
+  }
+};
+
+const seedDefaultServices = async (client, companyId) => {
+  const countResult = await client.query(
+    'select count(*)::int as count from service_catalog where company_id = $1',
+    [companyId],
+  );
+  if (countResult.rows[0].count > 0) {
+    return;
+  }
+  for (const [code, categoryName, name, price, hours] of defaultServiceCatalog) {
+    const categoryResult = await client.query(
+      `insert into service_categories (company_id, name)
+       values ($1, $2)
+       on conflict (company_id, name) do update set updated_at = now()
+       returning id`,
+      [companyId, categoryName],
+    );
+    await client.query(
+      `insert into service_catalog
+        (company_id, category_id, code, name, base_price, estimated_hours)
+       values ($1, $2, $3, $4, $5, $6)
+       on conflict (company_id, code) do nothing`,
+      [companyId, categoryResult.rows[0].id, code, name, price, hours],
     );
   }
 };
@@ -477,12 +582,101 @@ const denyMechanicAccess = (req, res, next) => {
   return next();
 };
 
+const requireWorkshopAdmin = (req, res, next) => {
+  if (!isWorkshopAdminRole(req.user?.role)) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+  return next();
+};
+
 const splitServicePrice = (service = '') => {
   const match = String(service).match(/^(.*?)\s*\(\$\s*([^)]+)\)\s*$/);
   return {
     name: (match?.[1] || service).trim(),
     price: match?.[2]?.replace(/[^\d]/g, '') || '',
   };
+};
+
+const syncVehicleServices = async (
+  client,
+  companyId,
+  vehicleId,
+  services = [],
+  addedBy = '',
+  vehicleStatus = 'Ingresado',
+) => {
+  const parsedServices = services
+    .map(String)
+    .filter((service) => !service.startsWith('[REPUESTO]'))
+    .map(splitServicePrice)
+    .filter((service) => service.name);
+
+  const names = parsedServices.map((service) => service.name);
+  if (names.length === 0) {
+    await client.query(
+      'delete from vehicle_services where vehicle_id = $1 and company_id = $2',
+      [vehicleId, companyId],
+    );
+    return;
+  }
+
+  const catalogResult = await client.query(
+    `select id, name, base_price::float as base_price,
+            estimated_hours::float as estimated_hours
+     from service_catalog
+     where company_id = $1 and name = any($2::text[])`,
+    [companyId, names],
+  );
+  const catalogByName = new Map(
+    catalogResult.rows.map((service) => [service.name, service]),
+  );
+
+  for (const service of parsedServices) {
+    const catalogItem = catalogByName.get(service.name);
+    const snapshotPrice = service.price
+      ? Number(service.price)
+      : Number(catalogItem?.base_price) || 0;
+    await client.query(
+      `insert into vehicle_services
+        (company_id, vehicle_id, service_id, service_name_snapshot,
+         unit_price_snapshot, estimated_hours_snapshot, added_by, status)
+       values ($1, $2, $3, $4, $5, $6, $7, $8)
+       on conflict (vehicle_id, service_name_snapshot)
+       do update set service_id = coalesce(vehicle_services.service_id, excluded.service_id),
+                     unit_price_snapshot = case
+                       when vehicle_services.status = 'Completado'
+                         then vehicle_services.unit_price_snapshot
+                       else excluded.unit_price_snapshot
+                     end,
+                     estimated_hours_snapshot = case
+                       when vehicle_services.status = 'Completado'
+                         then vehicle_services.estimated_hours_snapshot
+                       else excluded.estimated_hours_snapshot
+                     end,
+                     status = excluded.status,
+                     updated_at = now()`,
+      [
+        companyId,
+        vehicleId,
+        catalogItem?.id || null,
+        service.name,
+        snapshotPrice,
+        Number(catalogItem?.estimated_hours) || 0,
+        addedBy,
+        vehicleStatus === 'Entregado'
+          ? 'Completado'
+          : vehicleStatus === 'En Taller'
+            ? 'En proceso'
+            : 'Pendiente',
+      ],
+    );
+  }
+  await client.query(
+    `delete from vehicle_services
+     where vehicle_id = $1 and company_id = $2
+       and not (service_name_snapshot = any($3::text[]))`,
+    [vehicleId, companyId, names],
+  );
 };
 
 const sanitizeServicesForMechanic = (services = []) =>
@@ -547,6 +741,37 @@ const mergeMechanicServicesWithStoredPrices = (storedServices = [], incomingServ
   });
 
   return mergedServices;
+};
+
+const applyCatalogPricesToMissingServices = async (companyId, services = []) => {
+  const parsed = services
+    .map(String)
+    .filter((service) => !service.startsWith('[REPUESTO]'))
+    .map(splitServicePrice);
+  const missingNames = parsed
+    .filter((service) => !service.price)
+    .map((service) => service.name);
+  if (missingNames.length === 0) {
+    return services;
+  }
+  const { rows } = await pool.query(
+    `select name, base_price::float as base_price
+     from service_catalog
+     where company_id = $1 and active = true and name = any($2::text[])`,
+    [companyId, missingNames],
+  );
+  const prices = new Map(rows.map((service) => [service.name, service.base_price]));
+  return services.map((service) => {
+    const text = String(service);
+    if (text.startsWith('[REPUESTO]')) {
+      return text;
+    }
+    const parsedService = splitServicePrice(text);
+    if (parsedService.price || !prices.has(parsedService.name)) {
+      return text;
+    }
+    return `${parsedService.name} ($${prices.get(parsedService.name)})`;
+  });
 };
 
 const sanitizeVehicleForRole = (vehicle, role) => {
@@ -881,6 +1106,181 @@ app.get('/roles', authRequired, async (req, res) => {
     res.json(rows);
   } catch (error) {
     console.error('GET /roles failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.get('/service-categories', authRequired, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  try {
+    await seedDefaultServices(pool, companyId);
+    const { rows } = await pool.query(
+      `select id, name, active, created_at, updated_at
+       from service_categories
+       where company_id = $1
+       order by active desc, name`,
+      [companyId],
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error('GET /service-categories failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.post('/service-categories', authRequired, requireWorkshopAdmin, ensureWritable, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  const name = String(req.body.name || '').trim();
+  if (!name) {
+    return res.status(400).json({ error: 'missing_name' });
+  }
+  try {
+    const { rows } = await pool.query(
+      `insert into service_categories (company_id, name)
+       values ($1, $2)
+       returning id, name, active, created_at, updated_at`,
+      [companyId, name],
+    );
+    res.status(201).json(rows[0]);
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'service_category_exists' });
+    }
+    console.error('POST /service-categories failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.put('/service-categories/:id', authRequired, requireWorkshopAdmin, ensureWritable, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  const name = String(req.body.name || '').trim();
+  if (!name) {
+    return res.status(400).json({ error: 'missing_name' });
+  }
+  try {
+    const { rows } = await pool.query(
+      `update service_categories
+       set name = $1, active = $2, updated_at = now()
+       where id = $3 and company_id = $4
+       returning id, name, active, created_at, updated_at`,
+      [name, req.body.active !== false, req.params.id, companyId],
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+    res.json(rows[0]);
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'service_category_exists' });
+    }
+    console.error('PUT /service-categories/:id failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.get('/service-catalog', authRequired, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  const includeInactive =
+    req.query.include_inactive === 'true' && isWorkshopAdminRole(req.user.role);
+  try {
+    await seedDefaultServices(pool, companyId);
+    const { rows } = await pool.query(
+      `select sc.id, sc.category_id, c.name as category, sc.code, sc.name,
+              sc.description, sc.base_price::float as base_price,
+              sc.estimated_hours::float as estimated_hours, sc.active,
+              sc.created_at, sc.updated_at
+       from service_catalog sc
+       join service_categories c on c.id = sc.category_id
+       where sc.company_id = $1
+         and ($2::boolean or (sc.active = true and c.active = true))
+       order by c.name, sc.name`,
+      [companyId, includeInactive],
+    );
+    res.json(
+      isMechanicRole(req.user.role)
+        ? rows.map(({ base_price, ...service }) => service)
+        : rows,
+    );
+  } catch (error) {
+    console.error('GET /service-catalog failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.post('/service-catalog', authRequired, requireWorkshopAdmin, ensureWritable, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  const code = String(req.body.code || '').trim().toUpperCase();
+  const name = String(req.body.name || '').trim();
+  const categoryId = normalizeUuid(req.body.category_id);
+  const basePrice = Number(req.body.base_price);
+  const estimatedHours = Number(req.body.estimated_hours);
+  if (!code || !name || !categoryId || !Number.isFinite(basePrice) || basePrice < 0 ||
+      !Number.isFinite(estimatedHours) || estimatedHours < 0) {
+    return res.status(400).json({ error: 'invalid_service' });
+  }
+  try {
+    const { rows } = await pool.query(
+      `insert into service_catalog
+        (company_id, category_id, code, name, description, base_price, estimated_hours)
+       select $1, c.id, $2, $3, $4, $5, $6
+       from service_categories c
+       where c.id = $7 and c.company_id = $1
+       returning id, category_id, code, name, description,
+                 base_price::float as base_price, estimated_hours::float as estimated_hours,
+                 active, created_at, updated_at`,
+      [companyId, code, name, req.body.description || '', basePrice, estimatedHours, categoryId],
+    );
+    if (rows.length === 0) {
+      return res.status(400).json({ error: 'invalid_category' });
+    }
+    const category = await pool.query('select name from service_categories where id = $1', [categoryId]);
+    res.status(201).json({ ...rows[0], category: category.rows[0].name });
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'service_exists' });
+    }
+    console.error('POST /service-catalog failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.put('/service-catalog/:id', authRequired, requireWorkshopAdmin, ensureWritable, async (req, res) => {
+  const { company_id: companyId } = req.user;
+  const code = String(req.body.code || '').trim().toUpperCase();
+  const name = String(req.body.name || '').trim();
+  const categoryId = normalizeUuid(req.body.category_id);
+  const basePrice = Number(req.body.base_price);
+  const estimatedHours = Number(req.body.estimated_hours);
+  if (!code || !name || !categoryId || !Number.isFinite(basePrice) || basePrice < 0 ||
+      !Number.isFinite(estimatedHours) || estimatedHours < 0) {
+    return res.status(400).json({ error: 'invalid_service' });
+  }
+  try {
+    const { rows } = await pool.query(
+      `update service_catalog sc
+       set category_id = c.id, code = $1, name = $2, description = $3,
+           base_price = $4, estimated_hours = $5, active = $6, updated_at = now()
+       from service_categories c
+       where sc.id = $7 and sc.company_id = $8
+         and c.id = $9 and c.company_id = $8
+       returning sc.id, sc.category_id, c.name as category, sc.code, sc.name,
+                 sc.description, sc.base_price::float as base_price,
+                 sc.estimated_hours::float as estimated_hours, sc.active,
+                 sc.created_at, sc.updated_at`,
+      [
+        code, name, req.body.description || '', basePrice, estimatedHours,
+        req.body.active !== false, req.params.id, companyId, categoryId,
+      ],
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+    res.json(rows[0]);
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'service_exists' });
+    }
+    console.error('PUT /service-catalog/:id failed', error);
     res.status(500).json({ error: 'internal_error' });
   }
 });
@@ -1582,6 +1982,15 @@ app.post('/vehicles', authRequired, denyMechanicAccess, ensureWritable, async (r
       }
     }
 
+    await syncVehicleServices(
+      pool,
+      companyId,
+      rows[0].id,
+      servicesToPersist,
+      req.user.full_name || req.user.name || req.user.email || '',
+      estado,
+    );
+
     res.status(201).json(sanitizeVehicleForRole(rows[0], req.user.role));
   } catch (error) {
     if (error.code === '23505') {
@@ -1693,6 +2102,10 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
           existingVehicle.servicios || [],
           servicios || []
         );
+        servicesToPersist = await applyCatalogPricesToMissingServices(
+          companyId,
+          servicesToPersist,
+        );
       }
     }
 
@@ -1796,6 +2209,15 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
     if (rows.length === 0) {
       return res.status(404).json({ error: 'not_found' });
     }
+
+    await syncVehicleServices(
+      pool,
+      companyId,
+      id,
+      servicesToPersist,
+      req.user.full_name || req.user.name || req.user.email || '',
+      estado,
+    );
 
     const timerResult = await pool.query(
       `update vehicles

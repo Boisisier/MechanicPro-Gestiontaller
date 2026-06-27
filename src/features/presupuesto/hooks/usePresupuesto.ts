@@ -136,6 +136,18 @@ export default function usePresupuesto(
     showNotification("success", "Servicio agregado al presupuesto");
   };
 
+  const handleCatalogServiceSelect = (
+    name: string,
+    catalog: Array<{ name: string; base_price?: number }>,
+  ) => {
+    const service = catalog.find((item) => item.name === name);
+    setBudgetService({
+      id: service ? crypto.randomUUID() : "",
+      name,
+      price: service?.base_price || 0,
+    });
+  };
+
   const handleRemoveBudgetService = (id: string) => {
     setBudgetItems((prev) => prev.filter((item) => item.id !== id));
   };
@@ -203,6 +215,7 @@ export default function usePresupuesto(
 
     handleBudgetFormChange,
     handleBudgetServiceChange,
+    handleCatalogServiceSelect,
     handleAddBudgetService,
     handleRemoveBudgetService,
     handleSaveBudget,

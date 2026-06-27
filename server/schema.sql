@@ -94,6 +94,47 @@ CREATE TABLE IF NOT EXISTS vehicles (
   CHECK (tipo_vehiculo IN ('Auto', 'Camioneta', 'SUV', 'Moto', 'Camion', 'Furgon'))
 );
 -- tabla de vehiculos en taller, con indices para consultas rapidas por empresa, patente, fecha de ingreso y estado
+CREATE TABLE IF NOT EXISTS service_categories (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (company_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS service_catalog (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  category_id uuid NOT NULL REFERENCES service_categories(id) ON DELETE RESTRICT,
+  code text NOT NULL,
+  name text NOT NULL,
+  description text NOT NULL DEFAULT '',
+  base_price numeric(12,2) NOT NULL CHECK (base_price >= 0),
+  estimated_hours numeric(8,2) NOT NULL DEFAULT 0 CHECK (estimated_hours >= 0),
+  active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (company_id, code),
+  UNIQUE (company_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS vehicle_services (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  vehicle_id uuid NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
+  service_id uuid REFERENCES service_catalog(id) ON DELETE SET NULL,
+  service_name_snapshot text NOT NULL,
+  unit_price_snapshot numeric(12,2) NOT NULL DEFAULT 0 CHECK (unit_price_snapshot >= 0),
+  estimated_hours_snapshot numeric(8,2) NOT NULL DEFAULT 0 CHECK (estimated_hours_snapshot >= 0),
+  quantity numeric(8,2) NOT NULL DEFAULT 1 CHECK (quantity > 0),
+  status text NOT NULL DEFAULT 'Pendiente' CHECK (status IN ('Pendiente', 'En proceso', 'Completado', 'Cancelado')),
+  added_by text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (vehicle_id, service_name_snapshot)
+);
 CREATE TABLE IF NOT EXISTS inventory_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,

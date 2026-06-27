@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, History, RotateCcw, Save, Search, Send, X } from 'lucide-react';
 import { getModelsForBrand, vehicleBrandNames } from '../../../features/vehiculo/vehicleModelCatalog';
-import { serviceCatalogByCategory } from '../../../features/vehiculo/serviceCatalog';
+import type { CatalogService } from '../../lib/types';
 import ConfirmDialog from '../ui/ConfirmDialog';
 
 type PreviousVehicleData = Omit<Partial<VehicleFormData>, 'promised_delivery_date'> & {
@@ -35,6 +35,7 @@ interface VehicleFormProps {
   existingVehicles?: PreviousVehicleData[];
   mechanics?: Array<{ id: string; name: string }>;
   canManageAdvance?: boolean;
+  serviceCatalog?: CatalogService[];
 }
 
 export interface VehicleFormData {
@@ -170,6 +171,7 @@ export default function VehicleForm({
   existingVehicles = [],
   mechanics = [],
   canManageAdvance = false,
+  serviceCatalog = [],
 }: VehicleFormProps) {
   const [formData, setFormData] = useState<VehicleFormData>({
     ...initialFormData,
@@ -194,11 +196,17 @@ export default function VehicleForm({
     .filter((model) => normalizeSearch(model).includes(normalizeSearch(formData.modelo)))
     .slice(0, 8);
   const normalizedServiceSearch = normalizeSearch(serviceSearch);
-  const filteredServiceCatalog = serviceCatalogByCategory
-    .map((category) => ({
-      ...category,
-      services: category.services.filter((service) =>
-        normalizeSearch(`${category.category} ${service}`).includes(
+  const filteredServiceCatalog = Array.from(
+    serviceCatalog.reduce<Map<string, CatalogService[]>>((groups, service) => {
+      const current = groups.get(service.category) || [];
+      groups.set(service.category, [...current, service]);
+      return groups;
+    }, new Map()),
+  )
+    .map(([category, services]) => ({
+      category,
+      services: services.filter((service) =>
+        normalizeSearch(`${category} ${service.name}`).includes(
           normalizedServiceSearch,
         ),
       ),
@@ -805,19 +813,24 @@ export default function VehicleForm({
                           </p>
                           <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
                             {category.services.map((service) => {
-                              const selected = formData.servicios.includes(service);
+                              const selected = formData.servicios.includes(service.name);
                               return (
                                 <button
-                                  key={service}
+                                  key={service.id || service.name}
                                   type="button"
-                                  onClick={() => handleServiceToggle(service)}
+                                  onClick={() => handleServiceToggle(service.name)}
                                   className={`flex min-h-10 items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
                                     selected
                                       ? 'border-[#0f4471] bg-[#0f4471]/5 font-semibold text-[#0f4471]'
                                       : 'border-gray-200 text-gray-700 hover:bg-gray-50'
                                   }`}
                                 >
-                                  <span>{service}</span>
+                                  <span>
+                                    {service.name}
+                                    <small className="ml-2 text-gray-500">
+                                      {service.estimated_hours || 0} h
+                                    </small>
+                                  </span>
                                   <span className="text-xs font-bold">
                                     {selected ? 'Seleccionado' : '+'}
                                   </span>
