@@ -1,13 +1,10 @@
-﻿import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
-
-import { useCallback } from "react";
+﻿import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import {
   clearAuthToken,
   createVehicle,
   createAuditLog,
   createParkingRelease,
-  createWorkshopUser,
   getAuthToken,
   getAuditLogs,
   getInventoryItems,
@@ -19,8 +16,6 @@ import {
   loginDemo,
   setAuthToken,
   deleteParkingRelease,
-  deleteWorkshopUser,
-  updateWorkshopUser,
   updateInventoryItem,
   updateVehicle,
   getServiceCatalog,
@@ -43,7 +38,6 @@ import Sidebar from "./components/layout/Sidebar";
 
 import Header from "./components/layout/Header";
 
-
 import VehicleForm, {
   VehicleFormData,
 } from "./components/vehicles/VehicleForm";
@@ -53,18 +47,7 @@ import ExitPricingSection from "./components/vehicles/ExitPricingSection";
 import ConfirmDialog from "./components/ui/ConfirmDialog";
 import Toast from "./components/ui/Toast";
 
-import {
-  Search,
-  Trash2,
-  X,
-  Plus,
-  RotateCcw,
-  Send,
-  Edit2,
-  Clock,
-} from "lucide-react";
-
-import { toSoftAccent } from "./utils/colors";
+import { Search, Trash2, X, RotateCcw, Send, Clock } from "lucide-react";
 
 import {
   parseStoredReviewServices,
@@ -81,28 +64,8 @@ import InventoryPage from "../features/inventario/InventoryPage";
 import mechanicProLogo from "./assets/mechanic-pro-logo.png";
 import PresupuestoPage from "../features/presupuesto/PresupuestoPage";
 import DashboardPage from "../features/dashboard/DashboardPage";
+import ConfiguracionPage from "../features/configuracion/ConfiguracionPage";
 import ServiceCatalogManager from "./components/settings/ServiceCatalogManager";
-
-const roleModules: Record<UserRole, string[]> = {
-  "Administrador de Taller": [
-    "Dashboard",
-    "Vehículos",
-    "Presupuesto",
-    "Inventario",
-    "Estacionamiento",
-    "Reportes",
-    "Configuración",
-    "Registro de acciones",
-  ],
-  Administrativo: [
-    "Dashboard",
-    "Vehículos",
-    "Presupuesto",
-    "Estacionamiento",
-    "Reportes",
-  ],
-  Mecánico: ["Vehículos", "Reportes"],
-};
 
 const defaultWorkshopUsers: WorkshopUser[] = [
   {
@@ -125,7 +88,6 @@ const defaultWorkshopUsers: WorkshopUser[] = [
   },
 ];
 
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const auditLogsPageSize = 15;
 const mechanicHiddenSections = [
   "dashboard",
@@ -166,15 +128,10 @@ function App() {
   const { notification, showNotification, clearNotification } =
     useNotification();
 
-  const [accentColor, setAccentColor] = useState(
-    () => localStorage.getItem("accentColor") || "#0f4471",
-  );
-
   const [activeSection, setActiveSection] = useState("vehiculos");
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [catalogServices, setCatalogServices] = useState<CatalogService[]>([]);
-  const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
 
   const [editingVehicle, setEditingVehicle] = useState<
     (VehicleFormData & { id: string }) | null
@@ -221,21 +178,6 @@ function App() {
     const raw = localStorage.getItem("workshopUsers");
     return raw ? JSON.parse(raw) : defaultWorkshopUsers;
   });
-
-  const [userForm, setUserForm] = useState<{
-    name: string;
-    rut: string;
-    email: string;
-    password: string;
-    role: UserRole;
-  }>({
-    name: "",
-    rut: "",
-    email: "",
-    password: "",
-    role: "Administrativo",
-  });
-  const [editingUserId, setEditingUserId] = useState<string | null>(null);
 
   const [vehicleTab, setVehicleTab] = useState<"ingreso" | "taller" | "salida">(
     "ingreso",
@@ -396,15 +338,6 @@ function App() {
   }, [authToken]);
 
   useEffect(() => {
-    document.documentElement.style.setProperty("--accent", accentColor);
-    document.documentElement.style.setProperty(
-      "--accent-soft",
-      toSoftAccent(accentColor),
-    );
-    localStorage.setItem("accentColor", accentColor);
-  }, [accentColor]);
-
-  useEffect(() => {
     localStorage.setItem("workshopUsers", JSON.stringify(workshopUsers));
   }, [workshopUsers]);
 
@@ -459,24 +392,6 @@ function App() {
     setLoading(true);
     load();
   }, [authToken, sessionRole, showNotification]);
-
-  const loadServiceCatalog = useCallback(async () => {
-    if (!authToken || sessionRole !== "member") return;
-    const [services, categories] = await Promise.all([
-      getServiceCatalog(isSessionAdmin),
-      getServiceCategories(),
-    ]);
-    setCatalogServices(services);
-    setServiceCategories(categories);
-  }, [authToken, sessionRole, isSessionAdmin]);
-
-  useEffect(() => {
-    if (!authToken || sessionRole !== "member") return;
-    loadServiceCatalog().catch((error) => {
-      console.error("Service catalog load failed", error);
-      showNotification("error", "No se pudo cargar el catálogo de servicios");
-    });
-  }, [authToken, sessionRole, loadServiceCatalog, showNotification]);
 
   useEffect(() => {
     if (!authToken || sessionRole !== "member" || isMechanicSession) {
@@ -597,202 +512,27 @@ function App() {
       onConfirm: performLogout,
     });
   };
+  const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>(
+    [],
+  );
 
-  const handleUserFormChange = (
-    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ) => {
-    const { name, value } = event.target;
-    setUserForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
+  const loadServiceCatalog = useCallback(async () => {
+    if (!authToken || sessionRole !== "member") return;
+    const [services, categories] = await Promise.all([
+      getServiceCatalog(isSessionAdmin),
+      getServiceCategories(),
+    ]);
+    setCatalogServices(services);
+    setServiceCategories(categories);
+  }, [authToken, sessionRole, isSessionAdmin]);
 
-  const handleUserSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-    const name = userForm.name.trim();
-    const rut = userForm.rut.trim();
-    const email = userForm.email.trim();
-    const password = userForm.password.trim();
-
-    if (!name || !rut || !email || (!editingUserId && !password)) {
-      showNotification("error", "Completa nombre, RUT, correo y contraseña");
-      return;
-    }
-
-    if (!emailRegex.test(email)) {
-      showNotification("error", "Ingresa un correo electrónico válido");
-      return;
-    }
-
-    const exists = workshopUsers.some(
-      (user) =>
-        user.email.toLowerCase() === email.toLowerCase() &&
-        user.id !== editingUserId,
-    );
-    if (exists) {
-      showNotification("error", "Ya existe un usuario con ese correo");
-      return;
-    }
-
-    const nextUser = {
-      id: crypto.randomUUID(),
-      name,
-      rut,
-      email,
-      role: userForm.role,
-    };
-
-    try {
-      if (editingUserId) {
-        if (authToken && sessionRole === "member") {
-          const savedUser = await updateWorkshopUser(editingUserId, {
-            name,
-            rut,
-            email,
-            password,
-            role: userForm.role,
-          });
-          setWorkshopUsers((prev) =>
-            prev.map((user) =>
-              user.id === editingUserId
-                ? {
-                    ...user,
-                    name: savedUser.name,
-                    rut: savedUser.rut,
-                    email: savedUser.email,
-                    role:
-                      savedUser.role_name || savedUser.role || userForm.role,
-                  }
-                : user,
-            ),
-          );
-        } else {
-          setWorkshopUsers((prev) =>
-            prev.map((user) =>
-              user.id === editingUserId
-                ? {
-                    ...user,
-                    name,
-                    rut,
-                    email,
-                    role: userForm.role,
-                  }
-                : user,
-            ),
-          );
-        }
-      } else if (authToken && sessionRole === "member") {
-        const savedUser = await createWorkshopUser({
-          name,
-          rut,
-          email,
-          password,
-          role: userForm.role,
-        });
-        setWorkshopUsers((prev) => [
-          ...prev,
-          {
-            id: savedUser.id,
-            name: savedUser.name,
-            rut: savedUser.rut,
-            email: savedUser.email,
-            role: savedUser.role_name || savedUser.role || userForm.role,
-          },
-        ]);
-      } else {
-        setWorkshopUsers((prev) => [...prev, nextUser]);
-      }
-    } catch (error) {
-      console.error("Save workshop user failed", error);
-      showNotification(
-        "error",
-        editingUserId
-          ? "No se pudo actualizar el usuario"
-          : "No se pudo crear el usuario",
-      );
-      return;
-    }
-
-    const wasEditing = Boolean(editingUserId);
-    setUserForm({
-      name: "",
-      rut: "",
-      email: "",
-      password: "",
-      role: "Administrativo",
+  useEffect(() => {
+    if (!authToken || sessionRole !== "member") return;
+    loadServiceCatalog().catch((error) => {
+      console.error("Service catalog load failed", error);
+      showNotification("error", "No se pudo cargar el catálogo de servicios");
     });
-    setEditingUserId(null);
-    logAction(
-      wasEditing ? "Usuario actualizado" : "Usuario creado",
-      "Configuración",
-      `${name} fue ${wasEditing ? "actualizado" : "creado"} con perfil ${userForm.role}`,
-    );
-    showNotification(
-      "success",
-      wasEditing
-        ? "Usuario actualizado correctamente"
-        : "Usuario creado correctamente",
-    );
-  };
-
-  const handleEditUser = (user: WorkshopUser) => {
-    setEditingUserId(user.id);
-    setUserForm({
-      name: user.name,
-      rut: user.rut || "",
-      email: user.email,
-      password: "",
-      role: (user.role_name || user.role) as UserRole,
-    });
-  };
-
-  const handleCancelUserEdit = () => {
-    setEditingUserId(null);
-    setUserForm({
-      name: "",
-      rut: "",
-      email: "",
-      password: "",
-      role: "Administrativo",
-    });
-  };
-
-  const performDeleteUser = async (id: string) => {
-    const deletedUser = workshopUsers.find((user) => user.id === id);
-    if (authToken && sessionRole === "member") {
-      try {
-        await deleteWorkshopUser(id);
-      } catch (error) {
-        console.error("Delete workshop user failed", error);
-        showNotification("error", "No se pudo eliminar el usuario");
-        return;
-      }
-    }
-    setWorkshopUsers((prev) => prev.filter((user) => user.id !== id));
-    if (editingUserId === id) {
-      handleCancelUserEdit();
-    }
-    logAction(
-      "Usuario eliminado",
-      "Configuración",
-      deletedUser
-        ? `${deletedUser.name} fue eliminado`
-        : `Usuario ${id} eliminado`,
-    );
-    showNotification("success", "Usuario eliminado");
-  };
-
-  const handleDeleteUser = (id: string) => {
-    const user = workshopUsers.find((item) => item.id === id);
-    requestConfirmation({
-      title: "Eliminar usuario",
-      message: `Se eliminará ${user?.name || "este usuario"} del mantenedor. Esta acción no se puede deshacer desde la pantalla actual.`,
-      confirmLabel: "Eliminar usuario",
-      variant: "danger",
-      onConfirm: () => performDeleteUser(id),
-    });
-  };
+  }, [authToken, sessionRole, loadServiceCatalog, showNotification]);
 
   const buildVehiclePayload = (
     vehicle: Vehicle,
@@ -1436,7 +1176,9 @@ function App() {
     const selectedCatalogItems = formData.servicios.map((serviceText) => {
       const parsed = parseStoredReviewServices([serviceText])[0];
       const name = parsed?.name || serviceText;
-      const catalogItem = catalogServices.find((service) => service.name === name);
+      const catalogItem = catalogServices.find(
+        (service) => service.name === name,
+      );
       return {
         name,
         price: String(catalogItem?.base_price ?? parsed?.price ?? 0),
@@ -1748,17 +1490,17 @@ function App() {
     null;
 
   const filteredServiceCatalog = catalogServices
-        .filter((service) => service.active !== false)
-        .filter((service) => {
-          const normalizedSearch = serviceSearch.toLowerCase();
-          const matchesSearch =
-            service.name.toLowerCase().includes(normalizedSearch) ||
-            service.category.toLowerCase().includes(normalizedSearch);
-          const alreadySelected = reviewServices.some(
-            (item) => item.name === service.name,
-          );
-          return matchesSearch && !alreadySelected;
-        });
+    .filter((service) => service.active !== false)
+    .filter((service) => {
+      const normalizedSearch = serviceSearch.toLowerCase();
+      const matchesSearch =
+        service.name.toLowerCase().includes(normalizedSearch) ||
+        service.category.toLowerCase().includes(normalizedSearch);
+      const alreadySelected = reviewServices.some(
+        (item) => item.name === service.name,
+      );
+      return matchesSearch && !alreadySelected;
+    });
 
   const filteredServiceCatalogByCategory = filteredServiceCatalog.reduce<
     Array<{ category: string; services: CatalogService[] }>
@@ -1834,8 +1576,6 @@ function App() {
     body: string;
     time: string;
   }>;
-
-  
 
   if (!authToken) {
     return (
@@ -3117,10 +2857,7 @@ function App() {
           )}
 
           {activeSection === "dashboard" && !isMechanicSession && (
-            <DashboardPage
-              vehicles={vehicles}
-              canViewPrices={canViewPrices}
-            />
+            <DashboardPage vehicles={vehicles} canViewPrices={canViewPrices} />
           )}
 
           {activeSection === "inventario" && !isMechanicSession && (
@@ -3527,208 +3264,7 @@ function App() {
 
           {activeSection === "configuracion" && !isMechanicSession && (
             <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Mantenedor de usuarios
-                </h3>
-                <p className="text-sm text-gray-500">
-                  {editingUserId
-                    ? "Edita los datos del usuario. La contraseña solo cambia si escribes una nueva."
-                    : "Crea usuarios y asigna perfiles de acceso por rol."}
-                </p>
-              </div>
-
-              <form
-                onSubmit={handleUserSubmit}
-                className="grid grid-cols-1 gap-4 rounded-lg border border-gray-200 p-4 lg:grid-cols-6"
-              >
-                <div>
-                  <label
-                    htmlFor="user-name"
-                    className="mb-2 block text-sm font-medium text-gray-700"
-                  >
-                    Nombre
-                  </label>
-                  <input
-                    id="user-name"
-                    name="name"
-                    type="text"
-                    value={userForm.name}
-                    onChange={handleUserFormChange}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                    placeholder="Nombre del usuario"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="user-rut"
-                    className="mb-2 block text-sm font-medium text-gray-700"
-                  >
-                    RUT
-                  </label>
-                  <input
-                    id="user-rut"
-                    name="rut"
-                    type="text"
-                    value={userForm.rut}
-                    onChange={handleUserFormChange}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                    placeholder="12.345.678-9"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="user-email"
-                    className="mb-2 block text-sm font-medium text-gray-700"
-                  >
-                    Correo
-                  </label>
-                  <input
-                    id="user-email"
-                    name="email"
-                    type="email"
-                    value={userForm.email}
-                    onChange={handleUserFormChange}
-                    pattern="^[^\s@]+@[^\s@]+\.[^\s@]+$"
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                    placeholder="usuario@taller.cl"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="user-password"
-                    className="mb-2 block text-sm font-medium text-gray-700"
-                  >
-                    Crear contraseña
-                  </label>
-                  <input
-                    id="user-password"
-                    name="password"
-                    type="password"
-                    value={userForm.password}
-                    onChange={handleUserFormChange}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                    placeholder="Contraseña"
-                    autoComplete="new-password"
-                    required={!editingUserId}
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="user-role"
-                    className="mb-2 block text-sm font-medium text-gray-700"
-                  >
-                    Perfil
-                  </label>
-                  <select
-                    id="user-role"
-                    name="role"
-                    value={userForm.role}
-                    onChange={handleUserFormChange}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                    required
-                  >
-                    {Object.keys(roleModules).map((role) => (
-                      <option key={role} value={role}>
-                        {role}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex items-end gap-2">
-                  <button
-                    type="submit"
-                    className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
-                  >
-                    {editingUserId ? (
-                      <Edit2 className="h-4 w-4" />
-                    ) : (
-                      <Plus className="h-4 w-4" />
-                    )}
-                    {editingUserId ? "Actualizar usuario" : "Crear usuario"}
-                  </button>
-                  {editingUserId && (
-                    <button
-                      type="button"
-                      onClick={handleCancelUserEdit}
-                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                    >
-                      Cancelar
-                    </button>
-                  )}
-                </div>
-              </form>
-
-              <div className="overflow-hidden rounded-lg border border-gray-200">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700">
-                        Usuario
-                      </th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700">
-                        Perfil
-                      </th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700">
-                        Accesos
-                      </th>
-                      <th className="px-4 py-3 text-right font-semibold text-gray-700">
-                        Acción
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 bg-white">
-                    {workshopUsers.map((user) => (
-                      <tr key={user.id}>
-                        <td className="px-4 py-3">
-                          <p className="font-semibold text-gray-900">
-                            {user.name}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            RUT: {user.rut || "-"}
-                          </p>
-                          <p className="text-xs text-gray-500">{user.email}</p>
-                        </td>
-                        <td className="px-4 py-3 font-medium text-gray-900">
-                          {user.role}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600">
-                          {roleModules[user.role].join(", ")}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleEditUser(user)}
-                              className="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
-                            >
-                              <Edit2 className="h-4 w-4" />
-                              Editar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteUser(user.id)}
-                              className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#fc3d3c]/30 px-3 py-2 text-xs font-semibold text-[#b42318] hover:bg-[#fc3d3c]/10"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              Eliminar
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
+              <ConfiguracionPage />
               {isSessionAdmin && (
                 <ServiceCatalogManager
                   categories={serviceCategories}
@@ -3740,43 +3276,6 @@ function App() {
                   }
                 />
               )}
-
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Apariencia
-                </h3>
-
-                <p className="text-sm text-gray-500">
-                  Personaliza el color principal de la interfaz.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-4 md:flex-row md:items-center">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={accentColor}
-                    onChange={(event) => setAccentColor(event.target.value)}
-                    className="h-10 w-14 rounded border border-gray-300"
-                  />
-
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">
-                      Color principal
-                    </p>
-
-                    <p className="text-xs text-gray-500">{accentColor}</p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setAccentColor("#0f4471")}
-                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                >
-                  Restaurar color
-                </button>
-              </div>
             </div>
           )}
         </main>
