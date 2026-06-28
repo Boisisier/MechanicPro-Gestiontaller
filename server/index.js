@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { Pool } from 'pg';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+import { completeServiceCatalog } from './serviceCatalogSeed.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -60,37 +61,6 @@ const defaultRoles = [
     name: 'Mecánico',
     modules: ['Vehículos', 'Reportes'],
   },
-];
-
-const defaultServiceCatalog = [
-  ['DIAG', 'Diagnóstico e inspección', 'Diagnóstico general', 20000, 1],
-  ['SCAN', 'Diagnóstico e inspección', 'Escaneo computarizado', 20000, 0.5],
-  ['PRECOMP', 'Diagnóstico e inspección', 'Revisión precompra', 45000, 2],
-  ['ACE-MOT', 'Mantenimiento preventivo', 'Cambio de aceite de motor', 35000, 0.75],
-  ['FIL-ACE', 'Mantenimiento preventivo', 'Cambio de filtro de aceite', 12000, 0.25],
-  ['FIL-AIR', 'Mantenimiento preventivo', 'Cambio de filtro de aire', 10000, 0.25],
-  ['FIL-CAB', 'Mantenimiento preventivo', 'Cambio de filtro de cabina', 12000, 0.4],
-  ['BUJIAS', 'Mantenimiento preventivo', 'Cambio de bujías', 35000, 1.5],
-  ['DIST', 'Motor', 'Cambio de kit de distribución', 180000, 5],
-  ['INYEC', 'Motor', 'Limpieza de inyectores', 60000, 2],
-  ['REFRIG', 'Refrigeración', 'Cambio de líquido refrigerante', 30000, 1],
-  ['RAD', 'Refrigeración', 'Cambio de radiador', 85000, 3],
-  ['PAST', 'Frenos', 'Cambio de pastillas de freno', 50000, 1.5],
-  ['DISC', 'Frenos', 'Cambio de discos de freno', 90000, 2],
-  ['RECT-DISC', 'Frenos', 'Rectificado de discos', 45000, 2],
-  ['LIQ-FRE', 'Frenos', 'Cambio de líquido de frenos', 30000, 1],
-  ['ALIN', 'Dirección y neumáticos', 'Alineación', 25000, 0.75],
-  ['BAL', 'Dirección y neumáticos', 'Balanceo', 20000, 0.75],
-  ['NEUM', 'Dirección y neumáticos', 'Cambio de neumáticos', 30000, 1],
-  ['AMORT', 'Suspensión', 'Cambio de amortiguadores', 120000, 4],
-  ['BANDEJA', 'Suspensión', 'Cambio de bandeja de suspensión', 65000, 2],
-  ['BAT', 'Electricidad', 'Cambio de batería', 15000, 0.5],
-  ['ALT', 'Electricidad', 'Cambio de alternador', 70000, 2.5],
-  ['ARR', 'Electricidad', 'Cambio de motor de arranque', 70000, 2.5],
-  ['EMB', 'Transmisión y embrague', 'Cambio de kit de embrague', 220000, 7],
-  ['ACE-CAJA', 'Transmisión y embrague', 'Cambio de aceite de caja', 45000, 1.5],
-  ['AACC', 'Climatización', 'Carga de aire acondicionado', 45000, 1],
-  ['ESC', 'Escape', 'Reparación de sistema de escape', 60000, 2],
 ];
 
 const normalizePatente = (value = '') => {
@@ -463,14 +433,19 @@ const seedDefaultRoles = async (client, companyId) => {
 };
 
 const seedDefaultServices = async (client, companyId) => {
-  const countResult = await client.query(
-    'select count(*)::int as count from service_catalog where company_id = $1',
+  const existingResult = await client.query(
+    'select name from service_catalog where company_id = $1',
     [companyId],
   );
-  if (countResult.rows[0].count > 0) {
+  const existingNames = new Set(existingResult.rows.map((row) => row.name));
+  const missingServices = completeServiceCatalog.filter(
+    ([, , name]) => !existingNames.has(name),
+  );
+  if (missingServices.length === 0) {
     return;
   }
-  for (const [code, categoryName, name, price, hours] of defaultServiceCatalog) {
+
+  for (const [code, categoryName, name, price, hours] of missingServices) {
     const categoryResult = await client.query(
       `insert into service_categories (company_id, name)
        values ($1, $2)
@@ -482,7 +457,18 @@ const seedDefaultServices = async (client, companyId) => {
       `insert into service_catalog
         (company_id, category_id, code, name, base_price, estimated_hours)
        values ($1, $2, $3, $4, $5, $6)
-       on conflict (company_id, code) do nothing`,
+       on conflict (company_id, name) do update
+       set category_id = excluded.category_id,
+           base_price = case
+             when service_catalog.base_price = 0 then excluded.base_price
+             else service_catalog.base_price
+           end,
+           estimated_hours = case
+             when service_catalog.estimated_hours = 0 then excluded.estimated_hours
+             else service_catalog.estimated_hours
+           end,
+           active = true,
+           updated_at = now()`,
       [companyId, categoryResult.rows[0].id, code, name, price, hours],
     );
   }
