@@ -38,7 +38,7 @@ import Header from "./components/layout/Header";
 
 import VehicleForm, {
   VehicleFormData,
-} from "./components/vehicles/VehicleForm";
+} from "../features/vehiculo/components/VehicleForm";
 
 import VehicleTable from "./components/vehicles/VehicleTable";
 import ExitPricingSection from "./components/vehicles/ExitPricingSection";
@@ -345,8 +345,6 @@ function App() {
     return () => window.clearInterval(timer);
   }, []);
 
-  
-
   useEffect(() => {
     localStorage.setItem(
       "releasedParkingIds",
@@ -414,8 +412,6 @@ function App() {
       )
       .catch((error) => console.error("Parking releases load failed", error));
   }, [authToken, sessionRole, isMechanicSession]);
-
-  
 
   useEffect(() => {
     if (
@@ -1336,12 +1332,6 @@ function App() {
 
   const reviewAttentionTotal =
     reviewServiceTotal + reviewPartTotal + reviewSupplyTotal;
-
-  
-  
-  
-  
-
 
   const performSendToParking = async (vehicle: Vehicle) => {
     try {
@@ -2786,7 +2776,7 @@ function App() {
           )}
 
           {activeSection === "estacionamiento" && !isMechanicSession && (
-            <EstacionamientoPage/>
+            <EstacionamientoPage />
           )}
 
           {activeSection === "reportes" && (
@@ -2813,9 +2803,7 @@ function App() {
           )}
 
           {activeSection === "registro_acciones" && !isMechanicSession && (
-            <RegistroPage
-              isSessionAdmin={isSessionAdmin}
-            />
+            <RegistroPage isSessionAdmin={isSessionAdmin} />
           )}
 
           {activeSection === "configuracion" && !isMechanicSession && (
