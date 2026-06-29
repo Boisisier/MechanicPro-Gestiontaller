@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AuditLog } from "../../../shared/lib/types";
+import { getAuditLogs, getAuthToken } from "../../../shared/lib/api";
 
 export default function useRegistro() {
-  const [auditLogs,] = useState<AuditLog[]>(() => {
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => {
     const raw = localStorage.getItem("auditLogs");
     return raw ? JSON.parse(raw) : [];
   });
@@ -47,6 +48,37 @@ export default function useRegistro() {
     auditStartIndex + auditLogsPageSize,
     filteredAuditLogs.length,
   );
+
+  const [authToken] = useState<string | null>(() =>
+    getAuthToken(),
+  );
+
+  useEffect(() => {
+    setAuditPage(1);
+  }, [auditDateFrom, auditDateTo]);
+
+  const [sessionRole] = useState<"member" | null>(null);
+  const [sessionUser] = useState<{
+    name: string;
+    email: string;
+    role: string;
+  } | null>(null);
+  const sessionUserRole = sessionUser?.role || "";
+  const isMechanicSession = sessionUserRole === "Mecánico";
+
+  useEffect(() => {
+    if (!authToken || sessionRole !== "member" || isMechanicSession) {
+      return;
+    }
+
+    getAuditLogs({
+      date_from: auditDateFrom || undefined,
+      date_to: auditDateTo || undefined,
+    })
+      .then((rows) => setAuditLogs(rows))
+      .catch((error) => console.error("Audit logs load failed", error));
+  }, [authToken, sessionRole, isMechanicSession, auditDateFrom, auditDateTo]);
+
   return {
     filteredAuditLogs,
     auditLogs,
@@ -59,6 +91,6 @@ export default function useRegistro() {
     auditTotalPages,
     setAuditDateFrom,
     setAuditDateTo,
-    setAuditPage
+    setAuditPage,
   };
 }

@@ -5,7 +5,6 @@ import {
   createVehicle,
   createAuditLog,
   getAuthToken,
-  getAuditLogs,
   getInventoryItems,
   getParkingReleases,
   getSession,
@@ -89,7 +88,6 @@ const defaultWorkshopUsers: WorkshopUser[] = [
   },
 ];
 
-const auditLogsPageSize = 15;
 const mechanicHiddenSections = [
   "dashboard",
   "presupuesto",
@@ -213,10 +211,6 @@ function App() {
     const raw = localStorage.getItem("auditLogs");
     return raw ? JSON.parse(raw) : [];
   });
-  const [auditDateFrom, setAuditDateFrom] = useState("");
-  const [auditDateTo, setAuditDateTo] = useState("");
-  const [auditPage, setAuditPage] = useState(1);
-
   const [releasedParkingIds, setReleasedParkingIds] = useState<string[]>(() => {
     const raw = localStorage.getItem("releasedParkingIds");
     return raw ? JSON.parse(raw) : [];
@@ -351,9 +345,7 @@ function App() {
     return () => window.clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    setAuditPage(1);
-  }, [auditDateFrom, auditDateTo]);
+  
 
   useEffect(() => {
     localStorage.setItem(
@@ -423,18 +415,7 @@ function App() {
       .catch((error) => console.error("Parking releases load failed", error));
   }, [authToken, sessionRole, isMechanicSession]);
 
-  useEffect(() => {
-    if (!authToken || sessionRole !== "member" || isMechanicSession) {
-      return;
-    }
-
-    getAuditLogs({
-      date_from: auditDateFrom || undefined,
-      date_to: auditDateTo || undefined,
-    })
-      .then((rows) => setAuditLogs(rows))
-      .catch((error) => console.error("Audit logs load failed", error));
-  }, [authToken, sessionRole, isMechanicSession, auditDateFrom, auditDateTo]);
+  
 
   useEffect(() => {
     if (
@@ -1356,41 +1337,10 @@ function App() {
   const reviewAttentionTotal =
     reviewServiceTotal + reviewPartTotal + reviewSupplyTotal;
 
-  const auditFromTime = auditDateFrom
-    ? new Date(`${auditDateFrom}T00:00:00`).getTime()
-    : null;
-  const auditToTime = auditDateTo
-    ? new Date(`${auditDateTo}T23:59:59.999`).getTime()
-    : null;
-  const filteredAuditLogs = auditLogs.filter((entry) => {
-    const createdTime = new Date(entry.created_at).getTime();
-    if (Number.isNaN(createdTime)) {
-      return false;
-    }
-    if (auditFromTime !== null && createdTime < auditFromTime) {
-      return false;
-    }
-    if (auditToTime !== null && createdTime > auditToTime) {
-      return false;
-    }
-    return true;
-  });
-  const auditTotalPages = Math.max(
-    1,
-    Math.ceil(filteredAuditLogs.length / auditLogsPageSize),
-  );
-  const auditCurrentPage = Math.min(auditPage, auditTotalPages);
-  const auditStartIndex = (auditCurrentPage - 1) * auditLogsPageSize;
-  const paginatedAuditLogs = filteredAuditLogs.slice(
-    auditStartIndex,
-    auditStartIndex + auditLogsPageSize,
-  );
-  const auditVisibleFrom =
-    filteredAuditLogs.length === 0 ? 0 : auditStartIndex + 1;
-  const auditVisibleTo = Math.min(
-    auditStartIndex + auditLogsPageSize,
-    filteredAuditLogs.length,
-  );
+  
+  
+  
+  
 
 
   const performSendToParking = async (vehicle: Vehicle) => {
