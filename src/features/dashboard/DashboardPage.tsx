@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Vehicle } from "../../shared/lib/types";
 import DashboardMetricsCards from "./components/DashboardMetricsCards";
 import DashboarSalesChart from "./components/DashboardSalesChart";
@@ -17,18 +18,23 @@ export default function DashboardPage({
   vehicles,
   canViewPrices,
 }: DashboardPageProps) {
+  const [serviceFlowPeriod, setServiceFlowPeriod] = useState<
+    "week" | "month" | "year"
+  >("month");
   const {
     metrics,
     weeklySales,
-    salesByMonth,
+    serviceFlow,
+    serviceFlowLabel,
     latestMaintenances,
     inventoryMovements,
     mostRequestedServices,
     maxRequestedServiceCount,
-    maxSales,
+    maxServiceFlow,
     completedServices,
   } = useDashboard({
     vehicles,
+    serviceFlowPeriod,
   });
   return (
     <div className="space-y-6">
@@ -47,12 +53,13 @@ export default function DashboardPage({
             completedServicesCount={completedServices.length}
           />
 
-          {canViewPrices && (
-            <DashboarSalesChart
-              salesByMonth={salesByMonth}
-              maxSales={maxSales}
-            />
-          )}
+          <DashboarSalesChart
+            serviceFlow={serviceFlow}
+            maxServiceFlow={maxServiceFlow}
+            period={serviceFlowPeriod}
+            periodLabel={serviceFlowLabel}
+            onPeriodChange={setServiceFlowPeriod}
+          />
 
           <DashboardMaintenanceHistory
             latestMaintenances={latestMaintenances}

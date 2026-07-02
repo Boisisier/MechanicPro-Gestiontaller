@@ -160,12 +160,68 @@ export const deleteInventoryItem = async (id: string) =>
     })
   );
 
-export const getBudgets = async () =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/budgets`, {
+export const getBudgets = async (filters?: {
+  status?: string;
+  date_from?: string;
+  date_to?: string;
+  search?: string;
+}) => {
+  const params = new URLSearchParams();
+  Object.entries(filters || {}).forEach(([key, value]) => {
+    if (value) params.set(key, value);
+  });
+  const query = params.toString();
+  return handleResponse(
+    await fetch(`${apiBaseUrl}/budgets${query ? `?${query}` : ""}`, {
       headers: withAuthHeader(),
     })
   );
+};
+
+export const getInventoryMovements = async () =>
+  handleResponse(await fetch(`${apiBaseUrl}/inventory-movements`, { headers: withAuthHeader() }));
+
+export const getInventorySuppliers = async () =>
+  handleResponse(await fetch(`${apiBaseUrl}/inventory-suppliers`, { headers: withAuthHeader() }));
+
+export const createInventorySupplier = async (body: unknown) =>
+  handleResponse(await fetch(`${apiBaseUrl}/inventory-suppliers`, {
+    method: "POST",
+    headers: withAuthHeader({ "Content-Type": "application/json" }),
+    body: JSON.stringify(body),
+  }));
+
+export const getInventoryPurchaseOrders = async () =>
+  handleResponse(await fetch(`${apiBaseUrl}/inventory-purchase-orders`, { headers: withAuthHeader() }));
+
+export const createInventoryPurchaseOrder = async (body: unknown) =>
+  handleResponse(await fetch(`${apiBaseUrl}/inventory-purchase-orders`, {
+    method: "POST",
+    headers: withAuthHeader({ "Content-Type": "application/json" }),
+    body: JSON.stringify(body),
+  }));
+
+export const receiveInventoryPurchaseOrder = async (id: string) =>
+  handleResponse(await fetch(`${apiBaseUrl}/inventory-purchase-orders/${id}/receive`, {
+    method: "POST",
+    headers: withAuthHeader({ "Content-Type": "application/json" }),
+  }));
+
+export const getInventoryStockCounts = async () =>
+  handleResponse(await fetch(`${apiBaseUrl}/inventory-stock-counts`, { headers: withAuthHeader() }));
+
+export const createInventoryStockCount = async (body: unknown) =>
+  handleResponse(await fetch(`${apiBaseUrl}/inventory-stock-counts`, {
+    method: "POST",
+    headers: withAuthHeader({ "Content-Type": "application/json" }),
+    body: JSON.stringify(body),
+  }));
+
+export const completeInventoryStockCount = async (id: string) =>
+  handleResponse(await fetch(`${apiBaseUrl}/inventory-stock-counts/${id}/complete`, {
+    method: "POST",
+    headers: withAuthHeader({ "Content-Type": "application/json" }),
+  }));
 
 export const createBudget = async (body: unknown) =>
   handleResponse(
@@ -244,6 +300,18 @@ export const deleteParkingRelease = async (vehicleId: string) =>
       method: 'DELETE',
       headers: withAuthHeader(),
     })
+  );
+
+export const updateBudgetStatus = async (
+  id: string,
+  body: { status: string; converted_vehicle_id?: string },
+) =>
+  handleResponse(
+    await fetch(`${apiBaseUrl}/budgets/${id}/status`, {
+      method: "PATCH",
+      headers: withAuthHeader({ "Content-Type": "application/json" }),
+      body: JSON.stringify(body),
+    }),
   );
 
 export const getServiceCategories = async () =>

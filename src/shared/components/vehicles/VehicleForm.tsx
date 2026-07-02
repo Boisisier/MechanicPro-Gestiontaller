@@ -36,6 +36,7 @@ interface VehicleFormProps {
   mechanics?: Array<{ id: string; name: string }>;
   canManageAdvance?: boolean;
   serviceCatalog?: CatalogService[];
+  initialData?: Partial<VehicleFormData> | null;
 }
 
 export interface VehicleFormData {
@@ -172,9 +173,11 @@ export default function VehicleForm({
   mechanics = [],
   canManageAdvance = false,
   serviceCatalog = [],
+  initialData = null,
 }: VehicleFormProps) {
   const [formData, setFormData] = useState<VehicleFormData>({
     ...initialFormData,
+    ...(initialData || {}),
     ...(editingVehicle || {}),
     servicios: editingVehicle?.servicios || [],
   });
@@ -222,7 +225,7 @@ export default function VehicleForm({
         servicios: data.servicios || [],
       });
     } else {
-      setFormData(initialFormData);
+      setFormData({ ...initialFormData, ...(initialData || {}) });
     }
     setLoadedPatente('');
     setLookupMode(null);
@@ -230,7 +233,7 @@ export default function VehicleForm({
     setCurrentStep(0);
     setServiceSearch('');
     setServiceCatalogOpen(false);
-  }, [editingVehicle]);
+  }, [editingVehicle, initialData]);
 
   const lookupMatches = existingVehicles
     .filter((vehicle) => {

@@ -6,9 +6,13 @@ import {
 
 interface UseDashboardProps {
   vehicles: Vehicle[];
+  serviceFlowPeriod: "week" | "month" | "year";
 }
 
-export default function useDashboard({ vehicles }: UseDashboardProps) {
+export default function useDashboard({
+  vehicles,
+  serviceFlowPeriod,
+}: UseDashboardProps) {
   const completedServices = vehicles.flatMap((vehicle) =>
     parseStoredReviewServices(vehicle.servicios).map((service) => ({
       ...service,
@@ -36,34 +40,61 @@ export default function useDashboard({ vehicles }: UseDashboardProps) {
       0,
     );
 
-  const salesByMonth = Array.from({ length: 6 }, (_, index) => {
-    const date = new Date();
-    date.setMonth(date.getMonth() - (5 - index));
-    const month = date.getMonth();
-    const year = date.getFullYear();
+  const periodCount = serviceFlowPeriod === "week" ? 8 : serviceFlowPeriod === "month" ? 6 : 5;
+  const serviceFlow = Array.from({ length: periodCount }, (_, index) => {
+    const now = new Date();
+    let start: Date;
+    let end: Date;
+    let label: string;
+
+    if (serviceFlowPeriod === "week") {
+      const offset = (periodCount - 1 - index) * 7;
+      start = new Date(now);
+      start.setDate(now.getDate() - offset - 6);
+      start.setHours(0, 0, 0, 0);
+      end = new Date(now);
+      end.setDate(now.getDate() - offset);
+      end.setHours(23, 59, 59, 999);
+      label = `${start.getDate()}-${end.getDate()} ${end
+        .toLocaleDateString("es-CL", { month: "short" })
+        .replace(".", "")}`;
+    } else if (serviceFlowPeriod === "month") {
+      start = new Date(now.getFullYear(), now.getMonth() - (periodCount - 1 - index), 1);
+      end = new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59, 999);
+      label = start
+        .toLocaleDateString("es-CL", { month: "short" })
+        .replace(".", "");
+    } else {
+      const year = now.getFullYear() - (periodCount - 1 - index);
+      start = new Date(year, 0, 1);
+      end = new Date(year, 11, 31, 23, 59, 59, 999);
+      label = String(year);
+    }
+
     const total = vehicles
       .filter((vehicle) => {
-        const vehicleDate = new Date(
-          vehicle.updated_at || vehicle.fecha_ingreso,
+        const date = new Date(
+          vehicle.fecha_salida_confirmada ||
+            vehicle.updated_at ||
+            vehicle.fecha_ingreso,
         );
-        return (
-          vehicleDate.getMonth() === month && vehicleDate.getFullYear() === year
-        );
+        return date >= start && date <= end;
       })
-      .flatMap((vehicle) => parseStoredReviewServices(vehicle.servicios))
       .reduce(
-        (sum, service) => sum + (parseInt(service.price || "0", 10) || 0),
+        (sum, vehicle) =>
+          sum + parseStoredReviewServices(vehicle.servicios).length,
         0,
       );
-    return {
-      label: date
-        .toLocaleDateString("es-CL", { month: "short" })
-        .replace(".", ""),
-      total,
-    };
+    return { label, total };
   });
 
-  const maxSales = Math.max(...salesByMonth.map((item) => item.total), 1);
+  const serviceFlowLabel =
+    serviceFlowPeriod === "week"
+      ? "Últimas 8 semanas"
+      : serviceFlowPeriod === "month"
+        ? "Últimos 6 meses"
+        : "Últimos 5 años";
+  const maxServiceFlow = Math.max(...serviceFlow.map((item) => item.total), 1);
 
   const latestMaintenances = vehicles
     .filter(
@@ -105,12 +136,13 @@ export default function useDashboard({ vehicles }: UseDashboardProps) {
   return {
     metrics,
     weeklySales,
-    salesByMonth,
+    serviceFlow,
+    serviceFlowLabel,
     latestMaintenances,
     inventoryMovements,
     mostRequestedServices,
     maxRequestedServiceCount,
-    maxSales,
+    maxServiceFlow,
     completedServices,
   };
 }

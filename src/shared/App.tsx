@@ -23,6 +23,7 @@ import {
   updateWorkshopUser,
   updateInventoryItem,
   updateVehicle,
+  updateBudgetStatus,
   getServiceCatalog,
   getServiceCategories,
 } from "./lib/api";
@@ -62,6 +63,12 @@ import {
   Send,
   Edit2,
   Clock,
+  Users,
+  ListChecks,
+  Palette,
+  Activity,
+  UserCheck,
+  Layers3,
 } from "lucide-react";
 
 import { toSoftAccent } from "./utils/colors";
@@ -82,6 +89,7 @@ import mechanicProLogo from "./assets/mechanic-pro-logo.png";
 import PresupuestoPage from "../features/presupuesto/PresupuestoPage";
 import DashboardPage from "../features/dashboard/DashboardPage";
 import ServiceCatalogManager from "./components/settings/ServiceCatalogManager";
+import type { BudgetQuote } from "../features/presupuesto/types/presupuesto";
 
 const roleModules: Record<UserRole, string[]> = {
   "Administrador de Taller": [
@@ -179,6 +187,10 @@ function App() {
   const [editingVehicle, setEditingVehicle] = useState<
     (VehicleFormData & { id: string }) | null
   >(null);
+  const [budgetVehicleDraft, setBudgetVehicleDraft] =
+    useState<Partial<VehicleFormData> | null>(null);
+  const [budgetDraftParts, setBudgetDraftParts] = useState<ReviewPartItem[]>([]);
+  const [budgetSourceId, setBudgetSourceId] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
 
@@ -236,6 +248,9 @@ function App() {
     role: "Administrativo",
   });
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [configTab, setConfigTab] = useState<
+    "users" | "services" | "appearance"
+  >("users");
 
   const [vehicleTab, setVehicleTab] = useState<"ingreso" | "taller" | "salida">(
     "ingreso",
@@ -272,6 +287,8 @@ function App() {
   });
   const [auditDateFrom, setAuditDateFrom] = useState("");
   const [auditDateTo, setAuditDateTo] = useState("");
+  const [auditSearch, setAuditSearch] = useState("");
+  const [auditModuleFilter, setAuditModuleFilter] = useState("");
   const [auditPage, setAuditPage] = useState(1);
 
   const [releasedParkingIds, setReleasedParkingIds] = useState<string[]>(() => {
@@ -419,7 +436,7 @@ function App() {
 
   useEffect(() => {
     setAuditPage(1);
-  }, [auditDateFrom, auditDateTo]);
+  }, [auditDateFrom, auditDateTo, auditSearch, auditModuleFilter]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -1201,6 +1218,12 @@ function App() {
             return updateInventoryItem(inventoryItem.id, {
               ...inventoryItem,
               stock: inventoryItem.stock - partDelta.delta,
+              movement_type:
+                partDelta.delta > 0 ? "consumo_taller" : "devolucion_taller",
+              movement_reason: `Atención de vehículo ${vehicle.patente}`,
+              vehicle_id: vehicle.id,
+              vehicle_patente: vehicle.patente,
+              mechanic_name: vehicle.assigned_mechanic_name || "",
             });
           }),
       );
@@ -1449,9 +1472,12 @@ function App() {
     );
     const payload = {
       ...formData,
-      servicios: selectedCatalogItems.map(({ name, price }) =>
-        serializeReviewService({ name, price }),
-      ),
+      servicios: [
+        ...selectedCatalogItems.map(({ name, price }) =>
+          serializeReviewService({ name, price }),
+        ),
+        ...budgetDraftParts.map(serializeReviewPart),
+      ],
       estimated_work_hours:
         catalogHours > 0 ? catalogHours : formData.estimated_work_hours,
     };
@@ -1484,6 +1510,28 @@ function App() {
         );
 
         showNotification("success", "vehículo registrado correctamente");
+        if (budgetSourceId) {
+          try {
+            await updateBudgetStatus(budgetSourceId, {
+              status: "convertido",
+              converted_vehicle_id: created.id,
+            });
+            logAction(
+              "Presupuesto convertido",
+              "Presupuesto",
+              `${formData.patente} fue convertido en ingreso de vehículo`,
+            );
+          } catch (error) {
+            console.error("Budget conversion status update failed", error);
+            showNotification(
+              "error",
+              "El vehículo fue creado, pero no se pudo actualizar el presupuesto",
+            );
+          }
+        }
+        setBudgetVehicleDraft(null);
+        setBudgetDraftParts([]);
+        setBudgetSourceId(null);
       }
     } catch (error) {
       const message =
@@ -1495,6 +1543,57 @@ function App() {
 
       console.error("Error:", error);
     }
+  };
+
+  const handleBudgetToVehicle = (budget: BudgetQuote) => {
+    setBudgetSourceId(budget.id);
+    const serviceItems = (budget.items || []).filter(
+      (item) => item.item_type === "servicio",
+    );
+    const inventoryBudgetItems = (budget.items || []).filter(
+      (item) => item.item_type !== "servicio",
+    );
+    setBudgetVehicleDraft({
+      patente: budget.patente || "",
+      modelo: budget.vehicle || "",
+      customer_name: budget.customer_name || "",
+      customer_rut: budget.customer_rut || "",
+      customer_phone: budget.customer_phone || "",
+      customer_email: budget.customer_email || "",
+      customer_address: budget.customer_address || "",
+      customer_city: budget.customer_city || "",
+      observaciones: budget.notes || "",
+      customer_authorized: true,
+      servicios: serviceItems.map((item) => item.name),
+      estimated_work_hours: serviceItems.reduce(
+        (sum, item) => sum + (Number(item.estimated_hours) || 0),
+        0,
+      ),
+    });
+    setBudgetDraftParts(
+      inventoryBudgetItems.map((item) => {
+        const inventoryItem = inventoryItems.find(
+          (inventory) => inventory.id === item.reference_id,
+        );
+        return {
+          inventoryItemId: item.reference_id || crypto.randomUUID(),
+          itemType: item.item_type === "insumo" ? "insumo" : "repuesto",
+          name: item.name,
+          sku: inventoryItem?.sku || "",
+          quantity: Number(item.quantity) || 1,
+          unit: inventoryItem?.unit || "unidad",
+          unitCost: Number(item.unit_price) || 0,
+          location: inventoryItem?.location || "",
+        };
+      }),
+    );
+    setEditingVehicle(null);
+    setActiveSection("vehiculos");
+    setVehicleTab("ingreso");
+    showNotification(
+      "success",
+      "Presupuesto cargado en Ingreso de vehículos. Completa los datos faltantes.",
+    );
   };
 
   const mechanicOptions = workshopUsers
@@ -1630,8 +1729,43 @@ function App() {
     if (auditToTime !== null && createdTime > auditToTime) {
       return false;
     }
+    if (auditModuleFilter && entry.module !== auditModuleFilter) {
+      return false;
+    }
+    const normalizedSearch = auditSearch.trim().toLowerCase();
+    if (
+      normalizedSearch &&
+      !`${entry.user_name} ${entry.module} ${entry.action} ${entry.detail}`
+        .toLowerCase()
+        .includes(normalizedSearch)
+    ) {
+      return false;
+    }
     return true;
   });
+  const auditModules = Array.from(
+    new Set(auditLogs.map((entry) => entry.module).filter(Boolean)),
+  ).sort();
+  const auditUsersCount = new Set(
+    auditLogs.map((entry) => entry.user_name).filter(Boolean),
+  ).size;
+  const auditTodayCount = auditLogs.filter(
+    (entry) =>
+      new Date(entry.created_at).toDateString() === new Date().toDateString(),
+  ).length;
+  const auditActionStyle = (action: string) => {
+    const normalized = action.toLowerCase();
+    if (/elimin|anulad|rechaz|error/.test(normalized)) {
+      return "bg-[#fc3d3c]/10 text-[#b42318]";
+    }
+    if (/cread|registr|aprobad|recibid|guardad/.test(normalized)) {
+      return "bg-emerald-50 text-emerald-700";
+    }
+    if (/actualiz|editad|modific/.test(normalized)) {
+      return "bg-[#0f4471]/10 text-[#0f4471]";
+    }
+    return "bg-sky-50 text-sky-700";
+  };
   const auditTotalPages = Math.max(
     1,
     Math.ceil(filteredAuditLogs.length / auditLogsPageSize),
@@ -2073,6 +2207,7 @@ function App() {
                       serviceCatalog={catalogServices.filter(
                         (service) => service.active !== false,
                       )}
+                      initialData={budgetVehicleDraft}
                     />
                   </div>
 
@@ -2195,7 +2330,7 @@ function App() {
                               <div className="flex items-center gap-2 text-right">
                                 <Clock className="h-4 w-4 text-[#0f4471]" />
                                 <div>
-                                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                                  <p className="text-[13px] font-semibold uppercase tracking-wide text-gray-500">
                                     Tiempo de trabajo
                                   </p>
                                   <p className="text-sm font-bold text-[#0f4471]">
@@ -3128,6 +3263,10 @@ function App() {
               inventoryItems={inventoryItems}
               setInventoryItems={setInventoryItems}
               showNotification={showNotification}
+              isAdmin={isSessionAdmin}
+              onAudit={(action, detail) =>
+                logAction(action, "Inventario", detail)
+              }
             />
           )}
 
@@ -3137,6 +3276,12 @@ function App() {
               serviceCatalog={catalogServices.filter(
                 (service) => service.active !== false,
               )}
+              inventoryItems={inventoryItems}
+              onConvertToVehicle={handleBudgetToVehicle}
+              onNotify={showNotification}
+              onAudit={(action, detail) =>
+                logAction(action, "Presupuesto", detail)
+              }
             />
           )}
 
@@ -3371,9 +3516,56 @@ function App() {
                   Solo el Administrador de Taller puede ingresar a este módulo.
                 </div>
               ) : (
+                <>
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    {[
+                      {
+                        label: "Acciones almacenadas",
+                        value: auditLogs.length,
+                        icon: Activity,
+                        style: "border-[#0f4471]/20 bg-[#0f4471]/5 text-[#0f4471]",
+                      },
+                      {
+                        label: "Actividad de hoy",
+                        value: auditTodayCount,
+                        icon: Clock,
+                        style: "border-sky-200 bg-sky-50 text-sky-700",
+                      },
+                      {
+                        label: "Usuarios registrados",
+                        value: auditUsersCount,
+                        icon: UserCheck,
+                        style: "border-emerald-200 bg-emerald-50 text-emerald-700",
+                      },
+                      {
+                        label: "Módulos auditados",
+                        value: auditModules.length,
+                        icon: Layers3,
+                        style: "border-[#fc3d3c]/20 bg-[#fc3d3c]/5 text-[#b42318]",
+                      },
+                    ].map((metric) => {
+                      const Icon = metric.icon;
+                      return (
+                        <div
+                          key={metric.label}
+                          className={`flex items-center gap-4 rounded-lg border p-4 ${metric.style}`}
+                        >
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/80">
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold">
+                              {metric.label}
+                            </p>
+                            <p className="text-2xl font-bold">{metric.value}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
                   <div className="border-b border-gray-200 px-5 py-4">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                    <div className="flex flex-col gap-4">
                       <div>
                         <p className="text-sm font-semibold text-gray-900">
                           {filteredAuditLogs.length} acción(es) encontradas
@@ -3382,7 +3574,50 @@ function App() {
                           Total almacenado: {auditLogs.length} registro(s)
                         </p>
                       </div>
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+                        <div>
+                          <label
+                            htmlFor="audit-search"
+                            className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500"
+                          >
+                            Buscar
+                          </label>
+                          <div className="flex items-center gap-2 rounded-lg border border-gray-300 px-3">
+                            <Search className="h-4 w-4 text-gray-400" />
+                            <input
+                              id="audit-search"
+                              value={auditSearch}
+                              onChange={(event) =>
+                                setAuditSearch(event.target.value)
+                              }
+                              className="w-full py-2 text-sm outline-none"
+                              placeholder="Usuario, acción o detalle"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label
+                            htmlFor="audit-module"
+                            className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500"
+                          >
+                            Módulo
+                          </label>
+                          <select
+                            id="audit-module"
+                            value={auditModuleFilter}
+                            onChange={(event) =>
+                              setAuditModuleFilter(event.target.value)
+                            }
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#0f4471] focus:outline-none"
+                          >
+                            <option value="">Todos los módulos</option>
+                            {auditModules.map((module) => (
+                              <option key={module} value={module}>
+                                {module}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                         <div>
                           <label
                             htmlFor="audit-date-from"
@@ -3423,6 +3658,8 @@ function App() {
                             onClick={() => {
                               setAuditDateFrom("");
                               setAuditDateTo("");
+                              setAuditSearch("");
+                              setAuditModuleFilter("");
                             }}
                             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
                           >
@@ -3472,10 +3709,16 @@ function App() {
                                   {entry.user_name}
                                 </td>
                                 <td className="px-4 py-3 text-gray-700">
-                                  {entry.module}
+                                  <span className="rounded-full bg-[#0f4471]/10 px-2.5 py-1 text-xs font-semibold text-[#0f4471]">
+                                    {entry.module}
+                                  </span>
                                 </td>
                                 <td className="px-4 py-3 text-gray-700">
-                                  {entry.action}
+                                  <span
+                                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${auditActionStyle(entry.action)}`}
+                                  >
+                                    {entry.action}
+                                  </span>
                                 </td>
                                 <td className="px-4 py-3 text-gray-600">
                                   {entry.detail || "-"}
@@ -3502,7 +3745,7 @@ function App() {
                             Anterior
                           </button>
                           <span className="min-w-24 text-center text-sm font-semibold text-gray-700">
-                            Pagina {auditCurrentPage} de {auditTotalPages}
+                            Página {auditCurrentPage} de {auditTotalPages}
                           </span>
                           <button
                             type="button"
@@ -3521,13 +3764,66 @@ function App() {
                     </>
                   )}
                 </div>
+                </>
               )}
             </div>
           )}
 
           {activeSection === "configuracion" && !isMechanicSession && (
             <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-6">
-              <div>
+              <div className="border-b border-gray-200 pb-5">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Configuración
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Administra usuarios, servicios y preferencias del sistema.
+                </p>
+                <div className="mt-5 flex flex-wrap gap-3" role="tablist">
+                  {[
+                    {
+                      id: "users" as const,
+                      label: "Usuarios y permisos",
+                      icon: Users,
+                    },
+                    {
+                      id: "services" as const,
+                      label: "Servicios y precios",
+                      icon: ListChecks,
+                    },
+                    {
+                      id: "appearance" as const,
+                      label: "Apariencia",
+                      icon: Palette,
+                    },
+                  ]
+                    .filter((tab) => tab.id !== "services" || isSessionAdmin)
+                    .map((tab) => {
+                      const Icon = tab.icon;
+                      const active = configTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          role="tab"
+                          aria-selected={active}
+                          onClick={() => setConfigTab(tab.id)}
+                          className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition-colors ${
+                            active
+                              ? "border-[#0f4471] bg-[#0f4471] text-white shadow-sm"
+                              : "border-[#0f4471]/30 bg-white text-[#0f4471] hover:bg-[#0f4471]/5"
+                          }`}
+                        >
+                          <Icon className="h-4 w-4" />
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                </div>
+              </div>
+
+              {configTab === "users" && (
+                <div className="space-y-6" role="tabpanel">
+                  <div>
                 <h3 className="text-lg font-semibold text-gray-900">
                   Mantenedor de usuarios
                 </h3>
@@ -3728,8 +4024,10 @@ function App() {
                   </tbody>
                 </table>
               </div>
+                </div>
+              )}
 
-              {isSessionAdmin && (
+              {configTab === "services" && isSessionAdmin && (
                 <ServiceCatalogManager
                   categories={serviceCategories}
                   services={catalogServices}
@@ -3741,42 +4039,46 @@ function App() {
                 />
               )}
 
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Apariencia
-                </h3>
-
-                <p className="text-sm text-gray-500">
-                  Personaliza el color principal de la interfaz.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-4 md:flex-row md:items-center">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={accentColor}
-                    onChange={(event) => setAccentColor(event.target.value)}
-                    className="h-10 w-14 rounded border border-gray-300"
-                  />
-
+              {configTab === "appearance" && (
+                <div className="space-y-6" role="tabpanel">
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">
-                      Color principal
-                    </p>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Apariencia
+                    </h3>
 
-                    <p className="text-xs text-gray-500">{accentColor}</p>
+                    <p className="text-sm text-gray-500">
+                      Personaliza el color principal de la interfaz.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-4 rounded-lg border border-gray-200 p-4 md:flex-row md:items-center">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={accentColor}
+                        onChange={(event) => setAccentColor(event.target.value)}
+                        className="h-10 w-14 rounded border border-gray-300"
+                      />
+
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">
+                          Color principal
+                        </p>
+
+                        <p className="text-xs text-gray-500">{accentColor}</p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setAccentColor("#0f4471")}
+                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      Restaurar color
+                    </button>
                   </div>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => setAccentColor("#0f4471")}
-                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                >
-                  Restaurar color
-                </button>
-              </div>
+              )}
             </div>
           )}
         </main>

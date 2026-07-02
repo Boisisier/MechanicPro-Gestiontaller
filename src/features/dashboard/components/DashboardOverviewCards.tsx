@@ -15,7 +15,7 @@ export default function DashboardOverviewCards({
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
 
       {canViewPrices && (
-        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-[#0f4471]/20 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">
@@ -34,7 +34,7 @@ export default function DashboardOverviewCards({
         </div>
       )}
 
-      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="rounded-xl border border-emerald-200 bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-gray-500">
@@ -46,8 +46,8 @@ export default function DashboardOverviewCards({
             </p>
           </div>
 
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#0f4471]/10">
-            <Wrench className="h-5 w-5 text-[#0f4471]" />
+          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-50">
+            <Wrench className="h-5 w-5 text-emerald-600" />
           </div>
         </div>
       </div>

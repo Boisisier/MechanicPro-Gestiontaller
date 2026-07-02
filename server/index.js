@@ -267,6 +267,104 @@ const ensureVehicleColumns = async () => {
     )
   `);
   await pool.query(`
+    alter table inventory_items
+      add column if not exists sale_price numeric(12,2) not null default 0,
+      add column if not exists status text not null default 'activo',
+      add column if not exists supplier_id uuid,
+      add column if not exists warehouse text not null default '',
+      add column if not exists aisle text not null default '',
+      add column if not exists shelf text not null default '',
+      add column if not exists bin text not null default ''
+  `);
+  await pool.query(`
+    create table if not exists inventory_suppliers (
+      id uuid primary key default gen_random_uuid(),
+      company_id uuid not null references companies(id) on delete cascade,
+      name text not null, rut text not null default '', phone text not null default '',
+      email text not null default '', address text not null default '',
+      active boolean not null default true,
+      created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
+      unique (company_id, name)
+    )
+  `);
+  await pool.query(`
+    create table if not exists inventory_movements (
+      id uuid primary key default gen_random_uuid(),
+      company_id uuid not null references companies(id) on delete cascade,
+      inventory_item_id uuid not null references inventory_items(id) on delete cascade,
+      movement_type text not null, quantity numeric(12,2) not null,
+      stock_before numeric(12,2) not null, stock_after numeric(12,2) not null,
+      reason text not null default '', vehicle_id uuid references vehicles(id) on delete set null,
+      vehicle_patente text not null default '', mechanic_name text not null default '',
+      user_name text not null default '', created_at timestamptz not null default now()
+    )
+  `);
+  await pool.query(`
+    create table if not exists inventory_purchase_orders (
+      id uuid primary key default gen_random_uuid(),
+      company_id uuid not null references companies(id) on delete cascade,
+      supplier_id uuid references inventory_suppliers(id) on delete set null,
+      order_number text not null, status text not null default 'pendiente',
+      order_date date not null default current_date, expected_date date,
+      notes text not null default '', created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(), unique (company_id, order_number)
+    )
+  `);
+  await pool.query(`
+    create table if not exists inventory_purchase_order_items (
+      id uuid primary key default gen_random_uuid(),
+      purchase_order_id uuid not null references inventory_purchase_orders(id) on delete cascade,
+      inventory_item_id uuid not null references inventory_items(id) on delete restrict,
+      quantity numeric(12,2) not null, received_quantity numeric(12,2) not null default 0,
+      unit_cost numeric(12,2) not null default 0
+    )
+  `);
+  await pool.query(`
+    create table if not exists inventory_stock_counts (
+      id uuid primary key default gen_random_uuid(),
+      company_id uuid not null references companies(id) on delete cascade,
+      status text not null default 'abierto', notes text not null default '',
+      created_by text not null default '', created_at timestamptz not null default now(),
+      completed_at timestamptz
+    )
+  `);
+  await pool.query(`
+    create table if not exists inventory_stock_count_items (
+      id uuid primary key default gen_random_uuid(),
+      stock_count_id uuid not null references inventory_stock_counts(id) on delete cascade,
+      inventory_item_id uuid not null references inventory_items(id) on delete cascade,
+      expected_quantity numeric(12,2) not null, counted_quantity numeric(12,2) not null
+    )
+  `);
+  await pool.query(`
+    alter table budget_quotes
+      add column if not exists customer_rut text not null default '',
+      add column if not exists customer_email text not null default '',
+      add column if not exists customer_address text not null default '',
+      add column if not exists customer_city text not null default '',
+      add column if not exists issue_date date not null default current_date,
+      add column if not exists expiry_date date,
+      add column if not exists discount_percent numeric(5,2) not null default 0,
+      add column if not exists tax_percent numeric(5,2) not null default 19,
+      add column if not exists advance_required numeric(12,2) not null default 0,
+      add column if not exists payment_method text not null default '',
+      add column if not exists terms text not null default '',
+      add column if not exists converted_vehicle_id uuid references vehicles(id) on delete set null
+  `);
+  await pool.query(`
+    alter table budget_quote_items
+      add column if not exists item_type text not null default 'servicio',
+      add column if not exists reference_id uuid,
+      add column if not exists quantity numeric(10,2) not null default 1,
+      add column if not exists unit_price numeric(12,2) not null default 0,
+      add column if not exists estimated_hours numeric(8,2) not null default 0
+  `);
+  await pool.query(`
+    update budget_quote_items
+    set unit_price = price
+    where unit_price = 0 and price > 0
+  `);
+  await pool.query(`
     create table if not exists service_categories (
       id uuid primary key default gen_random_uuid(),
       company_id uuid not null references companies(id) on delete cascade,
@@ -395,6 +493,7 @@ const ensureVehicleColumns = async () => {
   await pool.query('create index if not exists idx_roles_company_id on roles(company_id)');
   await pool.query('create index if not exists idx_workshop_users_company_id on workshop_users(company_id)');
   await pool.query('create index if not exists idx_inventory_items_company_id on inventory_items(company_id)');
+  await pool.query('create index if not exists idx_inventory_movements_company_date on inventory_movements(company_id, created_at desc)');
   await pool.query(`
     create unique index if not exists idx_inventory_items_company_sku_unique
       on inventory_items(company_id, sku)
@@ -406,6 +505,7 @@ const ensureVehicleColumns = async () => {
       where barcode is not null and barcode <> ''
   `);
   await pool.query('create index if not exists idx_budget_quotes_company_id on budget_quotes(company_id)');
+  await pool.query('create index if not exists idx_budget_quotes_company_status_date on budget_quotes(company_id, status, issue_date desc)');
   await pool.query('create index if not exists idx_audit_logs_company_created_at on audit_logs(company_id, created_at desc)');
   await pool.query('create index if not exists idx_parking_releases_company_vehicle on parking_releases(company_id, vehicle_id)');
   await pool.query('create index if not exists idx_service_categories_company on service_categories(company_id, active, name)');
@@ -1415,7 +1515,8 @@ app.get('/inventory-items', authRequired, denyMechanicAccess, async (req, res) =
   try {
     const { rows } = await pool.query(
       `select id, item_type, name, category, sku, barcode, stock, min_stock as "minStock", unit, location, supplier,
-              cost::float as cost, notes, created_at, updated_at
+              cost::float as cost, sale_price::float as sale_price, status, supplier_id,
+              warehouse, aisle, shelf, bin, notes, created_at, updated_at
        from inventory_items
        where company_id = $1
        order by name`,
@@ -1457,10 +1558,12 @@ app.post('/inventory-items', authRequired, denyMechanicAccess, ensureWritable, a
 
     const { rows } = await pool.query(
       `insert into inventory_items
-        (company_id, item_type, name, category, sku, barcode, stock, min_stock, unit, location, supplier, cost, notes)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        (company_id, item_type, name, category, sku, barcode, stock, min_stock, unit, location, supplier, cost,
+         sale_price, status, supplier_id, warehouse, aisle, shelf, bin, notes)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
        returning id, item_type, name, category, sku, barcode, stock, min_stock as "minStock", unit, location, supplier,
-                 cost::float as cost, notes, created_at, updated_at`,
+                 cost::float as cost, sale_price::float as sale_price, status, supplier_id,
+                 warehouse, aisle, shelf, bin, notes, created_at, updated_at`,
       [
         companyId,
         itemType,
@@ -1474,9 +1577,29 @@ app.post('/inventory-items', authRequired, denyMechanicAccess, ensureWritable, a
         req.body.location || '',
         req.body.supplier || '',
         Number(req.body.cost) || 0,
+        Number(req.body.sale_price) || 0,
+        req.body.status || 'activo',
+        normalizeUuid(req.body.supplier_id),
+        req.body.warehouse || '',
+        req.body.aisle || '',
+        req.body.shelf || '',
+        req.body.bin || '',
         req.body.notes || '',
       ]
     );
+    if (Number(rows[0].stock) > 0) {
+      await pool.query(
+        `insert into inventory_movements
+          (company_id, inventory_item_id, movement_type, quantity, stock_before, stock_after, reason, user_name)
+         values ($1,$2,'inventario_inicial',$3,0,$3,'Registro inicial',$4)`,
+        [
+          companyId,
+          rows[0].id,
+          Number(rows[0].stock),
+          req.user.full_name || req.user.name || req.user.email || '',
+        ],
+      );
+    }
     res.status(201).json(rows[0]);
   } catch (error) {
     if (error.code === '23505') {
@@ -1495,25 +1618,44 @@ app.put('/inventory-items/:id', authRequired, denyMechanicAccess, ensureWritable
     return res.status(400).json({ error: 'missing_name' });
   }
   try {
+    const existingResult = await pool.query(
+      'select stock from inventory_items where id = $1 and company_id = $2',
+      [req.params.id, companyId],
+    );
+    if (!existingResult.rows.length) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+    const stockBefore = Number(existingResult.rows[0].stock) || 0;
+    const stockAfter = Math.max(0, Number(req.body.stock) || 0);
     const { rows } = await pool.query(
       `update inventory_items
        set item_type = $1, name = $2, category = $3, sku = $4, barcode = $5, stock = $6, min_stock = $7,
-           unit = $8, location = $9, supplier = $10, cost = $11, notes = $12, updated_at = now()
-       where id = $13 and company_id = $14
+           unit = $8, location = $9, supplier = $10, cost = $11, sale_price = $12, status = $13,
+           supplier_id = $14, warehouse = $15, aisle = $16, shelf = $17, bin = $18,
+           notes = $19, updated_at = now()
+       where id = $20 and company_id = $21
        returning id, item_type, name, category, sku, barcode, stock, min_stock as "minStock", unit, location, supplier,
-                 cost::float as cost, notes, created_at, updated_at`,
+                 cost::float as cost, sale_price::float as sale_price, status, supplier_id,
+                 warehouse, aisle, shelf, bin, notes, created_at, updated_at`,
       [
         itemType,
         name,
         req.body.category || '',
         req.body.sku || '',
         req.body.barcode || '',
-        Number(req.body.stock) || 0,
+        stockAfter,
         Number(req.body.minStock ?? req.body.min_stock) || 0,
         req.body.unit || 'unidad',
         req.body.location || '',
         req.body.supplier || '',
         Number(req.body.cost) || 0,
+        Number(req.body.sale_price) || 0,
+        req.body.status || 'activo',
+        normalizeUuid(req.body.supplier_id),
+        req.body.warehouse || '',
+        req.body.aisle || '',
+        req.body.shelf || '',
+        req.body.bin || '',
         req.body.notes || '',
         req.params.id,
         companyId,
@@ -1521,6 +1663,28 @@ app.put('/inventory-items/:id', authRequired, denyMechanicAccess, ensureWritable
     );
     if (rows.length === 0) {
       return res.status(404).json({ error: 'not_found' });
+    }
+    if (stockAfter !== stockBefore) {
+      const delta = stockAfter - stockBefore;
+      await pool.query(
+        `insert into inventory_movements
+          (company_id, inventory_item_id, movement_type, quantity, stock_before, stock_after,
+           reason, vehicle_id, vehicle_patente, mechanic_name, user_name)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [
+          companyId,
+          req.params.id,
+          req.body.movement_type || (delta > 0 ? 'entrada' : 'salida'),
+          Math.abs(delta),
+          stockBefore,
+          stockAfter,
+          req.body.movement_reason || req.body.reason || '',
+          normalizeUuid(req.body.vehicle_id),
+          req.body.vehicle_patente || '',
+          req.body.mechanic_name || '',
+          req.user.full_name || req.user.name || req.user.email || '',
+        ],
+      );
     }
     res.json(rows[0]);
   } catch (error) {
@@ -1549,6 +1713,265 @@ app.delete('/inventory-items/:id', authRequired, denyMechanicAccess, ensureWrita
   }
 });
 
+app.get('/inventory-movements', authRequired, denyMechanicAccess, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `select m.*, m.quantity::float, m.stock_before::float, m.stock_after::float,
+              i.name as item_name, i.sku
+       from inventory_movements m
+       join inventory_items i on i.id = m.inventory_item_id
+       where m.company_id = $1
+       order by m.created_at desc
+       limit 500`,
+      [req.user.company_id],
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error('GET /inventory-movements failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.get('/inventory-suppliers', authRequired, denyMechanicAccess, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'select * from inventory_suppliers where company_id=$1 order by active desc, name',
+      [req.user.company_id],
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error('GET /inventory-suppliers failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.post('/inventory-suppliers', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
+  const name = String(req.body.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'missing_name' });
+  try {
+    const { rows } = await pool.query(
+      `insert into inventory_suppliers (company_id,name,rut,phone,email,address)
+       values ($1,$2,$3,$4,$5,$6) returning *`,
+      [req.user.company_id, name, req.body.rut || '', req.body.phone || '', req.body.email || '', req.body.address || ''],
+    );
+    res.status(201).json(rows[0]);
+  } catch (error) {
+    if (error.code === '23505') return res.status(409).json({ error: 'supplier_exists' });
+    console.error('POST /inventory-suppliers failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.get('/inventory-purchase-orders', authRequired, denyMechanicAccess, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `select po.*, s.name as supplier_name,
+              coalesce(json_agg(json_build_object(
+                'id', pi.id, 'inventory_item_id', pi.inventory_item_id,
+                'item_name', ii.name, 'quantity', pi.quantity::float,
+                'received_quantity', pi.received_quantity::float,
+                'unit_cost', pi.unit_cost::float
+              )) filter (where pi.id is not null), '[]') as items
+       from inventory_purchase_orders po
+       left join inventory_suppliers s on s.id=po.supplier_id
+       left join inventory_purchase_order_items pi on pi.purchase_order_id=po.id
+       left join inventory_items ii on ii.id=pi.inventory_item_id
+       where po.company_id=$1 group by po.id,s.name order by po.created_at desc`,
+      [req.user.company_id],
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error('GET /inventory-purchase-orders failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.post('/inventory-purchase-orders', authRequired, requireWorkshopAdmin, ensureWritable, async (req, res) => {
+  const items = Array.isArray(req.body.items) ? req.body.items : [];
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const result = await client.query(
+      `insert into inventory_purchase_orders
+        (company_id,supplier_id,order_number,order_date,expected_date,notes)
+       values ($1,$2,$3,$4,$5,$6) returning *`,
+      [
+        req.user.company_id, normalizeUuid(req.body.supplier_id),
+        req.body.order_number || `OC-${Date.now()}`,
+        normalizeDateOnly(req.body.order_date) || new Date().toISOString().slice(0,10),
+        normalizeDateOnly(req.body.expected_date), req.body.notes || '',
+      ],
+    );
+    for (const item of items) {
+      await client.query(
+        `insert into inventory_purchase_order_items
+          (purchase_order_id,inventory_item_id,quantity,unit_cost)
+         values ($1,$2,$3,$4)`,
+        [result.rows[0].id, item.inventory_item_id, Math.max(1,Number(item.quantity)||1), Math.max(0,Number(item.unit_cost)||0)],
+      );
+    }
+    await client.query('commit');
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    await client.query('rollback').catch(() => {});
+    console.error('POST /inventory-purchase-orders failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  } finally {
+    client.release();
+  }
+});
+
+app.post('/inventory-purchase-orders/:id/receive', authRequired, requireWorkshopAdmin, ensureWritable, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const order = await client.query(
+      'select * from inventory_purchase_orders where id=$1 and company_id=$2 for update',
+      [req.params.id, req.user.company_id],
+    );
+    if (!order.rows.length) {
+      await client.query('rollback');
+      return res.status(404).json({ error: 'not_found' });
+    }
+    const items = await client.query(
+      `select pi.*, ii.stock from inventory_purchase_order_items pi
+       join inventory_items ii on ii.id=pi.inventory_item_id
+       where pi.purchase_order_id=$1`,
+      [req.params.id],
+    );
+    for (const item of items.rows) {
+      const pending = Number(item.quantity) - Number(item.received_quantity);
+      if (pending <= 0) continue;
+      const before = Number(item.stock);
+      const after = before + pending;
+      await client.query('update inventory_items set stock=$1,cost=$2,updated_at=now() where id=$3', [after,item.unit_cost,item.inventory_item_id]);
+      await client.query('update inventory_purchase_order_items set received_quantity=quantity where id=$1', [item.id]);
+      await client.query(
+        `insert into inventory_movements
+          (company_id,inventory_item_id,movement_type,quantity,stock_before,stock_after,reason,user_name)
+         values ($1,$2,'compra',$3,$4,$5,$6,$7)`,
+        [req.user.company_id,item.inventory_item_id,pending,before,after,`Recepción ${order.rows[0].order_number}`,req.user.full_name || req.user.email || ''],
+      );
+    }
+    await client.query(`update inventory_purchase_orders set status='recibida',updated_at=now() where id=$1`, [req.params.id]);
+    await client.query('commit');
+    res.json({ ok: true });
+  } catch (error) {
+    await client.query('rollback').catch(() => {});
+    console.error('POST /inventory-purchase-orders/:id/receive failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  } finally {
+    client.release();
+  }
+});
+
+app.get('/inventory-stock-counts', authRequired, denyMechanicAccess, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `select sc.*, coalesce(json_agg(json_build_object(
+        'id',ci.id,'inventory_item_id',ci.inventory_item_id,'item_name',ii.name,
+        'expected_quantity',ci.expected_quantity::float,'counted_quantity',ci.counted_quantity::float
+      )) filter (where ci.id is not null),'[]') as items
+       from inventory_stock_counts sc
+       left join inventory_stock_count_items ci on ci.stock_count_id=sc.id
+       left join inventory_items ii on ii.id=ci.inventory_item_id
+       where sc.company_id=$1 group by sc.id order by sc.created_at desc`,
+      [req.user.company_id],
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error('GET /inventory-stock-counts failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.post('/inventory-stock-counts', authRequired, requireWorkshopAdmin, ensureWritable, async (req, res) => {
+  const items = Array.isArray(req.body.items) ? req.body.items : [];
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const result = await client.query(
+      `insert into inventory_stock_counts (company_id,notes,created_by)
+       values ($1,$2,$3) returning *`,
+      [req.user.company_id,req.body.notes || '',req.user.full_name || req.user.email || ''],
+    );
+    for (const item of items) {
+      await client.query(
+        `insert into inventory_stock_count_items
+          (stock_count_id,inventory_item_id,expected_quantity,counted_quantity)
+         values ($1,$2,$3,$4)`,
+        [result.rows[0].id,item.inventory_item_id,Number(item.expected_quantity)||0,Number(item.counted_quantity)||0],
+      );
+    }
+    await client.query('commit');
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    await client.query('rollback').catch(() => {});
+    console.error('POST /inventory-stock-counts failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  } finally {
+    client.release();
+  }
+});
+
+app.post('/inventory-stock-counts/:id/complete', authRequired, requireWorkshopAdmin, ensureWritable, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const count = await client.query(
+      'select * from inventory_stock_counts where id=$1 and company_id=$2 and status=$3 for update',
+      [req.params.id,req.user.company_id,'abierto'],
+    );
+    if (!count.rows.length) {
+      await client.query('rollback');
+      return res.status(404).json({ error: 'not_found' });
+    }
+    const items = await client.query(
+      `select ci.*,ii.stock from inventory_stock_count_items ci
+       join inventory_items ii on ii.id=ci.inventory_item_id where ci.stock_count_id=$1`,
+      [req.params.id],
+    );
+    for (const item of items.rows) {
+      const before=Number(item.stock), after=Number(item.counted_quantity);
+      if (before === after) continue;
+      await client.query('update inventory_items set stock=$1,updated_at=now() where id=$2',[after,item.inventory_item_id]);
+      await client.query(
+        `insert into inventory_movements
+          (company_id,inventory_item_id,movement_type,quantity,stock_before,stock_after,reason,user_name)
+         values ($1,$2,'conteo',$3,$4,$5,$6,$7)`,
+        [req.user.company_id,item.inventory_item_id,Math.abs(after-before),before,after,'Ajuste por conteo físico',req.user.full_name || req.user.email || ''],
+      );
+    }
+    await client.query(`update inventory_stock_counts set status='completado',completed_at=now() where id=$1`,[req.params.id]);
+    await client.query('commit');
+    res.json({ ok:true });
+  } catch (error) {
+    await client.query('rollback').catch(() => {});
+    console.error('POST /inventory-stock-counts/:id/complete failed', error);
+    res.status(500).json({ error:'internal_error' });
+  } finally {
+    client.release();
+  }
+});
+
+const budgetStatuses = new Set([
+  'borrador', 'enviado', 'aprobado', 'rechazado', 'vencido', 'convertido', 'anulado',
+]);
+const budgetItemTypes = new Set(['servicio', 'repuesto', 'insumo']);
+const normalizeBudgetItems = (items) =>
+  (Array.isArray(items) ? items : []).map((item) => ({
+    item_type: budgetItemTypes.has(item.item_type) ? item.item_type : 'servicio',
+    reference_id: normalizeUuid(item.reference_id),
+    name: String(item.name || '').trim(),
+    quantity: Math.max(0.01, Number(item.quantity) || 1),
+    unit_price: Math.max(0, Number(item.unit_price ?? item.price) || 0),
+    estimated_hours: Math.max(0, Number(item.estimated_hours) || 0),
+  })).filter((item) => item.name);
+const calculateBudgetTotal = (items, discountPercent, taxPercent) => {
+  const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
+  return Math.round(subtotal * (1 - discountPercent / 100) * (1 + taxPercent / 100));
+};
+
 app.get('/budgets', authRequired, async (req, res) => {
   const { company_id: companyId } = req.user;
   if (isMechanicRole(req.user.role)) {
@@ -1557,7 +1980,13 @@ app.get('/budgets', authRequired, async (req, res) => {
   try {
     const { rows } = await pool.query(
       `select b.*,
-              coalesce(json_agg(json_build_object('id', bi.id, 'name', bi.name, 'price', bi.price::float)
+              b.total::float, b.discount_percent::float, b.tax_percent::float,
+              b.advance_required::float,
+              coalesce(json_agg(json_build_object(
+                'id', bi.id, 'item_type', bi.item_type, 'reference_id', bi.reference_id,
+                'name', bi.name, 'quantity', bi.quantity::float,
+                'unit_price', bi.unit_price::float, 'price', bi.unit_price::float,
+                'estimated_hours', bi.estimated_hours::float)
                 order by bi.created_at) filter (where bi.id is not null), '[]') as items
        from budget_quotes b
        left join budget_quote_items bi on bi.budget_quote_id = b.id
@@ -1578,31 +2007,50 @@ app.post('/budgets', authRequired, ensureWritable, async (req, res) => {
   if (isMechanicRole(req.user.role)) {
     return res.status(403).json({ error: 'forbidden' });
   }
-  const items = Array.isArray(req.body.items) ? req.body.items : [];
-  const total = items.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+  const items = normalizeBudgetItems(req.body.items);
+  const discountPercent = Math.min(100, Math.max(0, Number(req.body.discount_percent) || 0));
+  const taxPercent = Math.min(100, Math.max(0, Number(req.body.tax_percent) || 0));
+  const total = calculateBudgetTotal(items, discountPercent, taxPercent);
   const client = await pool.connect();
   try {
     await client.query('begin');
     const budgetResult = await client.query(
-      `insert into budget_quotes (company_id, customer_name, customer_phone, patente, vehicle, notes, total, status)
-       values ($1, $2, $3, $4, $5, $6, $7, $8)
+      `insert into budget_quotes
+        (company_id, customer_name, customer_rut, customer_phone, customer_email,
+         customer_address, customer_city, patente, vehicle, notes, issue_date,
+         expiry_date, discount_percent, tax_percent, advance_required,
+         payment_method, terms, total, status)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
        returning *`,
       [
         companyId,
         req.body.customerName || req.body.customer_name || '',
+        req.body.customer_rut || '',
         req.body.customerPhone || req.body.customer_phone || '',
+        req.body.customer_email || '',
+        req.body.customer_address || '',
+        req.body.customer_city || '',
         req.body.patente || '',
         req.body.vehicle || '',
         req.body.notes || '',
+        normalizeDateOnly(req.body.issue_date) || new Date().toISOString().slice(0, 10),
+        normalizeDateOnly(req.body.expiry_date),
+        discountPercent,
+        taxPercent,
+        Math.max(0, Number(req.body.advance_required) || 0),
+        req.body.payment_method || '',
+        req.body.terms || '',
         total,
-        req.body.status || 'borrador',
+        budgetStatuses.has(req.body.status) ? req.body.status : 'borrador',
       ]
     );
     const budget = budgetResult.rows[0];
     for (const item of items) {
       await client.query(
-        'insert into budget_quote_items (budget_quote_id, name, price) values ($1, $2, $3)',
-        [budget.id, item.name || '', Number(item.price) || 0]
+        `insert into budget_quote_items
+          (budget_quote_id, item_type, reference_id, name, quantity, unit_price, price, estimated_hours)
+         values ($1,$2,$3,$4,$5,$6,$6,$7)`,
+        [budget.id, item.item_type, item.reference_id, item.name, item.quantity, item.unit_price, item.estimated_hours]
       );
     }
     await client.query('commit');
@@ -1625,25 +2073,41 @@ app.put('/budgets/:id', authRequired, ensureWritable, async (req, res) => {
   if (isMechanicRole(req.user.role)) {
     return res.status(403).json({ error: 'forbidden' });
   }
-  const items = Array.isArray(req.body.items) ? req.body.items : [];
-  const total = items.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+  const items = normalizeBudgetItems(req.body.items);
+  const discountPercent = Math.min(100, Math.max(0, Number(req.body.discount_percent) || 0));
+  const taxPercent = Math.min(100, Math.max(0, Number(req.body.tax_percent) || 0));
+  const total = calculateBudgetTotal(items, discountPercent, taxPercent);
   const client = await pool.connect();
   try {
     await client.query('begin');
     const budgetResult = await client.query(
       `update budget_quotes
-       set customer_name = $1, customer_phone = $2, patente = $3, vehicle = $4,
-           notes = $5, total = $6, status = $7, updated_at = now()
-       where id = $8 and company_id = $9
+       set customer_name=$1, customer_rut=$2, customer_phone=$3, customer_email=$4,
+           customer_address=$5, customer_city=$6, patente=$7, vehicle=$8,
+           notes=$9, issue_date=$10, expiry_date=$11, discount_percent=$12,
+           tax_percent=$13, advance_required=$14, payment_method=$15, terms=$16,
+           total=$17, status=$18, updated_at=now()
+       where id=$19 and company_id=$20
        returning *`,
       [
         req.body.customerName || req.body.customer_name || '',
+        req.body.customer_rut || '',
         req.body.customerPhone || req.body.customer_phone || '',
+        req.body.customer_email || '',
+        req.body.customer_address || '',
+        req.body.customer_city || '',
         req.body.patente || '',
         req.body.vehicle || '',
         req.body.notes || '',
+        normalizeDateOnly(req.body.issue_date) || new Date().toISOString().slice(0, 10),
+        normalizeDateOnly(req.body.expiry_date),
+        discountPercent,
+        taxPercent,
+        Math.max(0, Number(req.body.advance_required) || 0),
+        req.body.payment_method || '',
+        req.body.terms || '',
         total,
-        req.body.status || 'borrador',
+        budgetStatuses.has(req.body.status) ? req.body.status : 'borrador',
         req.params.id,
         companyId,
       ]
@@ -1655,8 +2119,10 @@ app.put('/budgets/:id', authRequired, ensureWritable, async (req, res) => {
     await client.query('delete from budget_quote_items where budget_quote_id = $1', [req.params.id]);
     for (const item of items) {
       await client.query(
-        'insert into budget_quote_items (budget_quote_id, name, price) values ($1, $2, $3)',
-        [req.params.id, item.name || '', Number(item.price) || 0]
+        `insert into budget_quote_items
+          (budget_quote_id, item_type, reference_id, name, quantity, unit_price, price, estimated_hours)
+         values ($1,$2,$3,$4,$5,$6,$6,$7)`,
+        [req.params.id, item.item_type, item.reference_id, item.name, item.quantity, item.unit_price, item.estimated_hours]
       );
     }
     await client.query('commit');
@@ -1681,7 +2147,8 @@ app.delete('/budgets/:id', authRequired, ensureWritable, async (req, res) => {
   }
   try {
     const { rows } = await pool.query(
-      'delete from budget_quotes where id = $1 and company_id = $2 returning id',
+      `update budget_quotes set status = 'anulado', updated_at = now()
+       where id = $1 and company_id = $2 returning id`,
       [req.params.id, companyId]
     );
     if (rows.length === 0) {
@@ -1690,6 +2157,31 @@ app.delete('/budgets/:id', authRequired, ensureWritable, async (req, res) => {
     res.json({ ok: true });
   } catch (error) {
     console.error('DELETE /budgets/:id failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.patch('/budgets/:id/status', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
+  const status = budgetStatuses.has(req.body.status) ? req.body.status : null;
+  if (!status) {
+    return res.status(400).json({ error: 'invalid_status' });
+  }
+  try {
+    const { rows } = await pool.query(
+      `update budget_quotes
+       set status = $1,
+           converted_vehicle_id = coalesce($2, converted_vehicle_id),
+           updated_at = now()
+       where id = $3 and company_id = $4
+       returning *`,
+      [status, normalizeUuid(req.body.converted_vehicle_id), req.params.id, req.user.company_id],
+    );
+    if (!rows.length) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('PATCH /budgets/:id/status failed', error);
     res.status(500).json({ error: 'internal_error' });
   }
 });
@@ -2195,7 +2687,6 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
     if (rows.length === 0) {
       return res.status(404).json({ error: 'not_found' });
     }
-
     await syncVehicleServices(
       pool,
       companyId,

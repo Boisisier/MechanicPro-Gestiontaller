@@ -149,11 +149,89 @@ CREATE TABLE IF NOT EXISTS inventory_items (
   location text DEFAULT '',
   supplier text DEFAULT '',
   cost numeric(12,2) NOT NULL DEFAULT 0,
+  sale_price numeric(12,2) NOT NULL DEFAULT 0,
+  status text NOT NULL DEFAULT 'activo',
+  supplier_id uuid,
+  warehouse text NOT NULL DEFAULT '',
+  aisle text NOT NULL DEFAULT '',
+  shelf text NOT NULL DEFAULT '',
+  bin text NOT NULL DEFAULT '',
   notes text DEFAULT '',
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 -- tabla de items de inventario, con indices para consultas rapidas por empresa, sku y codigo de barras
+CREATE TABLE IF NOT EXISTS inventory_suppliers (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  rut text NOT NULL DEFAULT '',
+  phone text NOT NULL DEFAULT '',
+  email text NOT NULL DEFAULT '',
+  address text NOT NULL DEFAULT '',
+  active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (company_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS inventory_movements (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  inventory_item_id uuid NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
+  movement_type text NOT NULL,
+  quantity numeric(12,2) NOT NULL,
+  stock_before numeric(12,2) NOT NULL,
+  stock_after numeric(12,2) NOT NULL,
+  reason text NOT NULL DEFAULT '',
+  vehicle_id uuid REFERENCES vehicles(id) ON DELETE SET NULL,
+  vehicle_patente text NOT NULL DEFAULT '',
+  mechanic_name text NOT NULL DEFAULT '',
+  user_name text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS inventory_purchase_orders (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  supplier_id uuid REFERENCES inventory_suppliers(id) ON DELETE SET NULL,
+  order_number text NOT NULL,
+  status text NOT NULL DEFAULT 'pendiente',
+  order_date date NOT NULL DEFAULT current_date,
+  expected_date date,
+  notes text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (company_id, order_number)
+);
+
+CREATE TABLE IF NOT EXISTS inventory_purchase_order_items (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  purchase_order_id uuid NOT NULL REFERENCES inventory_purchase_orders(id) ON DELETE CASCADE,
+  inventory_item_id uuid NOT NULL REFERENCES inventory_items(id) ON DELETE RESTRICT,
+  quantity numeric(12,2) NOT NULL,
+  received_quantity numeric(12,2) NOT NULL DEFAULT 0,
+  unit_cost numeric(12,2) NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS inventory_stock_counts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  status text NOT NULL DEFAULT 'abierto',
+  notes text NOT NULL DEFAULT '',
+  created_by text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  completed_at timestamptz
+);
+
+CREATE TABLE IF NOT EXISTS inventory_stock_count_items (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  stock_count_id uuid NOT NULL REFERENCES inventory_stock_counts(id) ON DELETE CASCADE,
+  inventory_item_id uuid NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
+  expected_quantity numeric(12,2) NOT NULL,
+  counted_quantity numeric(12,2) NOT NULL,
+  difference numeric(12,2) GENERATED ALWAYS AS (counted_quantity - expected_quantity) STORED
+);
 CREATE TABLE IF NOT EXISTS budget_quotes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
@@ -161,7 +239,19 @@ CREATE TABLE IF NOT EXISTS budget_quotes (
   customer_phone text DEFAULT '',
   patente text DEFAULT '',
   vehicle text DEFAULT '',
+  customer_rut text NOT NULL DEFAULT '',
+  customer_email text NOT NULL DEFAULT '',
+  customer_address text NOT NULL DEFAULT '',
+  customer_city text NOT NULL DEFAULT '',
   notes text DEFAULT '',
+  issue_date date NOT NULL DEFAULT current_date,
+  expiry_date date,
+  discount_percent numeric(5,2) NOT NULL DEFAULT 0,
+  tax_percent numeric(5,2) NOT NULL DEFAULT 19,
+  advance_required numeric(12,2) NOT NULL DEFAULT 0,
+  payment_method text NOT NULL DEFAULT '',
+  terms text NOT NULL DEFAULT '',
+  converted_vehicle_id uuid REFERENCES vehicles(id) ON DELETE SET NULL,
   total numeric(12,2) NOT NULL DEFAULT 0,
   status text NOT NULL DEFAULT 'borrador',
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -173,6 +263,11 @@ CREATE TABLE IF NOT EXISTS budget_quote_items (
   budget_quote_id uuid NOT NULL REFERENCES budget_quotes(id) ON DELETE CASCADE,
   name text NOT NULL,
   price numeric(12,2) NOT NULL DEFAULT 0,
+  item_type text NOT NULL DEFAULT 'servicio',
+  reference_id uuid,
+  quantity numeric(10,2) NOT NULL DEFAULT 1,
+  unit_price numeric(12,2) NOT NULL DEFAULT 0,
+  estimated_hours numeric(8,2) NOT NULL DEFAULT 0,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 -- tabla de items asociados a presupuestos, con indice para consultas rapidas por presupuesto

@@ -23,7 +23,7 @@ export default function DashboardWorkshopStatus({
           {
             label: "Ingresado",
             value: metrics.enTaller,
-            color: "bg-blue-300",
+            color: "bg-[#fc3d3c]",
           },
           {
             label: "Entregados",

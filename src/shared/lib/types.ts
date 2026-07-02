@@ -163,9 +163,42 @@ export interface InventoryItem {
   location: string;
   supplier: string;
   cost: number;
+  sale_price?: number;
+  status?: "activo" | "descontinuado" | "bloqueado";
+  supplier_id?: string;
+  warehouse?: string;
+  aisle?: string;
+  shelf?: string;
+  bin?: string;
   notes: string;
   created_at?: string;
   updated_at: string;
+}
+
+export interface InventoryMovement {
+  id: string;
+  inventory_item_id: string;
+  item_name: string;
+  sku: string;
+  movement_type: string;
+  quantity: number;
+  stock_before: number;
+  stock_after: number;
+  reason: string;
+  vehicle_patente: string;
+  mechanic_name: string;
+  user_name: string;
+  created_at: string;
+}
+
+export interface InventorySupplier {
+  id: string;
+  name: string;
+  rut: string;
+  phone: string;
+  email: string;
+  address: string;
+  active: boolean;
 }
 
 export interface BudgetItem {
