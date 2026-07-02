@@ -7,23 +7,28 @@ import { Pool } from 'pg';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { completeServiceCatalog } from './serviceCatalogSeed.js';
+import { loadConfig } from './config.js';
+import {
+  createRateLimiter,
+  requestContext,
+  securityHeaders,
+} from './security.js';
+import {
+  calculateBudgetTotal,
+  normalizePatente,
+  splitServicePrice,
+} from './lib/core.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
+const config = loadConfig();
 const app = express();
-const port = process.env.PORT || 3001;
-
-const supabaseUrl = process.env.DATABASE_URL;
-if (!supabaseUrl) {
-  console.warn('DATABASE_URL is not set.');
-}
-
-const jwtSecret = process.env.JWT_SECRET;
-if (!jwtSecret) {
-  console.warn('JWT_SECRET is not set.');
-}
+const port = config.port;
+const jwtSecret = config.jwtSecret;
+let applicationReady = false;
+let server;
 
 const demoCompanyName = process.env.DEMO_COMPANY_NAME || 'Demo Taller';
 const demoUserName = process.env.DEMO_USER_NAME || 'Demo Cliente';
@@ -31,17 +36,38 @@ const demoUserEmail = process.env.DEMO_USER_EMAIL || 'demo@local';
 const demoUserPassword = process.env.DEMO_USER_PASSWORD || 'demo1234';
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  },
+  connectionString: config.databaseUrl,
+  ssl: config.databaseSsl
+    ? { rejectUnauthorized: config.databaseSslRejectUnauthorized }
+    : false,
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
 });
 
-app.use(cors());
-app.use(express.json());
+if (config.trustProxy) app.set('trust proxy', config.trustProxy);
+app.disable('x-powered-by');
+app.use(requestContext);
+app.use(securityHeaders);
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || config.corsOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('cors_origin_denied'));
+  },
+  credentials: false,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
+}));
+app.use(express.json({ limit: config.bodyLimit }));
+app.use(createRateLimiter({ windowMs: 60_000, max: 300 }));
+const authRateLimiter = createRateLimiter({
+  windowMs: 15 * 60_000,
+  max: 10,
+  key: (req) =>
+    `${req.ip}:${String(req.body?.email || '').trim().toLowerCase()}`,
+});
 
 const allowedStatuses = new Set(['Ingresado', 'En Taller', 'Entregado']);
 const allowedTipos = new Set(['Auto', 'Camioneta', 'SUV', 'Moto', 'Camion', 'Furgon']);
@@ -62,20 +88,6 @@ const defaultRoles = [
     modules: ['Vehículos', 'Reportes'],
   },
 ];
-
-const normalizePatente = (value = '') => {
-  const normalized = String(value).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
-  if (normalized.length <= 2) {
-    return normalized;
-  }
-  if (/^[A-Z]{2}\d/.test(normalized)) {
-    return `${normalized.slice(0, 2)}-${normalized.slice(2)}`;
-  }
-  if (normalized.length <= 4) {
-    return normalized;
-  }
-  return `${normalized.slice(0, 4)}-${normalized.slice(4)}`;
-};
 
 const allowedAttentionPriorities = new Set(['Baja', 'Normal', 'Alta', 'Urgente']);
 
@@ -675,14 +687,6 @@ const requireWorkshopAdmin = (req, res, next) => {
   return next();
 };
 
-const splitServicePrice = (service = '') => {
-  const match = String(service).match(/^(.*?)\s*\(\$\s*([^)]+)\)\s*$/);
-  return {
-    name: (match?.[1] || service).trim(),
-    price: match?.[2]?.replace(/[^\d]/g, '') || '',
-  };
-};
-
 const syncVehicleServices = async (
   client,
   companyId,
@@ -880,7 +884,23 @@ app.get('/health', async (req, res) => {
   }
 });
 
-app.post('/auth/demo-login', async (req, res) => {
+app.get('/health/live', (req, res) => {
+  res.json({ status: 'ok', uptime_seconds: Math.floor(process.uptime()) });
+});
+
+app.get('/health/ready', async (req, res) => {
+  if (!applicationReady) {
+    return res.status(503).json({ status: 'starting' });
+  }
+  try {
+    await pool.query('select 1');
+    res.json({ status: 'ready' });
+  } catch {
+    res.status(503).json({ status: 'unavailable' });
+  }
+});
+
+app.post('/auth/demo-login', authRateLimiter, async (req, res) => {
   if (!ensureJwtSecret(res)) {
     return;
   }
@@ -963,7 +983,7 @@ app.post('/auth/demo-login', async (req, res) => {
   }
 });
 
-app.post('/auth/login', async (req, res) => {
+app.post('/auth/login', authRateLimiter, async (req, res) => {
   if (!ensureJwtSecret(res)) {
     return;
   }
@@ -1967,11 +1987,6 @@ const normalizeBudgetItems = (items) =>
     unit_price: Math.max(0, Number(item.unit_price ?? item.price) || 0),
     estimated_hours: Math.max(0, Number(item.estimated_hours) || 0),
   })).filter((item) => item.name);
-const calculateBudgetTotal = (items, discountPercent, taxPercent) => {
-  const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
-  return Math.round(subtotal * (1 - discountPercent / 100) * (1 + taxPercent / 100));
-};
-
 app.get('/budgets', authRequired, async (req, res) => {
   const { company_id: companyId } = req.user;
   if (isMechanicRole(req.user.role)) {
@@ -2740,9 +2755,52 @@ app.delete('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
   }
 });
 
+app.use((req, res) => {
+  res.status(404).json({ error: 'not_found' });
+});
+
+app.use((error, req, res, next) => {
+  if (res.headersSent) return next(error);
+  console.error(JSON.stringify({
+    type: 'unhandled_request_error',
+    request_id: req.requestId,
+    message: error.message,
+  }));
+  if (error.message === 'cors_origin_denied') {
+    return res.status(403).json({ error: 'cors_origin_denied' });
+  }
+  if (error.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'payload_too_large' });
+  }
+  res.status(500).json({ error: 'internal_error' });
+});
+
+const shutdown = async (signal) => {
+  console.log(JSON.stringify({ type: 'shutdown_started', signal }));
+  applicationReady = false;
+  const forceExit = setTimeout(() => process.exit(1), 10_000);
+  forceExit.unref();
+  if (server) {
+    await new Promise((resolve) => server.close(resolve));
+  }
+  await pool.end();
+  clearTimeout(forceExit);
+  process.exit(0);
+};
+
+process.once('SIGTERM', () => shutdown('SIGTERM'));
+process.once('SIGINT', () => shutdown('SIGINT'));
+process.on('unhandledRejection', (error) => {
+  console.error(JSON.stringify({
+    type: 'unhandled_rejection',
+    message: error instanceof Error ? error.message : String(error),
+  }));
+});
+
 ensureVehicleColumns()
   .then(() => {
-    app.listen(port, () => {
+    server = app.listen(port, () => {
+      applicationReady = true;
       console.log(`API listening on port ${port}`);
     });
   })

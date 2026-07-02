@@ -21,3 +21,12 @@ supabase migration new *nombre migration*
 7) Correr:
 supabase db push
 
+## Validación
+
+```bash
+npm run check
+npm run verify:schema
+```
+
+La guía de despliegue y seguridad está en `docs/produccion.md`.
+
