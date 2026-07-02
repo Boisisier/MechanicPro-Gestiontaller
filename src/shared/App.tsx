@@ -1,10 +1,15 @@
-﻿import { useCallback, useEffect, useState, type FormEvent } from "react";
+﻿import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+
+import { useCallback } from "react";
 
 import {
   clearAuthToken,
   createVehicle,
   createAuditLog,
+  createParkingRelease,
+  createWorkshopUser,
   getAuthToken,
+  getAuditLogs,
   getInventoryItems,
   getParkingReleases,
   getSession,
@@ -14,6 +19,8 @@ import {
   loginDemo,
   setAuthToken,
   deleteParkingRelease,
+  deleteWorkshopUser,
+  updateWorkshopUser,
   updateInventoryItem,
   updateVehicle,
   updateBudgetStatus,
@@ -37,9 +44,10 @@ import Sidebar from "./components/layout/Sidebar";
 
 import Header from "./components/layout/Header";
 
+
 import VehicleForm, {
   VehicleFormData,
-} from "../features/vehiculo/components/VehicleForm";
+} from "./components/vehicles/VehicleForm";
 
 import VehicleTable from "./components/vehicles/VehicleTable";
 import ExitPricingSection from "./components/vehicles/ExitPricingSection";
@@ -55,6 +63,12 @@ import {
   Send,
   Edit2,
   Clock,
+  Users,
+  ListChecks,
+  Palette,
+  Activity,
+  UserCheck,
+  Layers3,
 } from "lucide-react";
 
 import { toSoftAccent } from "./utils/colors";
@@ -74,8 +88,8 @@ import InventoryPage from "../features/inventario/InventoryPage";
 import mechanicProLogo from "./assets/mechanic-pro-logo.png";
 import PresupuestoPage from "../features/presupuesto/PresupuestoPage";
 import DashboardPage from "../features/dashboard/DashboardPage";
-import ConfiguracionPage from "../features/configuracion/ConfiguracionPage";
 import ServiceCatalogManager from "./components/settings/ServiceCatalogManager";
+import type { BudgetQuote } from "../features/presupuesto/types/presupuesto";
 
 const roleModules: Record<UserRole, string[]> = {
   "Administrador de Taller": [
@@ -119,6 +133,8 @@ const defaultWorkshopUsers: WorkshopUser[] = [
   },
 ];
 
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const auditLogsPageSize = 15;
 const mechanicHiddenSections = [
   "dashboard",
   "presupuesto",
@@ -158,10 +174,15 @@ function App() {
   const { notification, showNotification, clearNotification } =
     useNotification();
 
+  const [accentColor, setAccentColor] = useState(
+    () => localStorage.getItem("accentColor") || "#0f4471",
+  );
+
   const [activeSection, setActiveSection] = useState("vehiculos");
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [catalogServices, setCatalogServices] = useState<CatalogService[]>([]);
+  const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
 
   const [editingVehicle, setEditingVehicle] = useState<
     (VehicleFormData & { id: string }) | null
@@ -227,6 +248,9 @@ function App() {
     role: "Administrativo",
   });
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [configTab, setConfigTab] = useState<
+    "users" | "services" | "appearance"
+  >("users");
 
   const [vehicleTab, setVehicleTab] = useState<"ingreso" | "taller" | "salida">(
     "ingreso",
@@ -263,6 +287,8 @@ function App() {
   });
   const [auditDateFrom, setAuditDateFrom] = useState("");
   const [auditDateTo, setAuditDateTo] = useState("");
+  const [auditSearch, setAuditSearch] = useState("");
+  const [auditModuleFilter, setAuditModuleFilter] = useState("");
   const [auditPage, setAuditPage] = useState(1);
 
   const [releasedParkingIds, setReleasedParkingIds] = useState<string[]>(() => {
@@ -387,6 +413,15 @@ function App() {
   }, [authToken]);
 
   useEffect(() => {
+    document.documentElement.style.setProperty("--accent", accentColor);
+    document.documentElement.style.setProperty(
+      "--accent-soft",
+      toSoftAccent(accentColor),
+    );
+    localStorage.setItem("accentColor", accentColor);
+  }, [accentColor]);
+
+  useEffect(() => {
     localStorage.setItem("workshopUsers", JSON.stringify(workshopUsers));
   }, [workshopUsers]);
 
@@ -401,7 +436,7 @@ function App() {
 
   useEffect(() => {
     setAuditPage(1);
-  }, [auditDateFrom, auditDateTo]);
+  }, [auditDateFrom, auditDateTo, auditSearch, auditModuleFilter]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -442,6 +477,24 @@ function App() {
     load();
   }, [authToken, sessionRole, showNotification]);
 
+  const loadServiceCatalog = useCallback(async () => {
+    if (!authToken || sessionRole !== "member") return;
+    const [services, categories] = await Promise.all([
+      getServiceCatalog(isSessionAdmin),
+      getServiceCategories(),
+    ]);
+    setCatalogServices(services);
+    setServiceCategories(categories);
+  }, [authToken, sessionRole, isSessionAdmin]);
+
+  useEffect(() => {
+    if (!authToken || sessionRole !== "member") return;
+    loadServiceCatalog().catch((error) => {
+      console.error("Service catalog load failed", error);
+      showNotification("error", "No se pudo cargar el catálogo de servicios");
+    });
+  }, [authToken, sessionRole, loadServiceCatalog, showNotification]);
+
   useEffect(() => {
     if (!authToken || sessionRole !== "member" || isMechanicSession) {
       return;
@@ -470,6 +523,19 @@ function App() {
       )
       .catch((error) => console.error("Parking releases load failed", error));
   }, [authToken, sessionRole, isMechanicSession]);
+
+  useEffect(() => {
+    if (!authToken || sessionRole !== "member" || isMechanicSession) {
+      return;
+    }
+
+    getAuditLogs({
+      date_from: auditDateFrom || undefined,
+      date_to: auditDateTo || undefined,
+    })
+      .then((rows) => setAuditLogs(rows))
+      .catch((error) => console.error("Audit logs load failed", error));
+  }, [authToken, sessionRole, isMechanicSession, auditDateFrom, auditDateTo]);
 
   useEffect(() => {
     if (
@@ -548,27 +614,202 @@ function App() {
       onConfirm: performLogout,
     });
   };
-  const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>(
-    [],
-  );
 
-  const loadServiceCatalog = useCallback(async () => {
-    if (!authToken || sessionRole !== "member") return;
-    const [services, categories] = await Promise.all([
-      getServiceCatalog(isSessionAdmin),
-      getServiceCategories(),
-    ]);
-    setCatalogServices(services);
-    setServiceCategories(categories);
-  }, [authToken, sessionRole, isSessionAdmin]);
+  const handleUserFormChange = (
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
+    const { name, value } = event.target;
+    setUserForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
 
-  useEffect(() => {
-    if (!authToken || sessionRole !== "member") return;
-    loadServiceCatalog().catch((error) => {
-      console.error("Service catalog load failed", error);
-      showNotification("error", "No se pudo cargar el catálogo de servicios");
+  const handleUserSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    const name = userForm.name.trim();
+    const rut = userForm.rut.trim();
+    const email = userForm.email.trim();
+    const password = userForm.password.trim();
+
+    if (!name || !rut || !email || (!editingUserId && !password)) {
+      showNotification("error", "Completa nombre, RUT, correo y contraseña");
+      return;
+    }
+
+    if (!emailRegex.test(email)) {
+      showNotification("error", "Ingresa un correo electrónico válido");
+      return;
+    }
+
+    const exists = workshopUsers.some(
+      (user) =>
+        user.email.toLowerCase() === email.toLowerCase() &&
+        user.id !== editingUserId,
+    );
+    if (exists) {
+      showNotification("error", "Ya existe un usuario con ese correo");
+      return;
+    }
+
+    const nextUser = {
+      id: crypto.randomUUID(),
+      name,
+      rut,
+      email,
+      role: userForm.role,
+    };
+
+    try {
+      if (editingUserId) {
+        if (authToken && sessionRole === "member") {
+          const savedUser = await updateWorkshopUser(editingUserId, {
+            name,
+            rut,
+            email,
+            password,
+            role: userForm.role,
+          });
+          setWorkshopUsers((prev) =>
+            prev.map((user) =>
+              user.id === editingUserId
+                ? {
+                    ...user,
+                    name: savedUser.name,
+                    rut: savedUser.rut,
+                    email: savedUser.email,
+                    role:
+                      savedUser.role_name || savedUser.role || userForm.role,
+                  }
+                : user,
+            ),
+          );
+        } else {
+          setWorkshopUsers((prev) =>
+            prev.map((user) =>
+              user.id === editingUserId
+                ? {
+                    ...user,
+                    name,
+                    rut,
+                    email,
+                    role: userForm.role,
+                  }
+                : user,
+            ),
+          );
+        }
+      } else if (authToken && sessionRole === "member") {
+        const savedUser = await createWorkshopUser({
+          name,
+          rut,
+          email,
+          password,
+          role: userForm.role,
+        });
+        setWorkshopUsers((prev) => [
+          ...prev,
+          {
+            id: savedUser.id,
+            name: savedUser.name,
+            rut: savedUser.rut,
+            email: savedUser.email,
+            role: savedUser.role_name || savedUser.role || userForm.role,
+          },
+        ]);
+      } else {
+        setWorkshopUsers((prev) => [...prev, nextUser]);
+      }
+    } catch (error) {
+      console.error("Save workshop user failed", error);
+      showNotification(
+        "error",
+        editingUserId
+          ? "No se pudo actualizar el usuario"
+          : "No se pudo crear el usuario",
+      );
+      return;
+    }
+
+    const wasEditing = Boolean(editingUserId);
+    setUserForm({
+      name: "",
+      rut: "",
+      email: "",
+      password: "",
+      role: "Administrativo",
     });
-  }, [authToken, sessionRole, loadServiceCatalog, showNotification]);
+    setEditingUserId(null);
+    logAction(
+      wasEditing ? "Usuario actualizado" : "Usuario creado",
+      "Configuración",
+      `${name} fue ${wasEditing ? "actualizado" : "creado"} con perfil ${userForm.role}`,
+    );
+    showNotification(
+      "success",
+      wasEditing
+        ? "Usuario actualizado correctamente"
+        : "Usuario creado correctamente",
+    );
+  };
+
+  const handleEditUser = (user: WorkshopUser) => {
+    setEditingUserId(user.id);
+    setUserForm({
+      name: user.name,
+      rut: user.rut || "",
+      email: user.email,
+      password: "",
+      role: (user.role_name || user.role) as UserRole,
+    });
+  };
+
+  const handleCancelUserEdit = () => {
+    setEditingUserId(null);
+    setUserForm({
+      name: "",
+      rut: "",
+      email: "",
+      password: "",
+      role: "Administrativo",
+    });
+  };
+
+  const performDeleteUser = async (id: string) => {
+    const deletedUser = workshopUsers.find((user) => user.id === id);
+    if (authToken && sessionRole === "member") {
+      try {
+        await deleteWorkshopUser(id);
+      } catch (error) {
+        console.error("Delete workshop user failed", error);
+        showNotification("error", "No se pudo eliminar el usuario");
+        return;
+      }
+    }
+    setWorkshopUsers((prev) => prev.filter((user) => user.id !== id));
+    if (editingUserId === id) {
+      handleCancelUserEdit();
+    }
+    logAction(
+      "Usuario eliminado",
+      "Configuración",
+      deletedUser
+        ? `${deletedUser.name} fue eliminado`
+        : `Usuario ${id} eliminado`,
+    );
+    showNotification("success", "Usuario eliminado");
+  };
+
+  const handleDeleteUser = (id: string) => {
+    const user = workshopUsers.find((item) => item.id === id);
+    requestConfirmation({
+      title: "Eliminar usuario",
+      message: `Se eliminará ${user?.name || "este usuario"} del mantenedor. Esta acción no se puede deshacer desde la pantalla actual.`,
+      confirmLabel: "Eliminar usuario",
+      variant: "danger",
+      onConfirm: () => performDeleteUser(id),
+    });
+  };
 
   const buildVehiclePayload = (
     vehicle: Vehicle,
@@ -1218,9 +1459,7 @@ function App() {
     const selectedCatalogItems = formData.servicios.map((serviceText) => {
       const parsed = parseStoredReviewServices([serviceText])[0];
       const name = parsed?.name || serviceText;
-      const catalogItem = catalogServices.find(
-        (service) => service.name === name,
-      );
+      const catalogItem = catalogServices.find((service) => service.name === name);
       return {
         name,
         price: String(catalogItem?.base_price ?? parsed?.price ?? 0),
@@ -1490,8 +1729,43 @@ function App() {
     if (auditToTime !== null && createdTime > auditToTime) {
       return false;
     }
+    if (auditModuleFilter && entry.module !== auditModuleFilter) {
+      return false;
+    }
+    const normalizedSearch = auditSearch.trim().toLowerCase();
+    if (
+      normalizedSearch &&
+      !`${entry.user_name} ${entry.module} ${entry.action} ${entry.detail}`
+        .toLowerCase()
+        .includes(normalizedSearch)
+    ) {
+      return false;
+    }
     return true;
   });
+  const auditModules = Array.from(
+    new Set(auditLogs.map((entry) => entry.module).filter(Boolean)),
+  ).sort();
+  const auditUsersCount = new Set(
+    auditLogs.map((entry) => entry.user_name).filter(Boolean),
+  ).size;
+  const auditTodayCount = auditLogs.filter(
+    (entry) =>
+      new Date(entry.created_at).toDateString() === new Date().toDateString(),
+  ).length;
+  const auditActionStyle = (action: string) => {
+    const normalized = action.toLowerCase();
+    if (/elimin|anulad|rechaz|error/.test(normalized)) {
+      return "bg-[#fc3d3c]/10 text-[#b42318]";
+    }
+    if (/cread|registr|aprobad|recibid|guardad/.test(normalized)) {
+      return "bg-emerald-50 text-emerald-700";
+    }
+    if (/actualiz|editad|modific/.test(normalized)) {
+      return "bg-[#0f4471]/10 text-[#0f4471]";
+    }
+    return "bg-sky-50 text-sky-700";
+  };
   const auditTotalPages = Math.max(
     1,
     Math.ceil(filteredAuditLogs.length / auditLogsPageSize),
@@ -1608,17 +1882,17 @@ function App() {
     null;
 
   const filteredServiceCatalog = catalogServices
-    .filter((service) => service.active !== false)
-    .filter((service) => {
-      const normalizedSearch = serviceSearch.toLowerCase();
-      const matchesSearch =
-        service.name.toLowerCase().includes(normalizedSearch) ||
-        service.category.toLowerCase().includes(normalizedSearch);
-      const alreadySelected = reviewServices.some(
-        (item) => item.name === service.name,
-      );
-      return matchesSearch && !alreadySelected;
-    });
+        .filter((service) => service.active !== false)
+        .filter((service) => {
+          const normalizedSearch = serviceSearch.toLowerCase();
+          const matchesSearch =
+            service.name.toLowerCase().includes(normalizedSearch) ||
+            service.category.toLowerCase().includes(normalizedSearch);
+          const alreadySelected = reviewServices.some(
+            (item) => item.name === service.name,
+          );
+          return matchesSearch && !alreadySelected;
+        });
 
   const filteredServiceCatalogByCategory = filteredServiceCatalog.reduce<
     Array<{ category: string; services: CatalogService[] }>
@@ -1694,6 +1968,8 @@ function App() {
     body: string;
     time: string;
   }>;
+
+  
 
   if (!authToken) {
     return (
@@ -2976,7 +3252,10 @@ function App() {
           )}
 
           {activeSection === "dashboard" && !isMechanicSession && (
-            <DashboardPage vehicles={vehicles} canViewPrices={canViewPrices} />
+            <DashboardPage
+              vehicles={vehicles}
+              canViewPrices={canViewPrices}
+            />
           )}
 
           {activeSection === "inventario" && !isMechanicSession && (
@@ -3007,7 +3286,195 @@ function App() {
           )}
 
           {activeSection === "estacionamiento" && !isMechanicSession && (
-            <EstacionamientoPage />
+            <div className="space-y-6">
+              <div className="flex flex-col gap-2">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Estacionamiento
+                </h2>
+                <p className="text-sm text-gray-500">
+                  Vehículos entregados que llevan más de una semana en el
+                  taller.
+                </p>
+              </div>
+
+              {parkedVehicles.length === 0 ? (
+                <div className="rounded-xl border border-gray-200 bg-white p-8 text-sm text-gray-500 shadow-sm">
+                  No hay vehículos pendientes en estacionamiento.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                  {parkedVehicles.map((vehicle) => {
+                    const services = parseStoredReviewServices(
+                      vehicle.servicios,
+                    );
+                    const parts = parseStoredReviewParts(vehicle.servicios);
+                    const total = getVehicleWorkTotal(vehicle);
+
+                    return (
+                      <div
+                        key={vehicle.id}
+                        className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
+                      >
+                        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-[#0f4471]">
+                              {getParkingDays(vehicle)} dias estacionado
+                            </p>
+                            <h3 className="mt-1 text-lg font-bold uppercase text-gray-900">
+                              {vehicle.patente}
+                            </h3>
+                            <p className="text-sm text-gray-600">
+                              {vehicle.marca} {vehicle.modelo} · {vehicle.ano}
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                              <span>
+                                Ingreso:{" "}
+                                {new Date(
+                                  vehicle.fecha_ingreso,
+                                ).toLocaleDateString("es-CL")}
+                              </span>
+                              <span>
+                                Salida:{" "}
+                                {getVehicleExitDate(vehicle).toLocaleDateString(
+                                  "es-CL",
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleReleaseFromParking(vehicle)}
+                            className="rounded-lg bg-[#fc3d3c] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#df2f2f]"
+                          >
+                            Sacar del estacionamiento
+                          </button>
+                        </div>
+
+                        <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+                          {canViewPrices && (
+                            <div className="rounded-lg border border-gray-200 p-4">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                Cliente
+                              </p>
+                              <p className="mt-2 text-sm font-semibold text-gray-900">
+                                {vehicle.customer_name || "Sin cliente"}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {vehicle.customer_rut || "-"}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {vehicle.customer_phone || "-"}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {vehicle.customer_city || "-"}
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="rounded-lg border border-gray-200 p-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Usuario
+                            </p>
+                            <p className="mt-2 text-sm font-semibold text-gray-900">
+                              {vehicle.assigned_mechanic_name ||
+                                "Sin mecánico asignado"}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Ingreso:{" "}
+                              {new Date(
+                                vehicle.fecha_ingreso,
+                              ).toLocaleDateString("es-CL")}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Salida:{" "}
+                              {getVehicleExitDate(vehicle).toLocaleDateString(
+                                "es-CL",
+                              )}
+                            </p>
+                          </div>
+
+                          {canViewPrices && (
+                            <div className="rounded-lg border border-gray-200 p-4">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                Valor total
+                              </p>
+                              <p className="mt-2 text-2xl font-bold text-gray-900">
+                                ${total.toLocaleString("es-CL")}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                          <div className="rounded-lg border border-gray-200 p-4">
+                            <p className="text-sm font-semibold text-gray-900">
+                              Trabajos realizados
+                            </p>
+                            {services.length === 0 ? (
+                              <p className="mt-2 text-sm text-gray-500">
+                                Sin servicios registrados.
+                              </p>
+                            ) : (
+                              <ul className="mt-2 space-y-1 text-sm text-gray-700">
+                                {services.map((service) => (
+                                  <li
+                                    key={service.name}
+                                    className="flex justify-between gap-3"
+                                  >
+                                    <span>{service.name}</span>
+                                    {canViewPrices && (
+                                      <span className="font-semibold">
+                                        $
+                                        {(
+                                          parseInt(service.price || "0", 10) ||
+                                          0
+                                        ).toLocaleString("es-CL")}
+                                      </span>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+
+                          <div className="rounded-lg border border-gray-200 p-4">
+                            <p className="text-sm font-semibold text-gray-900">
+                              Repuestos e insumos
+                            </p>
+                            {parts.length === 0 ? (
+                              <p className="mt-2 text-sm text-gray-500">
+                                Sin repuestos registrados.
+                              </p>
+                            ) : (
+                              <ul className="mt-2 space-y-1 text-sm text-gray-700">
+                                {parts.map((part) => (
+                                  <li
+                                    key={part.inventoryItemId}
+                                    className="flex justify-between gap-3"
+                                  >
+                                    <span>
+                                      {part.name} x{part.quantity} {part.unit}
+                                    </span>
+                                    {canViewPrices && (
+                                      <span className="font-semibold">
+                                        $
+                                        {(
+                                          part.quantity * (part.unitCost || 0)
+                                        ).toLocaleString("es-CL")}
+                                      </span>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           )}
 
           {activeSection === "reportes" && (
@@ -3049,9 +3516,56 @@ function App() {
                   Solo el Administrador de Taller puede ingresar a este módulo.
                 </div>
               ) : (
+                <>
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    {[
+                      {
+                        label: "Acciones almacenadas",
+                        value: auditLogs.length,
+                        icon: Activity,
+                        style: "border-[#0f4471]/20 bg-[#0f4471]/5 text-[#0f4471]",
+                      },
+                      {
+                        label: "Actividad de hoy",
+                        value: auditTodayCount,
+                        icon: Clock,
+                        style: "border-sky-200 bg-sky-50 text-sky-700",
+                      },
+                      {
+                        label: "Usuarios registrados",
+                        value: auditUsersCount,
+                        icon: UserCheck,
+                        style: "border-emerald-200 bg-emerald-50 text-emerald-700",
+                      },
+                      {
+                        label: "Módulos auditados",
+                        value: auditModules.length,
+                        icon: Layers3,
+                        style: "border-[#fc3d3c]/20 bg-[#fc3d3c]/5 text-[#b42318]",
+                      },
+                    ].map((metric) => {
+                      const Icon = metric.icon;
+                      return (
+                        <div
+                          key={metric.label}
+                          className={`flex items-center gap-4 rounded-lg border p-4 ${metric.style}`}
+                        >
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/80">
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold">
+                              {metric.label}
+                            </p>
+                            <p className="text-2xl font-bold">{metric.value}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
                   <div className="border-b border-gray-200 px-5 py-4">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                    <div className="flex flex-col gap-4">
                       <div>
                         <p className="text-sm font-semibold text-gray-900">
                           {filteredAuditLogs.length} acción(es) encontradas
@@ -3060,7 +3574,50 @@ function App() {
                           Total almacenado: {auditLogs.length} registro(s)
                         </p>
                       </div>
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+                        <div>
+                          <label
+                            htmlFor="audit-search"
+                            className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500"
+                          >
+                            Buscar
+                          </label>
+                          <div className="flex items-center gap-2 rounded-lg border border-gray-300 px-3">
+                            <Search className="h-4 w-4 text-gray-400" />
+                            <input
+                              id="audit-search"
+                              value={auditSearch}
+                              onChange={(event) =>
+                                setAuditSearch(event.target.value)
+                              }
+                              className="w-full py-2 text-sm outline-none"
+                              placeholder="Usuario, acción o detalle"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label
+                            htmlFor="audit-module"
+                            className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500"
+                          >
+                            Módulo
+                          </label>
+                          <select
+                            id="audit-module"
+                            value={auditModuleFilter}
+                            onChange={(event) =>
+                              setAuditModuleFilter(event.target.value)
+                            }
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#0f4471] focus:outline-none"
+                          >
+                            <option value="">Todos los módulos</option>
+                            {auditModules.map((module) => (
+                              <option key={module} value={module}>
+                                {module}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                         <div>
                           <label
                             htmlFor="audit-date-from"
@@ -3101,6 +3658,8 @@ function App() {
                             onClick={() => {
                               setAuditDateFrom("");
                               setAuditDateTo("");
+                              setAuditSearch("");
+                              setAuditModuleFilter("");
                             }}
                             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
                           >
@@ -3150,10 +3709,16 @@ function App() {
                                   {entry.user_name}
                                 </td>
                                 <td className="px-4 py-3 text-gray-700">
-                                  {entry.module}
+                                  <span className="rounded-full bg-[#0f4471]/10 px-2.5 py-1 text-xs font-semibold text-[#0f4471]">
+                                    {entry.module}
+                                  </span>
                                 </td>
                                 <td className="px-4 py-3 text-gray-700">
-                                  {entry.action}
+                                  <span
+                                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${auditActionStyle(entry.action)}`}
+                                  >
+                                    {entry.action}
+                                  </span>
                                 </td>
                                 <td className="px-4 py-3 text-gray-600">
                                   {entry.detail || "-"}
@@ -3180,7 +3745,7 @@ function App() {
                             Anterior
                           </button>
                           <span className="min-w-24 text-center text-sm font-semibold text-gray-700">
-                            Pagina {auditCurrentPage} de {auditTotalPages}
+                            Página {auditCurrentPage} de {auditTotalPages}
                           </span>
                           <button
                             type="button"
@@ -3199,13 +3764,66 @@ function App() {
                     </>
                   )}
                 </div>
+                </>
               )}
             </div>
           )}
 
           {activeSection === "configuracion" && !isMechanicSession && (
             <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-6">
-              <div>
+              <div className="border-b border-gray-200 pb-5">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Configuración
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Administra usuarios, servicios y preferencias del sistema.
+                </p>
+                <div className="mt-5 flex flex-wrap gap-3" role="tablist">
+                  {[
+                    {
+                      id: "users" as const,
+                      label: "Usuarios y permisos",
+                      icon: Users,
+                    },
+                    {
+                      id: "services" as const,
+                      label: "Servicios y precios",
+                      icon: ListChecks,
+                    },
+                    {
+                      id: "appearance" as const,
+                      label: "Apariencia",
+                      icon: Palette,
+                    },
+                  ]
+                    .filter((tab) => tab.id !== "services" || isSessionAdmin)
+                    .map((tab) => {
+                      const Icon = tab.icon;
+                      const active = configTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          role="tab"
+                          aria-selected={active}
+                          onClick={() => setConfigTab(tab.id)}
+                          className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition-colors ${
+                            active
+                              ? "border-[#0f4471] bg-[#0f4471] text-white shadow-sm"
+                              : "border-[#0f4471]/30 bg-white text-[#0f4471] hover:bg-[#0f4471]/5"
+                          }`}
+                        >
+                          <Icon className="h-4 w-4" />
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                </div>
+              </div>
+
+              {configTab === "users" && (
+                <div className="space-y-6" role="tabpanel">
+                  <div>
                 <h3 className="text-lg font-semibold text-gray-900">
                   Mantenedor de usuarios
                 </h3>
@@ -3406,8 +4024,10 @@ function App() {
                   </tbody>
                 </table>
               </div>
+                </div>
+              )}
 
-              {isSessionAdmin && (
+              {configTab === "services" && isSessionAdmin && (
                 <ServiceCatalogManager
                   categories={serviceCategories}
                   services={catalogServices}
@@ -3419,42 +4039,46 @@ function App() {
                 />
               )}
 
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Apariencia
-                </h3>
-
-                <p className="text-sm text-gray-500">
-                  Personaliza el color principal de la interfaz.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-4 md:flex-row md:items-center">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={accentColor}
-                    onChange={(event) => setAccentColor(event.target.value)}
-                    className="h-10 w-14 rounded border border-gray-300"
-                  />
-
+              {configTab === "appearance" && (
+                <div className="space-y-6" role="tabpanel">
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">
-                      Color principal
-                    </p>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Apariencia
+                    </h3>
 
-                    <p className="text-xs text-gray-500">{accentColor}</p>
+                    <p className="text-sm text-gray-500">
+                      Personaliza el color principal de la interfaz.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-4 rounded-lg border border-gray-200 p-4 md:flex-row md:items-center">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={accentColor}
+                        onChange={(event) => setAccentColor(event.target.value)}
+                        className="h-10 w-14 rounded border border-gray-300"
+                      />
+
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">
+                          Color principal
+                        </p>
+
+                        <p className="text-xs text-gray-500">{accentColor}</p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setAccentColor("#0f4471")}
+                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      Restaurar color
+                    </button>
                   </div>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => setAccentColor("#0f4471")}
-                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                >
-                  Restaurar color
-                </button>
-              </div>
+              )}
             </div>
           )}
         </main>
