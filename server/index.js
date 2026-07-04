@@ -74,6 +74,7 @@ const allowedTipos = new Set(['Auto', 'Camioneta', 'SUV', 'Moto', 'Camion', 'Fur
 const patenteRegex = /^(?:[A-Z]{2}-\d{4}|[A-Z]{4}-\d{2})$/;
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const customerNameMaxLength = 100;
 const defaultRoles = [
   {
     name: 'Administrador de Taller',
@@ -598,6 +599,9 @@ const validateVehicle = (payload) => {
   }
   if (!payload.customer_name || !payload.customer_rut || !payload.customer_phone || !payload.customer_address || !payload.customer_city) {
     return 'Missing customer fields';
+  }
+  if (String(payload.customer_name).trim().length > customerNameMaxLength) {
+    return 'Customer name too long';
   }
   if (!patenteRegex.test(payload.patente)) {
     return 'Invalid patente';
@@ -1987,6 +1991,94 @@ const normalizeBudgetItems = (items) =>
     unit_price: Math.max(0, Number(item.unit_price ?? item.price) || 0),
     estimated_hours: Math.max(0, Number(item.estimated_hours) || 0),
   })).filter((item) => item.name);
+
+const reviewPartPrefix = '[REPUESTO]';
+const parseInventoryUsage = (services) => {
+  const usage = new Map();
+  for (const service of Array.isArray(services) ? services : []) {
+    if (typeof service !== 'string' || !service.startsWith(reviewPartPrefix)) continue;
+    const [inventoryItemId, name, , quantity = '1'] = service
+      .slice(reviewPartPrefix.length)
+      .trim()
+      .split('|')
+      .map((value) => value.trim());
+    if (!uuidRegex.test(inventoryItemId) || !name) continue;
+    usage.set(
+      inventoryItemId,
+      (usage.get(inventoryItemId) || 0) + Math.max(1, Number.parseInt(quantity, 10) || 1),
+    );
+  }
+  return usage;
+};
+
+const reconcileVehicleInventory = async ({
+  client,
+  companyId,
+  vehicle,
+  previousServices,
+  nextServices,
+  user,
+}) => {
+  const previousUsage = parseInventoryUsage(previousServices);
+  const nextUsage = parseInventoryUsage(nextServices);
+  const itemIds = new Set([...previousUsage.keys(), ...nextUsage.keys()]);
+
+  for (const inventoryItemId of itemIds) {
+    const delta =
+      (nextUsage.get(inventoryItemId) || 0) -
+      (previousUsage.get(inventoryItemId) || 0);
+    if (delta === 0) continue;
+
+    const itemResult = await client.query(
+      `select id, name, stock
+       from inventory_items
+       where id = $1 and company_id = $2
+       for update`,
+      [inventoryItemId, companyId],
+    );
+    if (itemResult.rows.length === 0) {
+      const error = new Error('inventory_item_not_found');
+      error.status = 400;
+      throw error;
+    }
+
+    const item = itemResult.rows[0];
+    const stockBefore = Number(item.stock) || 0;
+    const stockAfter = stockBefore - delta;
+    if (stockAfter < 0) {
+      const error = new Error('insufficient_inventory_stock');
+      error.status = 409;
+      error.itemName = item.name;
+      throw error;
+    }
+
+    await client.query(
+      `update inventory_items
+       set stock = $1, updated_at = now()
+       where id = $2 and company_id = $3`,
+      [stockAfter, inventoryItemId, companyId],
+    );
+    await client.query(
+      `insert into inventory_movements
+        (company_id, inventory_item_id, movement_type, quantity, stock_before,
+         stock_after, reason, vehicle_id, vehicle_patente, mechanic_name, user_name)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [
+        companyId,
+        inventoryItemId,
+        delta > 0 ? 'consumo_taller' : 'devolucion_taller',
+        Math.abs(delta),
+        stockBefore,
+        stockAfter,
+        `Atención de vehículo ${vehicle.patente}`,
+        vehicle.id,
+        vehicle.patente,
+        vehicle.assigned_mechanic_name || '',
+        user.full_name || user.name || user.email || '',
+      ],
+    );
+  }
+};
 app.get('/budgets', authRequired, async (req, res) => {
   const { company_id: companyId } = req.user;
   if (isMechanicRole(req.user.role)) {
@@ -2023,6 +2115,10 @@ app.post('/budgets', authRequired, ensureWritable, async (req, res) => {
     return res.status(403).json({ error: 'forbidden' });
   }
   const items = normalizeBudgetItems(req.body.items);
+  const customerName = String(req.body.customerName || req.body.customer_name || '').trim();
+  if (!customerName || customerName.length > customerNameMaxLength) {
+    return res.status(400).json({ error: 'invalid_customer_name' });
+  }
   const discountPercent = Math.min(100, Math.max(0, Number(req.body.discount_percent) || 0));
   const taxPercent = Math.min(100, Math.max(0, Number(req.body.tax_percent) || 0));
   const total = calculateBudgetTotal(items, discountPercent, taxPercent);
@@ -2039,7 +2135,7 @@ app.post('/budgets', authRequired, ensureWritable, async (req, res) => {
        returning *`,
       [
         companyId,
-        req.body.customerName || req.body.customer_name || '',
+        customerName,
         req.body.customer_rut || '',
         req.body.customerPhone || req.body.customer_phone || '',
         req.body.customer_email || '',
@@ -2089,6 +2185,10 @@ app.put('/budgets/:id', authRequired, ensureWritable, async (req, res) => {
     return res.status(403).json({ error: 'forbidden' });
   }
   const items = normalizeBudgetItems(req.body.items);
+  const customerName = String(req.body.customerName || req.body.customer_name || '').trim();
+  if (!customerName || customerName.length > customerNameMaxLength) {
+    return res.status(400).json({ error: 'invalid_customer_name' });
+  }
   const discountPercent = Math.min(100, Math.max(0, Number(req.body.discount_percent) || 0));
   const taxPercent = Math.min(100, Math.max(0, Number(req.body.tax_percent) || 0));
   const total = calculateBudgetTotal(items, discountPercent, taxPercent);
@@ -2105,7 +2205,7 @@ app.put('/budgets/:id', authRequired, ensureWritable, async (req, res) => {
        where id=$19 and company_id=$20
        returning *`,
       [
-        req.body.customerName || req.body.customer_name || '',
+        customerName,
         req.body.customer_rut || '',
         req.body.customerPhone || req.body.customer_phone || '',
         req.body.customer_email || '',
@@ -2420,7 +2520,10 @@ app.post('/vehicles', authRequired, denyMechanicAccess, ensureWritable, async (r
       servicesToPersist = sanitizeServicesForMechanic(servicios || []);
     }
 
-    const { rows } = await pool.query(
+    const client = await pool.connect();
+    try {
+      await client.query('begin');
+      const { rows } = await client.query(
       `insert into vehicles
         (company_id, customer_name, customer_rut, customer_phone, customer_address, customer_city, customer_email, assigned_mechanic_id, assigned_mechanic_name, customer_advance, attention_priority, estimated_work_hours, promised_delivery_date, customer_authorized, customer_authorized_at, patente, marca, modelo, ano, tipo_vehiculo, codigo_vin, codigo_motor, color, kilometraje, cantidad_combustible, estado, servicios, observaciones, comentario_tecnico, salida_confirmada, fecha_salida_confirmada, en_estacionamiento_manual)
        values
@@ -2460,32 +2563,57 @@ app.post('/vehicles', authRequired, denyMechanicAccess, ensureWritable, async (r
         fecha_salida_confirmada || null,
         Boolean(en_estacionamiento_manual),
       ]
-    );
+      );
 
-    if (estado === 'En Taller' && normalizeUuid(assigned_mechanic_id)) {
-      const timerResult = await pool.query(
+      await reconcileVehicleInventory({
+        client,
+        companyId,
+        vehicle: rows[0],
+        previousServices: [],
+        nextServices: servicesToPersist,
+        user: req.user,
+      });
+
+      if (estado === 'En Taller' && normalizeUuid(assigned_mechanic_id)) {
+        const timerResult = await client.query(
         `update vehicles
          set work_timer_started_at = coalesce(work_timer_started_at, now())
          where id = $1 and company_id = $2
          returning *`,
         [rows[0].id, companyId]
-      );
-      if (timerResult.rows[0]) {
-        rows[0] = timerResult.rows[0];
+        );
+        if (timerResult.rows[0]) {
+          rows[0] = timerResult.rows[0];
+        }
       }
+
+      await syncVehicleServices(
+        client,
+        companyId,
+        rows[0].id,
+        servicesToPersist,
+        req.user.full_name || req.user.name || req.user.email || '',
+        estado,
+      );
+
+      await client.query('commit');
+      res.status(201).json(sanitizeVehicleForRole(rows[0], req.user.role));
+    } catch (error) {
+      await client.query('rollback');
+      throw error;
+    } finally {
+      client.release();
     }
-
-    await syncVehicleServices(
-      pool,
-      companyId,
-      rows[0].id,
-      servicesToPersist,
-      req.user.full_name || req.user.name || req.user.email || '',
-      estado,
-    );
-
-    res.status(201).json(sanitizeVehicleForRole(rows[0], req.user.role));
   } catch (error) {
+    if (error.message === 'insufficient_inventory_stock') {
+      return res.status(409).json({
+        error: 'insufficient_inventory_stock',
+        item_name: error.itemName,
+      });
+    }
+    if (error.message === 'inventory_item_not_found') {
+      return res.status(400).json({ error: 'inventory_item_not_found' });
+    }
     if (error.code === '23505') {
       return res.status(409).json({ error: 'patente_exists' });
     }
@@ -2626,7 +2754,36 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
       workTimerStartedAt = now;
     }
 
-    const { rows } = await pool.query(
+    const client = await pool.connect();
+    let rows;
+    try {
+      await client.query('begin');
+      const lockedVehicleResult = await client.query(
+        `select servicios
+         from vehicles
+         where id = $1 and company_id = $2
+         for update`,
+        [id, companyId],
+      );
+      if (lockedVehicleResult.rows.length === 0) {
+        await client.query('rollback');
+        return res.status(404).json({ error: 'not_found' });
+      }
+
+      await reconcileVehicleInventory({
+        client,
+        companyId,
+        vehicle: {
+          id,
+          patente,
+          assigned_mechanic_name,
+        },
+        previousServices: lockedVehicleResult.rows[0].servicios,
+        nextServices: servicesToPersist,
+        user: req.user,
+      });
+
+      const updateResult = await client.query(
       `update vehicles
        set customer_name = $1,
            customer_rut = $2,
@@ -2697,21 +2854,23 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
         id,
         companyId,
       ]
-    );
+      );
+      rows = updateResult.rows;
 
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'not_found' });
-    }
-    await syncVehicleServices(
-      pool,
-      companyId,
-      id,
-      servicesToPersist,
-      req.user.full_name || req.user.name || req.user.email || '',
-      estado,
-    );
+      if (rows.length === 0) {
+        await client.query('rollback');
+        return res.status(404).json({ error: 'not_found' });
+      }
+      await syncVehicleServices(
+        client,
+        companyId,
+        id,
+        servicesToPersist,
+        req.user.full_name || req.user.name || req.user.email || '',
+        estado,
+      );
 
-    const timerResult = await pool.query(
+      const timerResult = await client.query(
       `update vehicles
        set work_timer_started_at = $1,
            work_elapsed_seconds = $2
@@ -2723,10 +2882,26 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
         id,
         companyId,
       ]
-    );
+      );
 
-    res.json(sanitizeVehicleForRole(timerResult.rows[0] || rows[0], req.user.role));
+      await client.query('commit');
+      res.json(sanitizeVehicleForRole(timerResult.rows[0] || rows[0], req.user.role));
+    } catch (error) {
+      await client.query('rollback');
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
+    if (error.message === 'insufficient_inventory_stock') {
+      return res.status(409).json({
+        error: 'insufficient_inventory_stock',
+        item_name: error.itemName,
+      });
+    }
+    if (error.message === 'inventory_item_not_found') {
+      return res.status(400).json({ error: 'inventory_item_not_found' });
+    }
     if (error.code === '23505') {
       return res.status(409).json({ error: 'patente_exists' });
     }

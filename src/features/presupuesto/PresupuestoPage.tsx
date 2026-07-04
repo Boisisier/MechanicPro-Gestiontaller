@@ -25,6 +25,7 @@ import {
   updateBudgetStatus,
 } from "../../shared/lib/api";
 import type { CatalogService, InventoryItem } from "../../shared/lib/types";
+import { CUSTOMER_NAME_MAX_LENGTH } from "../../shared/lib/validation";
 import mechanicProLogo from "../../shared/assets/mechanic-pro-logo.png";
 import type {
   BudgetFormData,
@@ -241,6 +242,13 @@ export default function PresupuestoPage({
       onNotify("error", "Completa cliente, RUT y al menos un ítem");
       return;
     }
+    if (form.customerName.trim().length > CUSTOMER_NAME_MAX_LENGTH) {
+      onNotify(
+        "error",
+        `El nombre del cliente no puede superar ${CUSTOMER_NAME_MAX_LENGTH} caracteres`,
+      );
+      return;
+    }
     const printWindow = window.open("", "_blank");
     setSaving(true);
     try {
@@ -409,6 +417,7 @@ export default function PresupuestoPage({
                     type={type}
                     value={String(form[name as keyof BudgetFormData])}
                     onChange={handleFormChange}
+                    maxLength={name === "customerName" ? CUSTOMER_NAME_MAX_LENGTH : undefined}
                     className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#0f4471] focus:outline-none"
                   />
                 </label>

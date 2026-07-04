@@ -21,7 +21,6 @@ import {
   deleteParkingRelease,
   deleteWorkshopUser,
   updateWorkshopUser,
-  updateInventoryItem,
   updateVehicle,
   updateBudgetStatus,
   getServiceCatalog,
@@ -157,6 +156,10 @@ const apiErrorMessages: Record<string, string> = {
   "Missing field: patente": "Falta la patente del vehículo.",
   "Invalid patente": "La patente no tiene un formato válido.",
   "Invalid estado": "El estado del vehículo no es válido.",
+  insufficient_inventory_stock:
+    "No hay stock suficiente para guardar los repuestos o insumos seleccionados.",
+  inventory_item_not_found:
+    "Uno de los repuestos o insumos seleccionados ya no existe en inventario.",
 };
 
 const getFriendlyApiError = (error: unknown, fallback: string) => {
@@ -1189,44 +1192,9 @@ function App() {
         statusOverride ? "vehículo enviado a salida" : "Servicios guardados",
       );
 
-      setInventoryItems((prev) =>
-        prev.map((item) => {
-          const partDelta = partDeltas.find(
-            (delta) => delta.inventoryItemId === item.id,
-          );
-          if (!partDelta || partDelta.delta === 0) {
-            return item;
-          }
-          return {
-            ...item,
-            stock: item.stock - partDelta.delta,
-            updated_at: new Date().toISOString(),
-          };
-        }),
-      );
-
-      await Promise.all(
-        partDeltas
-          .filter((partDelta) => partDelta.delta !== 0)
-          .map((partDelta) => {
-            const inventoryItem = inventoryItems.find(
-              (item) => item.id === partDelta.inventoryItemId,
-            );
-            if (!inventoryItem) {
-              return Promise.resolve();
-            }
-            return updateInventoryItem(inventoryItem.id, {
-              ...inventoryItem,
-              stock: inventoryItem.stock - partDelta.delta,
-              movement_type:
-                partDelta.delta > 0 ? "consumo_taller" : "devolucion_taller",
-              movement_reason: `Atención de vehículo ${vehicle.patente}`,
-              vehicle_id: vehicle.id,
-              vehicle_patente: vehicle.patente,
-              mechanic_name: vehicle.assigned_mechanic_name || "",
-            });
-          }),
-      );
+      if (!isMechanicSession) {
+        setInventoryItems(await getInventoryItems());
+      }
 
       logAction(
         statusOverride === "Entregado" ? "Enviado a salida" : "Taller guardado",
@@ -3495,6 +3463,7 @@ function App() {
                   onExportPdf={canViewPrices ? exportVehiclePdf : undefined}
                   pageSize={8}
                   enableDateFilter
+                  enableStatusFilter
                 />
               )}
             </>

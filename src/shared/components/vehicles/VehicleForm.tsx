@@ -2,6 +2,7 @@
 import { ChevronLeft, ChevronRight, History, RotateCcw, Save, Search, Send, X } from 'lucide-react';
 import { getModelsForBrand, vehicleBrandNames } from '../../../features/vehiculo/vehicleModelCatalog';
 import type { CatalogService } from '../../lib/types';
+import { CUSTOMER_NAME_MAX_LENGTH } from '../../lib/validation';
 import ConfirmDialog from '../ui/ConfirmDialog';
 
 type PreviousVehicleData = Omit<Partial<VehicleFormData>, 'promised_delivery_date'> & {
@@ -897,6 +898,7 @@ export default function VehicleForm({
                 name="customer_name"
                 value={formData.customer_name}
                 onChange={handleChange}
+                maxLength={CUSTOMER_NAME_MAX_LENGTH}
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 placeholder="Nombre del cliente"

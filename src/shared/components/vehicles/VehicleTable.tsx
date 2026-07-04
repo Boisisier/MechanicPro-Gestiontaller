@@ -29,6 +29,8 @@ interface VehicleTableProps {
 
   enableDateFilter?: boolean;
 
+  enableStatusFilter?: boolean;
+
 }
 
 
@@ -55,6 +57,8 @@ export default function VehicleTable({
 
   enableDateFilter = false,
 
+  enableStatusFilter = false,
+
 }: VehicleTableProps) {
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -62,6 +66,8 @@ export default function VehicleTable({
   const [dateFrom, setDateFrom] = useState('');
 
   const [dateTo, setDateTo] = useState('');
+
+  const [statusFilter, setStatusFilter] = useState('');
 
   const [deleteConfirm, setDeleteConfirm] = useState<Vehicle | null>(null);
 
@@ -80,6 +86,10 @@ export default function VehicleTable({
       vehicle.modelo.toLowerCase().includes(searchTerm.toLowerCase());
 
     if (!matchesSearch) {
+      return false;
+    }
+
+    if (enableStatusFilter && statusFilter && getDisplayEstado(vehicle) !== statusFilter) {
       return false;
     }
 
@@ -105,7 +115,7 @@ export default function VehicleTable({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, dateFrom, dateTo, vehicles.length, pageSize]);
+  }, [searchTerm, dateFrom, dateTo, statusFilter, vehicles.length, pageSize]);
 
   const paginationEnabled = Boolean(pageSize && pageSize > 0);
   const totalPages = paginationEnabled
@@ -236,8 +246,10 @@ export default function VehicleTable({
 
         </div>
 
-        {enableDateFilter && (
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+        {(enableDateFilter || enableStatusFilter) && (
+          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_220px_auto] xl:items-end">
+            {enableDateFilter && (
+              <>
             <div>
               <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Fecha de ingreso desde
@@ -260,15 +272,36 @@ export default function VehicleTable({
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#0f4471] focus:outline-none focus:ring-2 focus:ring-[#0f4471]/15"
               />
             </div>
+              </>
+            )}
+            {enableStatusFilter && (
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Estado
+                </label>
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-[#0f4471] focus:outline-none focus:ring-2 focus:ring-[#0f4471]/15"
+                >
+                  <option value="">Todos los estados</option>
+                  <option value="Ingresado">Ingresado</option>
+                  <option value="En Taller">En Taller</option>
+                  <option value="Entregado">Entregado</option>
+                  <option value="Estacionamiento">Estacionamiento</option>
+                </select>
+              </div>
+            )}
             <button
               type="button"
               onClick={() => {
                 setDateFrom('');
                 setDateTo('');
+                setStatusFilter('');
               }}
               className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
             >
-              Limpiar fechas
+              Limpiar filtros
             </button>
           </div>
         )}
