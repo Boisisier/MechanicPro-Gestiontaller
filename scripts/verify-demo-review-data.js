@@ -16,9 +16,15 @@ const pool = new Pool({
 const main = async () => {
   const client = await pool.connect();
   try {
+    const companyName = process.env.DEMO_COMPANY_NAME || "Demo Taller";
     const company = (
-      await client.query("select id, name from companies order by created_at asc limit 1")
+      await client.query("select id, name from companies where name = $1 limit 1", [
+        companyName,
+      ])
     ).rows[0];
+    if (!company) {
+      throw new Error(`No existe la empresa ${companyName}`);
+    }
     const count = async (sql, params = []) =>
       Number((await client.query(sql, params)).rows[0].count);
 

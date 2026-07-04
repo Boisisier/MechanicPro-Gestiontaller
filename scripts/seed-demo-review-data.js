@@ -331,11 +331,14 @@ const budgets = [
 ];
 
 const ensureCompany = async (client) => {
-  const existing = await client.query("select id, name from companies order by created_at asc limit 1");
+  const companyName = process.env.DEMO_COMPANY_NAME || "Demo Taller";
+  const existing = await client.query("select id, name from companies where name = $1 limit 1", [
+    companyName,
+  ]);
   if (existing.rows.length) return existing.rows[0];
   const created = await client.query(
     "insert into companies (name) values ($1) returning id, name",
-    ["Mechanic Pro"],
+    [companyName],
   );
   return created.rows[0];
 };
