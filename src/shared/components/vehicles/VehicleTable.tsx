@@ -73,6 +73,9 @@ export default function VehicleTable({
 
   const [currentPage, setCurrentPage] = useState(1);
 
+  const getDisplayEstado = (vehicle: Vehicle) =>
+    vehicle.en_estacionamiento_manual ? 'Estacionamiento' : vehicle.estado;
+
 
 
   const fromTime = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
@@ -144,11 +147,6 @@ export default function VehicleTable({
     setDeleteConfirm(vehicle);
 
   };
-
-
-
-  const getDisplayEstado = (vehicle: Vehicle) =>
-    vehicle.en_estacionamiento_manual ? 'Estacionamiento' : vehicle.estado;
 
 
 
