@@ -86,7 +86,6 @@ create table if not exists roles (
 create table if not exists workshop_users (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null references companies(id) on delete cascade,
-  item_type text not null default 'repuesto',
   name text not null,
   rut text not null default '',
   email text not null,
