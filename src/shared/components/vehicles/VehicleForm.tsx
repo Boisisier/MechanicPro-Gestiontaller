@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, History, RotateCcw, Save, Search, Send, X } 
 import { getModelsForBrand, vehicleBrandNames } from '../../../features/vehiculo/vehicleModelCatalog';
 import type { CatalogService } from '../../lib/types';
 import { CUSTOMER_NAME_MAX_LENGTH } from '../../lib/validation';
+import { cleanRut, formatRut, isValidRut } from '../../utils/rut';
 import ConfirmDialog from '../ui/ConfirmDialog';
 
 type PreviousVehicleData = Omit<Partial<VehicleFormData>, 'promised_delivery_date'> & {
@@ -115,8 +116,6 @@ const formatPatente = (value: string) => {
 };
 
 const isCompletePatente = (value: string) => /^(?:[A-Z]{2}-\d{4}|[A-Z]{4}-\d{2})$/.test(value);
-
-const normalizeRut = (value: string) => value.toUpperCase().replace(/[^0-9K]/g, '');
 
 const normalizeSearch = (value: string) =>
   value
@@ -242,7 +241,7 @@ export default function VehicleForm({
         return vehicle.patente === lookupTerm;
       }
       if (lookupMode === 'rut') {
-        return normalizeRut(vehicle.customer_rut || '') === lookupTerm;
+        return cleanRut(vehicle.customer_rut || '') === lookupTerm;
       }
       return false;
     })
@@ -266,7 +265,7 @@ export default function VehicleForm({
     if (editingVehicle) {
       return;
     }
-    const normalizedRut = normalizeRut(rut);
+    const normalizedRut = cleanRut(rut);
     if (normalizedRut.length < 7) {
       return;
     }
@@ -298,6 +297,17 @@ export default function VehicleForm({
       if (isCompletePatente(patente)) {
         openPatenteLookup(patente);
       }
+      return;
+    }
+
+    if (name === 'customer_rut') {
+      const formatted = formatRut(value);
+      e.target.setCustomValidity(
+        formatted && !isValidRut(formatted)
+          ? 'Ingresa un RUT chileno válido, ej: 11.111.111-1'
+          : '',
+      );
+      setFormData((prev) => ({ ...prev, customer_rut: formatted }));
       return;
     }
 
@@ -923,7 +933,7 @@ export default function VehicleForm({
               <button
                 type="button"
                 onClick={() => openRutLookup()}
-                disabled={normalizeRut(formData.customer_rut).length < 7}
+                disabled={cleanRut(formData.customer_rut).length < 7}
                 className="mt-2 inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Search className="h-4 w-4" />

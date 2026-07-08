@@ -15,6 +15,8 @@ import {
 } from './security.js';
 import {
   calculateBudgetTotal,
+  formatRut,
+  isValidRut,
   normalizePatente,
   splitServicePrice,
 } from './lib/core.js';
@@ -44,6 +46,48 @@ const pool = new Pool({
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
 });
+
+// Guardarraíl de aislamiento entre talleres: no hay Row Level Security activa en la base
+// (ver supabase/migrations), así que cada query debe filtrar por company_id manualmente.
+// Fuera de producción, avisamos por consola si una query toca una tabla multi-tenant sin
+// mencionar company_id, para detectar el error en desarrollo/tests en vez de en producción.
+const multiTenantTables = [
+  'vehicles', 'vehicle_services', 'inventory_items', 'inventory_movements',
+  'inventory_suppliers', 'inventory_purchase_orders', 'inventory_stock_counts',
+  'budget_quotes', 'workshop_users', 'roles', 'service_catalog',
+  'service_categories', 'audit_logs', 'parking_releases',
+];
+const multiTenantTableRegex = new RegExp(
+  `\\b(from|into|update|join)\\s+(${multiTenantTables.join('|')})\\b`,
+  'i',
+);
+const warnIfMissingCompanyFilter = (text) => {
+  if (typeof text !== 'string') return;
+  if (/company_id/i.test(text)) return;
+  if (multiTenantTableRegex.test(text)) {
+    console.warn(`[tenant-guard] Query sin filtro company_id en tabla multi-tenant:\n${text}`);
+  }
+};
+if (!config.isProduction) {
+  const originalPoolQuery = pool.query.bind(pool);
+  pool.query = (...args) => {
+    warnIfMissingCompanyFilter(args[0]?.text ?? args[0]);
+    return originalPoolQuery(...args);
+  };
+  const originalConnect = pool.connect.bind(pool);
+  pool.connect = async (...args) => {
+    const client = await originalConnect(...args);
+    if (!client.__tenantGuardWrapped) {
+      client.__tenantGuardWrapped = true;
+      const originalClientQuery = client.query.bind(client);
+      client.query = (...queryArgs) => {
+        warnIfMissingCompanyFilter(queryArgs[0]?.text ?? queryArgs[0]);
+        return originalClientQuery(...queryArgs);
+      };
+    }
+    return client;
+  };
+}
 
 if (config.trustProxy) app.set('trust proxy', config.trustProxy);
 app.disable('x-powered-by');
@@ -587,7 +631,7 @@ const seedDefaultServices = async (client, companyId) => {
   }
 };
 
-const validateVehicle = (payload) => {
+const validateVehicle = (payload, { enforceRutFormat = true } = {}) => {
   const requiredFields = ['patente', 'marca', 'modelo', 'ano', 'estado'];
   for (const field of requiredFields) {
     if (!payload[field]) {
@@ -602,6 +646,9 @@ const validateVehicle = (payload) => {
   }
   if (String(payload.customer_name).trim().length > customerNameMaxLength) {
     return 'Customer name too long';
+  }
+  if (enforceRutFormat && !isValidRut(payload.customer_rut)) {
+    return 'Invalid customer_rut';
   }
   if (!patenteRegex.test(payload.patente)) {
     return 'Invalid patente';
@@ -687,6 +734,17 @@ const denyMechanicAccess = (req, res, next) => {
 const requireWorkshopAdmin = (req, res, next) => {
   if (!isWorkshopAdminRole(req.user?.role)) {
     return res.status(403).json({ error: 'forbidden' });
+  }
+  return next();
+};
+
+const hasModule = (user, moduleName) =>
+  isWorkshopAdminRole(user?.role) ||
+  (Array.isArray(user?.modules) && user.modules.includes(moduleName));
+
+const requireModule = (moduleName) => (req, res, next) => {
+  if (!hasModule(req.user, moduleName)) {
+    return res.status(403).json({ error: 'forbidden_module' });
   }
   return next();
 };
@@ -905,6 +963,9 @@ app.get('/health/ready', async (req, res) => {
 });
 
 app.post('/auth/demo-login', authRateLimiter, async (req, res) => {
+  if (!config.allowDemoLogin) {
+    return res.status(404).json({ error: 'not_found' });
+  }
   if (!ensureJwtSecret(res)) {
     return;
   }
@@ -1003,7 +1064,7 @@ app.post('/auth/login', authRateLimiter, async (req, res) => {
   try {
     await client.query('begin');
 
-    if (email === demoUserEmail.toLowerCase() && password === demoUserPassword) {
+    if (config.allowDemoLogin && email === demoUserEmail.toLowerCase() && password === demoUserPassword) {
       let companyResult = await client.query('select id, name from companies where name = $1 limit 1', [
         demoCompanyName,
       ]);
@@ -1090,9 +1151,11 @@ app.post('/auth/login', authRateLimiter, async (req, res) => {
     }
 
     const workshopUserResult = await client.query(
-      `select wu.id, wu.name, wu.email, wu.password_hash, wu.role_name, c.id as company_id, c.name as company_name
+      `select wu.id, wu.name, wu.email, wu.password_hash, wu.role_name, c.id as company_id, c.name as company_name,
+              coalesce(r.modules, '{}') as modules
        from workshop_users wu
        join companies c on c.id = wu.company_id
+       left join roles r on r.id = wu.role_id
        where lower(wu.email) = $1 and wu.active = true
        limit 1`,
       [email]
@@ -1114,6 +1177,7 @@ app.post('/auth/login', authRateLimiter, async (req, res) => {
         user_id: workshopUser.id,
         company_id: workshopUser.company_id,
         role: workshopUser.role_name,
+        modules: workshopUser.modules || [],
         source: 'workshop_user',
       },
       jwtSecret,
@@ -1395,7 +1459,7 @@ app.put('/service-catalog/:id', authRequired, requireWorkshopAdmin, ensureWritab
   }
 });
 
-app.get('/workshop-users', authRequired, denyMechanicAccess, async (req, res) => {
+app.get('/workshop-users', authRequired, requireModule('Configuración'), async (req, res) => {
   const { company_id: companyId } = req.user;
   try {
     const { rows } = await pool.query(
@@ -1414,7 +1478,7 @@ app.get('/workshop-users', authRequired, denyMechanicAccess, async (req, res) =>
   }
 });
 
-app.post('/workshop-users', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
+app.post('/workshop-users', authRequired, requireModule('Configuración'), ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   const name = String(req.body.name || '').trim();
   const rut = String(req.body.rut || '').trim();
@@ -1424,6 +1488,9 @@ app.post('/workshop-users', authRequired, denyMechanicAccess, ensureWritable, as
 
   if (!name || !rut || !email || !password || !roleName) {
     return res.status(400).json({ error: 'missing_fields' });
+  }
+  if (!isValidRut(rut)) {
+    return res.status(400).json({ error: 'invalid_rut' });
   }
   if (!emailRegex.test(email)) {
     return res.status(400).json({ error: 'invalid_email' });
@@ -1442,7 +1509,7 @@ app.post('/workshop-users', authRequired, denyMechanicAccess, ensureWritable, as
       `insert into workshop_users (company_id, name, rut, email, password_hash, role_id, role_name)
        values ($1, $2, $3, $4, $5, $6, $7)
        returning id, name, rut, email, role_id, role_name, active, created_at, updated_at`,
-      [companyId, name, rut, email, hashPassword(password), role.id, role.name]
+      [companyId, name, formatRut(rut), email, hashPassword(password), role.id, role.name]
     );
     res.status(201).json(rows[0]);
   } catch (error) {
@@ -1454,7 +1521,7 @@ app.post('/workshop-users', authRequired, denyMechanicAccess, ensureWritable, as
   }
 });
 
-app.put('/workshop-users/:id', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
+app.put('/workshop-users/:id', authRequired, requireModule('Configuración'), ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   const name = String(req.body.name || '').trim();
   const rut = String(req.body.rut || '').trim();
@@ -1471,6 +1538,21 @@ app.put('/workshop-users/:id', authRequired, denyMechanicAccess, ensureWritable,
   }
 
   try {
+    const existingResult = await pool.query(
+      'select rut from workshop_users where id = $1 and company_id = $2',
+      [req.params.id, companyId]
+    );
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+    // Solo exige el formato estricto si el RUT realmente cambió, para no bloquear
+    // ediciones de empleados cuyo RUT quedó guardado antes de esta validación.
+    const rutChanged = rut !== existingResult.rows[0].rut;
+    if (rutChanged && !isValidRut(rut)) {
+      return res.status(400).json({ error: 'invalid_rut' });
+    }
+    const rutToPersist = rutChanged ? formatRut(rut) : rut;
+
     const roleResult = await pool.query(
       'select id, name from roles where company_id = $1 and name = $2 limit 1',
       [companyId, roleName]
@@ -1493,7 +1575,7 @@ app.put('/workshop-users/:id', authRequired, denyMechanicAccess, ensureWritable,
        returning id, name, rut, email, role_id, role_name, active, created_at, updated_at`,
       [
         name,
-        rut,
+        rutToPersist,
         email,
         password,
         password ? hashPassword(password) : '',
@@ -1517,7 +1599,7 @@ app.put('/workshop-users/:id', authRequired, denyMechanicAccess, ensureWritable,
   }
 });
 
-app.delete('/workshop-users/:id', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
+app.delete('/workshop-users/:id', authRequired, requireModule('Configuración'), ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   try {
     const { rows } = await pool.query(
@@ -1534,7 +1616,7 @@ app.delete('/workshop-users/:id', authRequired, denyMechanicAccess, ensureWritab
   }
 });
 
-app.get('/inventory-items', authRequired, denyMechanicAccess, async (req, res) => {
+app.get('/inventory-items', authRequired, requireModule('Inventario'), async (req, res) => {
   const { company_id: companyId } = req.user;
   try {
     const { rows } = await pool.query(
@@ -1557,7 +1639,7 @@ app.get('/inventory-items', authRequired, denyMechanicAccess, async (req, res) =
   }
 });
 
-app.post('/inventory-items', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
+app.post('/inventory-items', authRequired, requireModule('Inventario'), ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   const name = String(req.body.name || '').trim();
   const itemType = req.body.item_type === 'insumo' ? 'insumo' : 'repuesto';
@@ -1634,7 +1716,7 @@ app.post('/inventory-items', authRequired, denyMechanicAccess, ensureWritable, a
   }
 });
 
-app.put('/inventory-items/:id', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
+app.put('/inventory-items/:id', authRequired, requireModule('Inventario'), ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   const name = String(req.body.name || '').trim();
   const itemType = req.body.item_type === 'insumo' ? 'insumo' : 'repuesto';
@@ -1720,7 +1802,7 @@ app.put('/inventory-items/:id', authRequired, denyMechanicAccess, ensureWritable
   }
 });
 
-app.delete('/inventory-items/:id', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
+app.delete('/inventory-items/:id', authRequired, requireModule('Inventario'), ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   try {
     const { rows } = await pool.query(
@@ -1737,7 +1819,7 @@ app.delete('/inventory-items/:id', authRequired, denyMechanicAccess, ensureWrita
   }
 });
 
-app.get('/inventory-movements', authRequired, denyMechanicAccess, async (req, res) => {
+app.get('/inventory-movements', authRequired, requireModule('Inventario'), async (req, res) => {
   try {
     const { rows } = await pool.query(
       `select m.*, m.quantity::float, m.stock_before::float, m.stock_after::float,
@@ -1756,7 +1838,7 @@ app.get('/inventory-movements', authRequired, denyMechanicAccess, async (req, re
   }
 });
 
-app.get('/inventory-suppliers', authRequired, denyMechanicAccess, async (req, res) => {
+app.get('/inventory-suppliers', authRequired, requireModule('Inventario'), async (req, res) => {
   try {
     const { rows } = await pool.query(
       'select * from inventory_suppliers where company_id=$1 order by active desc, name',
@@ -1769,14 +1851,19 @@ app.get('/inventory-suppliers', authRequired, denyMechanicAccess, async (req, re
   }
 });
 
-app.post('/inventory-suppliers', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
+app.post('/inventory-suppliers', authRequired, requireModule('Inventario'), ensureWritable, async (req, res) => {
   const name = String(req.body.name || '').trim();
   if (!name) return res.status(400).json({ error: 'missing_name' });
+  const supplierRutInput = String(req.body.rut || '').trim();
+  if (supplierRutInput && !isValidRut(supplierRutInput)) {
+    return res.status(400).json({ error: 'invalid_rut' });
+  }
+  const supplierRut = supplierRutInput ? formatRut(supplierRutInput) : '';
   try {
     const { rows } = await pool.query(
       `insert into inventory_suppliers (company_id,name,rut,phone,email,address)
        values ($1,$2,$3,$4,$5,$6) returning *`,
-      [req.user.company_id, name, req.body.rut || '', req.body.phone || '', req.body.email || '', req.body.address || ''],
+      [req.user.company_id, name, supplierRut, req.body.phone || '', req.body.email || '', req.body.address || ''],
     );
     res.status(201).json(rows[0]);
   } catch (error) {
@@ -1786,7 +1873,7 @@ app.post('/inventory-suppliers', authRequired, denyMechanicAccess, ensureWritabl
   }
 });
 
-app.get('/inventory-purchase-orders', authRequired, denyMechanicAccess, async (req, res) => {
+app.get('/inventory-purchase-orders', authRequired, requireModule('Inventario'), async (req, res) => {
   try {
     const { rows } = await pool.query(
       `select po.*, s.name as supplier_name,
@@ -1812,9 +1899,20 @@ app.get('/inventory-purchase-orders', authRequired, denyMechanicAccess, async (r
 
 app.post('/inventory-purchase-orders', authRequired, requireWorkshopAdmin, ensureWritable, async (req, res) => {
   const items = Array.isArray(req.body.items) ? req.body.items : [];
+  const itemIds = [...new Set(items.map((item) => normalizeUuid(item.inventory_item_id)).filter(Boolean))];
   const client = await pool.connect();
   try {
     await client.query('begin');
+    if (itemIds.length > 0) {
+      const ownedItems = await client.query(
+        'select id from inventory_items where company_id = $1 and id = any($2::uuid[])',
+        [req.user.company_id, itemIds],
+      );
+      if (ownedItems.rows.length !== itemIds.length) {
+        await client.query('rollback');
+        return res.status(400).json({ error: 'invalid_inventory_item' });
+      }
+    }
     const result = await client.query(
       `insert into inventory_purchase_orders
         (company_id,supplier_id,order_number,order_date,expected_date,notes)
@@ -1827,11 +1925,13 @@ app.post('/inventory-purchase-orders', authRequired, requireWorkshopAdmin, ensur
       ],
     );
     for (const item of items) {
+      const inventoryItemId = normalizeUuid(item.inventory_item_id);
+      if (!inventoryItemId) continue;
       await client.query(
         `insert into inventory_purchase_order_items
           (purchase_order_id,inventory_item_id,quantity,unit_cost)
          values ($1,$2,$3,$4)`,
-        [result.rows[0].id, item.inventory_item_id, Math.max(1,Number(item.quantity)||1), Math.max(0,Number(item.unit_cost)||0)],
+        [result.rows[0].id, inventoryItemId, Math.max(1,Number(item.quantity)||1), Math.max(0,Number(item.unit_cost)||0)],
       );
     }
     await client.query('commit');
@@ -1860,15 +1960,15 @@ app.post('/inventory-purchase-orders/:id/receive', authRequired, requireWorkshop
     const items = await client.query(
       `select pi.*, ii.stock from inventory_purchase_order_items pi
        join inventory_items ii on ii.id=pi.inventory_item_id
-       where pi.purchase_order_id=$1`,
-      [req.params.id],
+       where pi.purchase_order_id=$1 and ii.company_id=$2`,
+      [req.params.id, req.user.company_id],
     );
     for (const item of items.rows) {
       const pending = Number(item.quantity) - Number(item.received_quantity);
       if (pending <= 0) continue;
       const before = Number(item.stock);
       const after = before + pending;
-      await client.query('update inventory_items set stock=$1,cost=$2,updated_at=now() where id=$3', [after,item.unit_cost,item.inventory_item_id]);
+      await client.query('update inventory_items set stock=$1,cost=$2,updated_at=now() where id=$3 and company_id=$4', [after,item.unit_cost,item.inventory_item_id,req.user.company_id]);
       await client.query('update inventory_purchase_order_items set received_quantity=quantity where id=$1', [item.id]);
       await client.query(
         `insert into inventory_movements
@@ -1889,7 +1989,7 @@ app.post('/inventory-purchase-orders/:id/receive', authRequired, requireWorkshop
   }
 });
 
-app.get('/inventory-stock-counts', authRequired, denyMechanicAccess, async (req, res) => {
+app.get('/inventory-stock-counts', authRequired, requireModule('Inventario'), async (req, res) => {
   try {
     const { rows } = await pool.query(
       `select sc.*, coalesce(json_agg(json_build_object(
@@ -1911,20 +2011,33 @@ app.get('/inventory-stock-counts', authRequired, denyMechanicAccess, async (req,
 
 app.post('/inventory-stock-counts', authRequired, requireWorkshopAdmin, ensureWritable, async (req, res) => {
   const items = Array.isArray(req.body.items) ? req.body.items : [];
+  const itemIds = [...new Set(items.map((item) => normalizeUuid(item.inventory_item_id)).filter(Boolean))];
   const client = await pool.connect();
   try {
     await client.query('begin');
+    if (itemIds.length > 0) {
+      const ownedItems = await client.query(
+        'select id from inventory_items where company_id = $1 and id = any($2::uuid[])',
+        [req.user.company_id, itemIds],
+      );
+      if (ownedItems.rows.length !== itemIds.length) {
+        await client.query('rollback');
+        return res.status(400).json({ error: 'invalid_inventory_item' });
+      }
+    }
     const result = await client.query(
       `insert into inventory_stock_counts (company_id,notes,created_by)
        values ($1,$2,$3) returning *`,
       [req.user.company_id,req.body.notes || '',req.user.full_name || req.user.email || ''],
     );
     for (const item of items) {
+      const inventoryItemId = normalizeUuid(item.inventory_item_id);
+      if (!inventoryItemId) continue;
       await client.query(
         `insert into inventory_stock_count_items
           (stock_count_id,inventory_item_id,expected_quantity,counted_quantity)
          values ($1,$2,$3,$4)`,
-        [result.rows[0].id,item.inventory_item_id,Number(item.expected_quantity)||0,Number(item.counted_quantity)||0],
+        [result.rows[0].id,inventoryItemId,Number(item.expected_quantity)||0,Number(item.counted_quantity)||0],
       );
     }
     await client.query('commit');
@@ -1952,13 +2065,13 @@ app.post('/inventory-stock-counts/:id/complete', authRequired, requireWorkshopAd
     }
     const items = await client.query(
       `select ci.*,ii.stock from inventory_stock_count_items ci
-       join inventory_items ii on ii.id=ci.inventory_item_id where ci.stock_count_id=$1`,
-      [req.params.id],
+       join inventory_items ii on ii.id=ci.inventory_item_id where ci.stock_count_id=$1 and ii.company_id=$2`,
+      [req.params.id, req.user.company_id],
     );
     for (const item of items.rows) {
       const before=Number(item.stock), after=Number(item.counted_quantity);
       if (before === after) continue;
-      await client.query('update inventory_items set stock=$1,updated_at=now() where id=$2',[after,item.inventory_item_id]);
+      await client.query('update inventory_items set stock=$1,updated_at=now() where id=$2 and company_id=$3',[after,item.inventory_item_id,req.user.company_id]);
       await client.query(
         `insert into inventory_movements
           (company_id,inventory_item_id,movement_type,quantity,stock_before,stock_after,reason,user_name)
@@ -2119,6 +2232,11 @@ app.post('/budgets', authRequired, ensureWritable, async (req, res) => {
   if (!customerName || customerName.length > customerNameMaxLength) {
     return res.status(400).json({ error: 'invalid_customer_name' });
   }
+  const customerRutInput = String(req.body.customer_rut || '').trim();
+  if (customerRutInput && !isValidRut(customerRutInput)) {
+    return res.status(400).json({ error: 'invalid_customer_rut' });
+  }
+  const customerRut = customerRutInput ? formatRut(customerRutInput) : '';
   const discountPercent = Math.min(100, Math.max(0, Number(req.body.discount_percent) || 0));
   const taxPercent = Math.min(100, Math.max(0, Number(req.body.tax_percent) || 0));
   const total = calculateBudgetTotal(items, discountPercent, taxPercent);
@@ -2136,7 +2254,7 @@ app.post('/budgets', authRequired, ensureWritable, async (req, res) => {
       [
         companyId,
         customerName,
-        req.body.customer_rut || '',
+        customerRut,
         req.body.customerPhone || req.body.customer_phone || '',
         req.body.customer_email || '',
         req.body.customer_address || '',
@@ -2189,6 +2307,11 @@ app.put('/budgets/:id', authRequired, ensureWritable, async (req, res) => {
   if (!customerName || customerName.length > customerNameMaxLength) {
     return res.status(400).json({ error: 'invalid_customer_name' });
   }
+  const customerRutInput = String(req.body.customer_rut || '').trim();
+  if (customerRutInput && !isValidRut(customerRutInput)) {
+    return res.status(400).json({ error: 'invalid_customer_rut' });
+  }
+  const customerRut = customerRutInput ? formatRut(customerRutInput) : '';
   const discountPercent = Math.min(100, Math.max(0, Number(req.body.discount_percent) || 0));
   const taxPercent = Math.min(100, Math.max(0, Number(req.body.tax_percent) || 0));
   const total = calculateBudgetTotal(items, discountPercent, taxPercent);
@@ -2206,7 +2329,7 @@ app.put('/budgets/:id', authRequired, ensureWritable, async (req, res) => {
        returning *`,
       [
         customerName,
-        req.body.customer_rut || '',
+        customerRut,
         req.body.customerPhone || req.body.customer_phone || '',
         req.body.customer_email || '',
         req.body.customer_address || '',
@@ -2276,7 +2399,7 @@ app.delete('/budgets/:id', authRequired, ensureWritable, async (req, res) => {
   }
 });
 
-app.patch('/budgets/:id/status', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
+app.patch('/budgets/:id/status', authRequired, requireModule('Presupuesto'), ensureWritable, async (req, res) => {
   const status = budgetStatuses.has(req.body.status) ? req.body.status : null;
   if (!status) {
     return res.status(400).json({ error: 'invalid_status' });
@@ -2301,7 +2424,7 @@ app.patch('/budgets/:id/status', authRequired, denyMechanicAccess, ensureWritabl
   }
 });
 
-app.get('/audit-logs', authRequired, denyMechanicAccess, async (req, res) => {
+app.get('/audit-logs', authRequired, requireModule('Registro de acciones'), async (req, res) => {
   const { company_id: companyId } = req.user;
   const dateFrom = String(req.query.date_from || '').trim();
   const dateTo = String(req.query.date_to || '').trim();
@@ -2343,7 +2466,7 @@ app.get('/audit-logs', authRequired, denyMechanicAccess, async (req, res) => {
   }
 });
 
-app.post('/audit-logs', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
+app.post('/audit-logs', authRequired, requireModule('Registro de acciones'), ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   const userName = String(req.body.user_name || req.body.user || '').trim();
   const moduleName = String(req.body.module || '').trim();
@@ -2368,7 +2491,7 @@ app.post('/audit-logs', authRequired, denyMechanicAccess, ensureWritable, async 
   }
 });
 
-app.get('/parking-releases', authRequired, denyMechanicAccess, async (req, res) => {
+app.get('/parking-releases', authRequired, requireModule('Estacionamiento'), async (req, res) => {
   const { company_id: companyId } = req.user;
   try {
     const { rows } = await pool.query(
@@ -2385,7 +2508,7 @@ app.get('/parking-releases', authRequired, denyMechanicAccess, async (req, res) 
   }
 });
 
-app.post('/parking-releases', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
+app.post('/parking-releases', authRequired, requireModule('Estacionamiento'), ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   const vehicleId = String(req.body.vehicle_id || req.body.vehicleId || '').trim();
   const releasedBy = String(req.body.released_by || req.body.releasedBy || '').trim();
@@ -2411,7 +2534,7 @@ app.post('/parking-releases', authRequired, denyMechanicAccess, ensureWritable, 
   }
 });
 
-app.delete('/parking-releases/:vehicleId', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
+app.delete('/parking-releases/:vehicleId', authRequired, requireModule('Estacionamiento'), ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
   try {
     const { rows } = await pool.query(
@@ -2453,6 +2576,9 @@ app.post('/vehicles', authRequired, denyMechanicAccess, ensureWritable, async (r
     req.body.servicios = [];
   }
   req.body.patente = normalizePatente(req.body.patente);
+  if (req.body.customer_rut) {
+    req.body.customer_rut = formatRut(req.body.customer_rut);
+  }
 
   const errorMessage = validateVehicle(req.body);
   if (errorMessage) {
@@ -2637,6 +2763,16 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
       return res.status(404).json({ error: 'not_found' });
     }
     const existingVehicle = existingResult.rows[0];
+    // El RUT se valida en formato estricto solo cuando el cliente lo está editando de
+    // verdad, para no bloquear ediciones de vehículos con RUT heredado de antes de que
+    // existiera esta validación.
+    const isEditingRut =
+      typeof req.body.customer_rut === 'string' &&
+      req.body.customer_rut.trim() !== '' &&
+      req.body.customer_rut !== existingVehicle.customer_rut;
+    if (isEditingRut) {
+      req.body.customer_rut = formatRut(req.body.customer_rut);
+    }
     const mergedBody = {
       ...existingVehicle,
       ...req.body,
@@ -2653,7 +2789,7 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
           : [],
     };
 
-    const errorMessage = validateVehicle(mergedBody);
+    const errorMessage = validateVehicle(mergedBody, { enforceRutFormat: isEditingRut });
     if (errorMessage) {
       return res.status(400).json({ error: errorMessage });
     }
@@ -2910,7 +3046,7 @@ app.put('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
   }
 });
 
-app.delete('/vehicles/:id', authRequired, ensureWritable, async (req, res) => {
+app.delete('/vehicles/:id', authRequired, denyMechanicAccess, ensureWritable, async (req, res) => {
   const { company_id: companyId } = req.user;
 
   try {

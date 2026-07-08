@@ -71,6 +71,7 @@ import {
 } from "lucide-react";
 
 import { toSoftAccent } from "./utils/colors";
+import { formatRut, isValidRut } from "./utils/rut";
 
 import {
   parseStoredReviewServices,
@@ -155,6 +156,9 @@ const apiErrorMessages: Record<string, string> = {
     "Faltan datos del cliente. Revisa nombre, RUT, teléfono, dirección y ciudad.",
   "Missing field: patente": "Falta la patente del vehículo.",
   "Invalid patente": "La patente no tiene un formato válido.",
+  "Invalid customer_rut": "El RUT del cliente no es válido.",
+  invalid_customer_rut: "El RUT del cliente no es válido.",
+  invalid_rut: "El RUT ingresado no es válido.",
   "Invalid estado": "El estado del vehículo no es válido.",
   insufficient_inventory_stock:
     "No hay stock suficiente para guardar los repuestos o insumos seleccionados.",
@@ -624,7 +628,7 @@ function App() {
     const { name, value } = event.target;
     setUserForm((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: name === "rut" ? formatRut(value) : value,
     }));
   };
 
@@ -637,6 +641,11 @@ function App() {
 
     if (!name || !rut || !email || (!editingUserId && !password)) {
       showNotification("error", "Completa nombre, RUT, correo y contraseña");
+      return;
+    }
+
+    if (!isValidRut(rut)) {
+      showNotification("error", "Ingresa un RUT chileno válido, ej: 11.111.111-1");
       return;
     }
 

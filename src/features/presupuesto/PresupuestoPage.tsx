@@ -26,6 +26,7 @@ import {
 } from "../../shared/lib/api";
 import type { CatalogService, InventoryItem } from "../../shared/lib/types";
 import { CUSTOMER_NAME_MAX_LENGTH } from "../../shared/lib/validation";
+import { formatRut, isValidRut } from "../../shared/utils/rut";
 import mechanicProLogo from "../../shared/assets/mechanic-pro-logo.png";
 import type {
   BudgetFormData,
@@ -174,7 +175,9 @@ export default function PresupuestoPage({
       ...current,
       [name]: ["discountPercent", "taxPercent", "advanceRequired"].includes(name)
         ? Number(value) || 0
-        : value,
+        : name === "customerRut"
+          ? formatRut(value)
+          : value,
     }));
   };
 
@@ -240,6 +243,10 @@ export default function PresupuestoPage({
   const save = async (status: BudgetStatus = form.status) => {
     if (!form.customerName.trim() || !form.customerRut.trim() || items.length === 0) {
       onNotify("error", "Completa cliente, RUT y al menos un ítem");
+      return;
+    }
+    if (!isValidRut(form.customerRut)) {
+      onNotify("error", "Ingresa un RUT chileno válido, ej: 11.111.111-1");
       return;
     }
     if (form.customerName.trim().length > CUSTOMER_NAME_MAX_LENGTH) {
