@@ -35,7 +35,6 @@ services:
   - name: mechanicpro-gestiontaller-web
     type: web
     runtime: static
-    region: oregon
     plan: free
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
