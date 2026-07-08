@@ -378,3 +378,90 @@ UPDATE roles
 SET modules = ARRAY['Vehículos', 'Reportes'],
     updated_at = now()
 WHERE name IN ('Mecánico', 'Mecanico', 'MecÃ¡nico');
+
+-- Aislamiento multi-tenant vía Row Level Security. Ver
+-- supabase/migrations/20260707000000_enable_row_level_security.sql para la
+-- versión aplicada realmente (este archivo es solo un espejo de referencia).
+DO $$
+DECLARE
+  tbl text;
+BEGIN
+  FOREACH tbl IN ARRAY ARRAY[
+    'vehicles', 'vehicle_services', 'inventory_items', 'inventory_movements',
+    'inventory_suppliers', 'inventory_purchase_orders', 'inventory_stock_counts',
+    'budget_quotes', 'service_catalog', 'service_categories', 'audit_logs',
+    'parking_releases'
+  ]
+  LOOP
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', tbl);
+    EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', tbl);
+    EXECUTE format('DROP POLICY IF EXISTS tenant_isolation ON %I', tbl);
+    EXECUTE format(
+      'CREATE POLICY tenant_isolation ON %I ' ||
+      'USING (company_id = current_setting(''app.current_company_id'', true)::uuid) ' ||
+      'WITH CHECK (company_id = current_setting(''app.current_company_id'', true)::uuid)',
+      tbl
+    );
+  END LOOP;
+END $$;
+
+DO $$
+DECLARE
+  tbl text;
+BEGIN
+  FOREACH tbl IN ARRAY ARRAY['company_members', 'workshop_users', 'roles']
+  LOOP
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', tbl);
+    EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', tbl);
+    EXECUTE format('DROP POLICY IF EXISTS tenant_isolation ON %I', tbl);
+    EXECUTE format('DROP POLICY IF EXISTS tenant_isolation_login_lookup ON %I', tbl);
+    EXECUTE format(
+      'CREATE POLICY tenant_isolation ON %I ' ||
+      'USING (company_id = current_setting(''app.current_company_id'', true)::uuid) ' ||
+      'WITH CHECK (company_id = current_setting(''app.current_company_id'', true)::uuid)',
+      tbl
+    );
+    EXECUTE format(
+      'CREATE POLICY tenant_isolation_login_lookup ON %I ' ||
+      'FOR SELECT USING (current_setting(''app.login_lookup'', true) = ''on'')',
+      tbl
+    );
+  END LOOP;
+END $$;
+
+ALTER TABLE budget_quote_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE budget_quote_items FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON budget_quote_items;
+CREATE POLICY tenant_isolation ON budget_quote_items
+  USING (EXISTS (
+    SELECT 1 FROM budget_quotes bq WHERE bq.id = budget_quote_items.budget_quote_id
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM budget_quotes bq WHERE bq.id = budget_quote_items.budget_quote_id
+  ));
+
+ALTER TABLE inventory_purchase_order_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE inventory_purchase_order_items FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON inventory_purchase_order_items;
+CREATE POLICY tenant_isolation ON inventory_purchase_order_items
+  USING (EXISTS (
+    SELECT 1 FROM inventory_purchase_orders po
+    WHERE po.id = inventory_purchase_order_items.purchase_order_id
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM inventory_purchase_orders po
+    WHERE po.id = inventory_purchase_order_items.purchase_order_id
+  ));
+
+ALTER TABLE inventory_stock_count_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE inventory_stock_count_items FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON inventory_stock_count_items;
+CREATE POLICY tenant_isolation ON inventory_stock_count_items
+  USING (EXISTS (
+    SELECT 1 FROM inventory_stock_counts sc
+    WHERE sc.id = inventory_stock_count_items.stock_count_id
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM inventory_stock_counts sc
+    WHERE sc.id = inventory_stock_count_items.stock_count_id
+  ));

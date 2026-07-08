@@ -18,10 +18,19 @@ npm run check
 npm run verify:schema
 ```
 
-Aplicar migraciones antes de desplegar:
+`npm run check` incluye tests de integración de la API (`server/test/`) contra una base
+descartable — se saltan solos si no está definida `TEST_DATABASE_URL`. Para correrlos:
 
 ```bash
-supabase db push
+TEST_DATABASE_URL=postgresql://app_runtime:clave@host:5432/base npm run test:integration
+```
+
+Aplicar migraciones antes de desplegar. `supabase db push` depende de que el proyecto
+vinculado (`supabase link`) coincida con `DATABASE_URL` — si no estás seguro, usar el runner
+propio, que aplica directo contra `DATABASE_URL` sin depender del link:
+
+```bash
+DATABASE_URL=<conexión con permisos de DDL, ej. rol postgres> npm run migrate
 ```
 
 ## Salud del servicio
@@ -40,6 +49,13 @@ La plataforma de despliegue debe dirigir tráfico únicamente cuando
 - Rotar `JWT_SECRET` mediante el gestor de secretos del proveedor.
 - Mantener `DATABASE_SSL=require`.
 - Habilitar `TRUST_PROXY=true` detrás de un proxy confiable.
+- `DATABASE_URL` **debe** usar el rol `app_runtime` (creado por la migración
+  `20260707020000_create_app_runtime_role.sql`), nunca el rol `postgres`/admin de Supabase.
+  El aislamiento entre empresas se hace con Row Level Security
+  (`20260707000000_enable_row_level_security.sql`); el rol `postgres` tiene el atributo
+  `BYPASSRLS`, así que conectado como `postgres` esas políticas no protegen nada. El esquema
+  (tablas, columnas) se administra solo con migraciones — `app_runtime` no tiene permisos de
+  DDL a propósito.
 
 ## Base de datos
 
