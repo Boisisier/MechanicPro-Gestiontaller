@@ -21,7 +21,7 @@ jobs:
       - name: Respaldar PostgreSQL
         run: |
           filename="mechanicpro-$(date +%F).dump"
-          pg_dump "$BACKUP_DATABASE_URL" --format=custom --file="$filename"
+          /usr/lib/postgresql/17/bin/pg_dump "$BACKUP_DATABASE_URL" --format=custom --file="$filename"
           echo "BACKUP_FILE=$filename" >> "$GITHUB_ENV"
         env:
           BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
