@@ -1,11 +1,21 @@
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
-const authTokenStorageKey = "auth_token";
 
-export const getAuthToken = () => localStorage.getItem(authTokenStorageKey);
-export const setAuthToken = (token: string) =>
-  localStorage.setItem(authTokenStorageKey, token);
+// El JWT real vive en una cookie httpOnly (el servidor la setea en /auth/login,
+// /auth/demo-login); JavaScript nunca la puede leer, ni con XSS. Esta clave solo guarda una
+// bandera no-secreta de "hay sesión iniciada" para decidir si vale la pena llamar a /auth/me al
+// cargar la app — no es una credencial.
+const sessionFlagStorageKey = "auth_token";
+
+export const getAuthToken = () => localStorage.getItem(sessionFlagStorageKey);
+export const setAuthToken = (value: string) =>
+  localStorage.setItem(sessionFlagStorageKey, value);
 export const clearAuthToken = () =>
-  localStorage.removeItem(authTokenStorageKey);
+  localStorage.removeItem(sessionFlagStorageKey);
+
+const getCsrfToken = () => {
+  const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+};
 
 const handleResponse = async (response: Response) => {
   if (!response.ok) {
@@ -22,143 +32,115 @@ const handleResponse = async (response: Response) => {
   return response.json();
 };
 
-const withAuthHeader = (headers: HeadersInit = {}) => {
-  const token = getAuthToken();
-  if (!token) {
-    return headers;
+// Wrapper único para todas las llamadas a la API: siempre manda la cookie de sesión
+// (credentials: "include") y, en requests que mutan datos, el header X-CSRF-Token que el
+// servidor compara contra la cookie csrf_token (protección CSRF de doble cookie).
+const apiFetch = (path: string, init: RequestInit = {}) => {
+  const method = (init.method || "GET").toUpperCase();
+  const headers: HeadersInit = { ...init.headers };
+  if (method !== "GET" && method !== "HEAD") {
+    const csrfToken = getCsrfToken();
+    if (csrfToken) {
+      (headers as Record<string, string>)["X-CSRF-Token"] = csrfToken;
+    }
   }
-  return { ...headers, Authorization: `Bearer ${token}` };
+  return fetch(`${apiBaseUrl}${path}`, {
+    ...init,
+    method,
+    credentials: "include",
+    headers,
+  });
 };
 
 export const loginDemo = async () =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/auth/demo-login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    }),
-  );
+  handleResponse(await apiFetch("/auth/demo-login", { method: "POST" }));
 
 export const login = async (body: { email: string; password: string }) =>
   handleResponse(
-    await fetch(`${apiBaseUrl}/auth/login`, {
+    await apiFetch("/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
   );
 
-export const getSession = async () =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/auth/me`, {
-      headers: withAuthHeader(),
-    }),
-  );
+export const logout = async () =>
+  handleResponse(await apiFetch("/auth/logout", { method: "POST" }));
 
-export const getVehicles = async () =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/vehicles`, {
-      headers: withAuthHeader(),
-    }),
-  );
+export const getSession = async () => handleResponse(await apiFetch("/auth/me"));
+
+export const getVehicles = async () => handleResponse(await apiFetch("/vehicles"));
 
 export const createVehicle = async (body: unknown) =>
   handleResponse(
-    await fetch(`${apiBaseUrl}/vehicles`, {
+    await apiFetch("/vehicles", {
       method: "POST",
-      headers: withAuthHeader({ "Content-Type": "application/json" }),
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
   );
 
 export const updateVehicle = async (id: string, body: unknown) =>
   handleResponse(
-    await fetch(`${apiBaseUrl}/vehicles/${id}`, {
+    await apiFetch(`/vehicles/${id}`, {
       method: "PUT",
-      headers: withAuthHeader({ "Content-Type": "application/json" }),
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
   );
 
 export const deleteVehicle = async (id: string) =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/vehicles/${id}`, {
-      method: "DELETE",
-      headers: withAuthHeader(),
-    }),
-  );
+  handleResponse(await apiFetch(`/vehicles/${id}`, { method: "DELETE" }));
 
-export const getRoles = async () =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/roles`, {
-      headers: withAuthHeader(),
-    })
-  );
+export const getRoles = async () => handleResponse(await apiFetch("/roles"));
 
 export const getWorkshopUsers = async () =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/workshop-users`, {
-      headers: withAuthHeader(),
-    })
-  );
+  handleResponse(await apiFetch("/workshop-users"));
 
 export const createWorkshopUser = async (body: unknown) =>
   handleResponse(
-    await fetch(`${apiBaseUrl}/workshop-users`, {
-      method: 'POST',
-      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
+    await apiFetch("/workshop-users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-    })
+    }),
   );
 
 export const updateWorkshopUser = async (id: string, body: unknown) =>
   handleResponse(
-    await fetch(`${apiBaseUrl}/workshop-users/${id}`, {
-      method: 'PUT',
-      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
+    await apiFetch(`/workshop-users/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-    })
+    }),
   );
 
 export const deleteWorkshopUser = async (id: string) =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/workshop-users/${id}`, {
-      method: 'DELETE',
-      headers: withAuthHeader(),
-    })
-  );
+  handleResponse(await apiFetch(`/workshop-users/${id}`, { method: "DELETE" }));
 
 export const getInventoryItems = async () =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/inventory-items`, {
-      headers: withAuthHeader(),
-    })
-  );
+  handleResponse(await apiFetch("/inventory-items"));
 
 export const createInventoryItem = async (body: unknown) =>
   handleResponse(
-    await fetch(`${apiBaseUrl}/inventory-items`, {
-      method: 'POST',
-      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
+    await apiFetch("/inventory-items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-    })
+    }),
   );
 
 export const updateInventoryItem = async (id: string, body: unknown) =>
   handleResponse(
-    await fetch(`${apiBaseUrl}/inventory-items/${id}`, {
-      method: 'PUT',
-      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
+    await apiFetch(`/inventory-items/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-    })
+    }),
   );
 
 export const deleteInventoryItem = async (id: string) =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/inventory-items/${id}`, {
-      method: 'DELETE',
-      headers: withAuthHeader(),
-    })
-  );
+  handleResponse(await apiFetch(`/inventory-items/${id}`, { method: "DELETE" }));
 
 export const getBudgets = async (filters?: {
   status?: string;
@@ -171,83 +153,84 @@ export const getBudgets = async (filters?: {
     if (value) params.set(key, value);
   });
   const query = params.toString();
-  return handleResponse(
-    await fetch(`${apiBaseUrl}/budgets${query ? `?${query}` : ""}`, {
-      headers: withAuthHeader(),
-    })
-  );
+  return handleResponse(await apiFetch(`/budgets${query ? `?${query}` : ""}`));
 };
 
 export const getInventoryMovements = async () =>
-  handleResponse(await fetch(`${apiBaseUrl}/inventory-movements`, { headers: withAuthHeader() }));
+  handleResponse(await apiFetch("/inventory-movements"));
 
 export const getInventorySuppliers = async () =>
-  handleResponse(await fetch(`${apiBaseUrl}/inventory-suppliers`, { headers: withAuthHeader() }));
+  handleResponse(await apiFetch("/inventory-suppliers"));
 
 export const createInventorySupplier = async (body: unknown) =>
-  handleResponse(await fetch(`${apiBaseUrl}/inventory-suppliers`, {
-    method: "POST",
-    headers: withAuthHeader({ "Content-Type": "application/json" }),
-    body: JSON.stringify(body),
-  }));
+  handleResponse(
+    await apiFetch("/inventory-suppliers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
 
 export const getInventoryPurchaseOrders = async () =>
-  handleResponse(await fetch(`${apiBaseUrl}/inventory-purchase-orders`, { headers: withAuthHeader() }));
+  handleResponse(await apiFetch("/inventory-purchase-orders"));
 
 export const createInventoryPurchaseOrder = async (body: unknown) =>
-  handleResponse(await fetch(`${apiBaseUrl}/inventory-purchase-orders`, {
-    method: "POST",
-    headers: withAuthHeader({ "Content-Type": "application/json" }),
-    body: JSON.stringify(body),
-  }));
+  handleResponse(
+    await apiFetch("/inventory-purchase-orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
 
 export const receiveInventoryPurchaseOrder = async (id: string) =>
-  handleResponse(await fetch(`${apiBaseUrl}/inventory-purchase-orders/${id}/receive`, {
-    method: "POST",
-    headers: withAuthHeader({ "Content-Type": "application/json" }),
-  }));
+  handleResponse(
+    await apiFetch(`/inventory-purchase-orders/${id}/receive`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
 
 export const getInventoryStockCounts = async () =>
-  handleResponse(await fetch(`${apiBaseUrl}/inventory-stock-counts`, { headers: withAuthHeader() }));
+  handleResponse(await apiFetch("/inventory-stock-counts"));
 
 export const createInventoryStockCount = async (body: unknown) =>
-  handleResponse(await fetch(`${apiBaseUrl}/inventory-stock-counts`, {
-    method: "POST",
-    headers: withAuthHeader({ "Content-Type": "application/json" }),
-    body: JSON.stringify(body),
-  }));
+  handleResponse(
+    await apiFetch("/inventory-stock-counts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
 
 export const completeInventoryStockCount = async (id: string) =>
-  handleResponse(await fetch(`${apiBaseUrl}/inventory-stock-counts/${id}/complete`, {
-    method: "POST",
-    headers: withAuthHeader({ "Content-Type": "application/json" }),
-  }));
+  handleResponse(
+    await apiFetch(`/inventory-stock-counts/${id}/complete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
 
 export const createBudget = async (body: unknown) =>
   handleResponse(
-    await fetch(`${apiBaseUrl}/budgets`, {
-      method: 'POST',
-      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
+    await apiFetch("/budgets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-    })
+    }),
   );
 
 export const updateBudget = async (id: string, body: unknown) =>
   handleResponse(
-    await fetch(`${apiBaseUrl}/budgets/${id}`, {
-      method: 'PUT',
-      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
+    await apiFetch(`/budgets/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-    })
+    }),
   );
 
 export const deleteBudget = async (id: string) =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/budgets/${id}`, {
-      method: 'DELETE',
-      headers: withAuthHeader(),
-    })
-  );
+  handleResponse(await apiFetch(`/budgets/${id}`, { method: "DELETE" }));
 
 export const getAuditLogs = async (filters?: {
   date_from?: string;
@@ -262,105 +245,87 @@ export const getAuditLogs = async (filters?: {
   }
   const query = params.toString();
 
-  return handleResponse(
-    await fetch(`${apiBaseUrl}/audit-logs${query ? `?${query}` : ""}`, {
-      headers: withAuthHeader(),
-    })
-  );
+  return handleResponse(await apiFetch(`/audit-logs${query ? `?${query}` : ""}`));
 };
 
 export const createAuditLog = async (body: unknown) =>
   handleResponse(
-    await fetch(`${apiBaseUrl}/audit-logs`, {
-      method: 'POST',
-      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
+    await apiFetch("/audit-logs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-    })
+    }),
   );
 
 export const getParkingReleases = async () =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/parking-releases`, {
-      headers: withAuthHeader(),
-    })
-  );
+  handleResponse(await apiFetch("/parking-releases"));
 
 export const createParkingRelease = async (body: unknown) =>
   handleResponse(
-    await fetch(`${apiBaseUrl}/parking-releases`, {
-      method: 'POST',
-      headers: withAuthHeader({ 'Content-Type': 'application/json' }),
+    await apiFetch("/parking-releases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-    })
+    }),
   );
 
 export const deleteParkingRelease = async (vehicleId: string) =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/parking-releases/${vehicleId}`, {
-      method: 'DELETE',
-      headers: withAuthHeader(),
-    })
-  );
+  handleResponse(await apiFetch(`/parking-releases/${vehicleId}`, { method: "DELETE" }));
 
 export const updateBudgetStatus = async (
   id: string,
   body: { status: string; converted_vehicle_id?: string },
 ) =>
   handleResponse(
-    await fetch(`${apiBaseUrl}/budgets/${id}/status`, {
+    await apiFetch(`/budgets/${id}/status`, {
       method: "PATCH",
-      headers: withAuthHeader({ "Content-Type": "application/json" }),
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
   );
 
 export const getServiceCategories = async () =>
-  handleResponse(
-    await fetch(`${apiBaseUrl}/service-categories`, {
-      headers: withAuthHeader(),
-    }),
-  );
+  handleResponse(await apiFetch("/service-categories"));
 
 export const createServiceCategory = async (body: unknown) =>
   handleResponse(
-    await fetch(`${apiBaseUrl}/service-categories`, {
+    await apiFetch("/service-categories", {
       method: "POST",
-      headers: withAuthHeader({ "Content-Type": "application/json" }),
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
   );
 
 export const updateServiceCategory = async (id: string, body: unknown) =>
   handleResponse(
-    await fetch(`${apiBaseUrl}/service-categories/${id}`, {
+    await apiFetch(`/service-categories/${id}`, {
       method: "PUT",
-      headers: withAuthHeader({ "Content-Type": "application/json" }),
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
   );
 
 export const getServiceCatalog = async (includeInactive = false) =>
   handleResponse(
-    await fetch(
-      `${apiBaseUrl}/service-catalog${includeInactive ? "?include_inactive=true" : ""}`,
-      { headers: withAuthHeader() },
+    await apiFetch(
+      `/service-catalog${includeInactive ? "?include_inactive=true" : ""}`,
     ),
   );
 
 export const createServiceCatalogItem = async (body: unknown) =>
   handleResponse(
-    await fetch(`${apiBaseUrl}/service-catalog`, {
+    await apiFetch("/service-catalog", {
       method: "POST",
-      headers: withAuthHeader({ "Content-Type": "application/json" }),
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
   );
 
 export const updateServiceCatalogItem = async (id: string, body: unknown) =>
   handleResponse(
-    await fetch(`${apiBaseUrl}/service-catalog/${id}`, {
+    await apiFetch(`/service-catalog/${id}`, {
       method: "PUT",
-      headers: withAuthHeader({ "Content-Type": "application/json" }),
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
   );

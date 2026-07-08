@@ -126,6 +126,21 @@ const setTenantContext = async (client, companyId) => {
 const enableLoginLookupBypass = (client) =>
   client.query("select set_config('app.login_lookup', 'on', true)");
 
+// No hay cookie-parser instalado; el JWT y el token CSRF son las únicas cookies que la app
+// necesita leer, así que alcanza con un parser mínimo del header Cookie.
+const parseCookies = (req) => {
+  const header = req.headers.cookie;
+  if (!header) return {};
+  return header.split(';').reduce((acc, part) => {
+    const separatorIndex = part.indexOf('=');
+    if (separatorIndex === -1) return acc;
+    const key = part.slice(0, separatorIndex).trim();
+    const value = part.slice(separatorIndex + 1).trim();
+    if (key) acc[key] = decodeURIComponent(value);
+    return acc;
+  }, {});
+};
+
 if (config.trustProxy) app.set('trust proxy', config.trustProxy);
 app.disable('x-powered-by');
 app.use(requestContext);
@@ -138,11 +153,15 @@ app.use(cors({
     }
     return callback(new Error('cors_origin_denied'));
   },
-  credentials: false,
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'X-CSRF-Token'],
 }));
 app.use(express.json({ limit: config.bodyLimit }));
+app.use((req, res, next) => {
+  req.cookies = parseCookies(req);
+  next();
+});
 app.use(createRateLimiter({ windowMs: 60_000, max: 300 }));
 const authRateLimiter = createRateLimiter({
   windowMs: 15 * 60_000,
@@ -342,16 +361,22 @@ const ensureJwtSecret = (res) => {
   return true;
 };
 
+const mutatingMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
 const getTokenPayload = (req, res) => {
   if (!ensureJwtSecret(res)) {
     return null;
   }
+  // La cookie httpOnly es la vía normal (navegador); el header Authorization queda como
+  // respaldo para tests de integración y clientes que no sean navegador.
   const header = req.header('authorization');
-  if (!header || !header.startsWith('Bearer ')) {
+  const token =
+    req.cookies?.auth_token ||
+    (header && header.startsWith('Bearer ') ? header.slice(7) : null);
+  if (!token) {
     res.status(401).json({ error: 'missing_token' });
     return null;
   }
-  const token = header.slice(7);
   try {
     const payload = jwt.verify(token, jwtSecret);
     if (payload.company_id) {
@@ -373,11 +398,43 @@ const authRequired = (req, res, next) => {
   if (!payload.company_id) {
     return res.status(403).json({ error: 'missing_company' });
   }
+  // Protección CSRF de doble cookie: la cookie auth_token viaja sola en cualquier request al
+  // dominio de la API, así que las rutas que mutan datos exigen que el header X-CSRF-Token
+  // coincida con la cookie csrf_token — un sitio malicioso no puede leerla para falsificarlo.
+  if (mutatingMethods.has(req.method) && req.cookies?.auth_token) {
+    const csrfCookie = req.cookies?.csrf_token;
+    const csrfHeader = req.header('x-csrf-token');
+    if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader) {
+      return res.status(403).json({ error: 'csrf_token_invalid' });
+    }
+  }
   req.user = payload;
   return next();
 };
 
 const ensureWritable = (req, res, next) => next();
+
+// Firma el JWT y lo manda por cookie httpOnly (nunca en el body JSON, para que un XSS no pueda
+// leerlo ni interceptando la respuesta del login) junto con una cookie csrf_token legible por
+// JS, que el frontend debe reenviar como header X-CSRF-Token en cada request que muta datos.
+const issueSession = (res, tokenPayload) => {
+  const csrfToken = crypto.randomBytes(32).toString('hex');
+  const cookieOptions = {
+    httpOnly: true,
+    secure: config.authCookie.secure,
+    sameSite: config.authCookie.sameSite,
+    maxAge: config.authCookie.maxAgeMs,
+    path: '/',
+  };
+  const token = jwt.sign(tokenPayload, jwtSecret, { expiresIn: '8h' });
+  res.cookie('auth_token', token, cookieOptions);
+  res.cookie('csrf_token', csrfToken, { ...cookieOptions, httpOnly: false });
+};
+
+const clearSession = (res) => {
+  res.clearCookie('auth_token', { path: '/' });
+  res.clearCookie('csrf_token', { path: '/' });
+};
 
 const isMechanicRole = (role = '') => role === 'Mecánico';
 const isWorkshopAdminRole = (role = '') =>
@@ -682,14 +739,9 @@ app.post('/auth/demo-login', authRateLimiter, async (req, res) => {
 
     await client.query('commit');
 
-    const token = jwt.sign(
-      { user_id: user.id, company_id: company.id, role: 'admin' },
-      jwtSecret,
-      { expiresIn: '8h' }
-    );
+    issueSession(res, { user_id: user.id, company_id: company.id, role: 'admin' });
 
     res.json({
-      token,
       user: { id: user.id, full_name: user.full_name, email: user.email },
       company: { id: company.id, name: company.name },
       role: 'admin',
@@ -768,14 +820,9 @@ app.post('/auth/login', authRateLimiter, async (req, res) => {
 
       await client.query('commit');
 
-      const token = jwt.sign(
-        { user_id: user.id, company_id: company.id, role: 'admin' },
-        jwtSecret,
-        { expiresIn: '8h' }
-      );
+      issueSession(res, { user_id: user.id, company_id: company.id, role: 'admin' });
 
       return res.json({
-        token,
         user: { id: user.id, full_name: user.full_name, email: user.email },
         company: { id: company.id, name: company.name },
         role: 'admin',
@@ -802,14 +849,14 @@ app.post('/auth/login', authRateLimiter, async (req, res) => {
       await client.query('commit');
 
       const user = rows[0];
-      const token = jwt.sign(
-        { user_id: user.id, company_id: user.company_id, role: user.role, source: 'user' },
-        jwtSecret,
-        { expiresIn: '8h' }
-      );
+      issueSession(res, {
+        user_id: user.id,
+        company_id: user.company_id,
+        role: user.role,
+        source: 'user',
+      });
 
       return res.json({
-        token,
         user: { id: user.id, full_name: user.full_name, email: user.email },
         company: { id: user.company_id, name: user.company_name },
         role: user.role,
@@ -838,20 +885,15 @@ app.post('/auth/login', authRateLimiter, async (req, res) => {
     await client.query('commit');
 
     const workshopUser = workshopUserResult.rows[0];
-    const token = jwt.sign(
-      {
-        user_id: workshopUser.id,
-        company_id: workshopUser.company_id,
-        role: workshopUser.role_name,
-        modules: workshopUser.modules || [],
-        source: 'workshop_user',
-      },
-      jwtSecret,
-      { expiresIn: '8h' }
-    );
+    issueSession(res, {
+      user_id: workshopUser.id,
+      company_id: workshopUser.company_id,
+      role: workshopUser.role_name,
+      modules: workshopUser.modules || [],
+      source: 'workshop_user',
+    });
 
     return res.json({
-      token,
       user: {
         id: workshopUser.id,
         full_name: workshopUser.name,
@@ -874,6 +916,11 @@ app.post('/auth/login', authRateLimiter, async (req, res) => {
   } finally {
     client.release();
   }
+});
+
+app.post('/auth/logout', (req, res) => {
+  clearSession(res);
+  res.json({ ok: true });
 });
 
 app.get('/auth/me', (req, res) => {

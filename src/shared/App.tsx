@@ -17,6 +17,7 @@ import {
   getWorkshopUsers,
   login,
   loginDemo,
+  logout,
   setAuthToken,
   deleteParkingRelease,
   deleteWorkshopUser,
@@ -560,8 +561,8 @@ function App() {
     setDemoLoading(true);
     try {
       const session = await loginDemo();
-      setAuthToken(session.token);
-      setAuthTokenState(session.token);
+      setAuthToken("active");
+      setAuthTokenState("active");
       setSessionRole("member");
       setSessionUser({
         name: session.user?.full_name || "Usuario demo",
@@ -587,8 +588,8 @@ function App() {
         email: loginForm.email.trim(),
         password: loginForm.password,
       });
-      setAuthToken(session.token);
-      setAuthTokenState(session.token);
+      setAuthToken("active");
+      setAuthTokenState("active");
       setSessionRole("member");
       setSessionUser({
         name: session.user?.full_name || "Usuario",
@@ -604,7 +605,12 @@ function App() {
     }
   };
 
-  const performLogout = () => {
+  const performLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error("Logout request failed", error);
+    }
     clearAuthToken();
     setAuthTokenState(null);
     setSessionRole(null);

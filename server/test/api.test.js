@@ -38,12 +38,42 @@ if (!TEST_DATABASE_URL) {
       body: JSON.stringify({ email, password }),
     });
 
-  const tokenFor = async (email, password) => {
+  // El JWT y el token CSRF viajan por Set-Cookie, no en el body. El fetch nativo de Node (a
+  // diferencia del navegador) sí deja setear el header Cookie a mano, así que no hace falta un
+  // cookie-jar: se leen las cookies de la respuesta del login y se reenvían explícitamente.
+  const extractCookies = (res) => {
+    const raw = typeof res.headers.getSetCookie === 'function' ? res.headers.getSetCookie() : [];
+    const cookies = {};
+    for (const entry of raw) {
+      const pair = entry.split(';')[0];
+      const separator = pair.indexOf('=');
+      if (separator === -1) continue;
+      cookies[pair.slice(0, separator).trim()] = pair.slice(separator + 1).trim();
+    }
+    return cookies;
+  };
+
+  const sessionFor = async (email, password) => {
     const res = await login(email, password);
     assert.equal(res.status, 200, `login falló para ${email}`);
-    const body = await res.json();
-    return body.token;
+    const cookies = extractCookies(res);
+    assert.ok(cookies.auth_token, 'la respuesta de login debe traer auth_token en Set-Cookie');
+    assert.ok(cookies.csrf_token, 'la respuesta de login debe traer csrf_token en Set-Cookie');
+    return {
+      cookieHeader: `auth_token=${cookies.auth_token}; csrf_token=${cookies.csrf_token}`,
+      csrfToken: cookies.csrf_token,
+    };
   };
+
+  const authedFetch = (session, path, init = {}) =>
+    fetch(`${baseUrl}${path}`, {
+      ...init,
+      headers: {
+        ...init.headers,
+        Cookie: session.cookieHeader,
+        ...(init.method && init.method !== 'GET' ? { 'X-CSRF-Token': session.csrfToken } : {}),
+      },
+    });
 
   before(async () => {
     await ensureSchemaReady();
@@ -76,41 +106,40 @@ if (!TEST_DATABASE_URL) {
     assert.equal(res.status, 401);
   });
 
-  test('login válido devuelve token con el company_id correcto', async () => {
+  test('login válido fija cookies de sesión y no expone el JWT en el body', async () => {
     const res = await login(companyA.adminEmail, companyA.adminPassword);
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.company.id, companyA.companyId);
-    assert.ok(body.token);
+    assert.equal(body.token, undefined, 'el JWT no debe viajar en el body de la respuesta');
+    const cookies = extractCookies(res);
+    assert.ok(cookies.auth_token);
+    assert.ok(cookies.csrf_token);
   });
 
-  test('GET /vehicles sin token devuelve 401', async () => {
+  test('GET /vehicles sin cookie de sesión devuelve 401', async () => {
     const res = await fetch(`${baseUrl}/vehicles`);
     assert.equal(res.status, 401);
   });
 
   test('empresa A no ve vehículos de empresa B (aislamiento por RLS)', async () => {
-    const tokenA = await tokenFor(companyA.adminEmail, companyA.adminPassword);
-    const tokenB = await tokenFor(companyB.adminEmail, companyB.adminPassword);
+    const sessionA = await sessionFor(companyA.adminEmail, companyA.adminPassword);
+    const sessionB = await sessionFor(companyB.adminEmail, companyB.adminPassword);
 
-    const vehiclesA = await (
-      await fetch(`${baseUrl}/vehicles`, { headers: { Authorization: `Bearer ${tokenA}` } })
-    ).json();
+    const vehiclesA = await (await authedFetch(sessionA, '/vehicles')).json();
     assert.ok(vehiclesA.some((v) => v.id === vehicleA.id));
     assert.ok(vehiclesA.every((v) => v.company_id === companyA.companyId));
 
-    const vehiclesB = await (
-      await fetch(`${baseUrl}/vehicles`, { headers: { Authorization: `Bearer ${tokenB}` } })
-    ).json();
+    const vehiclesB = await (await authedFetch(sessionB, '/vehicles')).json();
     assert.ok(vehiclesB.every((v) => v.id !== vehicleA.id));
     assert.ok(vehiclesB.every((v) => v.company_id === companyB.companyId));
   });
 
-  test('POST /vehicles crea un vehículo dentro de la empresa del token', async () => {
-    const tokenA = await tokenFor(companyA.adminEmail, companyA.adminPassword);
-    const res = await fetch(`${baseUrl}/vehicles`, {
+  test('POST /vehicles crea un vehículo dentro de la empresa de la sesión', async () => {
+    const sessionA = await sessionFor(companyA.adminEmail, companyA.adminPassword);
+    const res = await authedFetch(sessionA, '/vehicles', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         customer_name: 'Cliente Nuevo',
         customer_rut: '11.111.111-1',
@@ -129,18 +158,41 @@ if (!TEST_DATABASE_URL) {
     assert.equal(created.company_id, companyA.companyId);
   });
 
-  test('DELETE de un vehículo de otra empresa devuelve 404 y no lo borra', async () => {
-    const tokenB = await tokenFor(companyB.adminEmail, companyB.adminPassword);
-    const res = await fetch(`${baseUrl}/vehicles/${vehicleA.id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${tokenB}` },
+  test('POST /vehicles sin header X-CSRF-Token devuelve 403', async () => {
+    const sessionA = await sessionFor(companyA.adminEmail, companyA.adminPassword);
+    const res = await fetch(`${baseUrl}/vehicles`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: sessionA.cookieHeader },
+      body: JSON.stringify({
+        customer_name: 'Cliente Sin CSRF',
+        customer_rut: '11.111.111-1',
+        customer_phone: '+56911111111',
+        customer_address: 'Calle 1',
+        customer_city: 'Santiago',
+        patente: 'CC-3333',
+        marca: 'Toyota',
+        modelo: 'Yaris',
+        ano: 2021,
+        estado: 'Ingresado',
+      }),
     });
+    assert.equal(res.status, 403);
+  });
+
+  test('DELETE de un vehículo de otra empresa devuelve 404 y no lo borra', async () => {
+    const sessionB = await sessionFor(companyB.adminEmail, companyB.adminPassword);
+    const res = await authedFetch(sessionB, `/vehicles/${vehicleA.id}`, { method: 'DELETE' });
     assert.equal(res.status, 404);
 
-    const tokenA = await tokenFor(companyA.adminEmail, companyA.adminPassword);
-    const stillThere = await (
-      await fetch(`${baseUrl}/vehicles`, { headers: { Authorization: `Bearer ${tokenA}` } })
-    ).json();
+    const sessionA = await sessionFor(companyA.adminEmail, companyA.adminPassword);
+    const stillThere = await (await authedFetch(sessionA, '/vehicles')).json();
     assert.ok(stillThere.some((v) => v.id === vehicleA.id));
+  });
+
+  test('POST /auth/logout limpia las cookies de sesión', async () => {
+    const res = await fetch(`${baseUrl}/auth/logout`, { method: 'POST' });
+    assert.equal(res.status, 200);
+    const setCookie = typeof res.headers.getSetCookie === 'function' ? res.headers.getSetCookie() : [];
+    assert.ok(setCookie.some((c) => c.startsWith('auth_token=;') || c.includes('auth_token=;')));
   });
 }

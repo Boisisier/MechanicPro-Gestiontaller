@@ -1,0 +1,25 @@
+name: Backup base de datos
+
+on:
+  schedule:
+    # 08:00 UTC todos los días.
+    - cron: '0 8 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Respaldar PostgreSQL
+        run: |
+          filename="mechanicpro-$(date +%F).dump"
+          pg_dump "$BACKUP_DATABASE_URL" --format=custom --file="$filename"
+          echo "BACKUP_FILE=$filename" >> "$GITHUB_ENV"
+        env:
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+      - name: Subir respaldo como artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BACKUP_FILE }}
+          path: ${{ env.BACKUP_FILE }}
+          retention-days: 90

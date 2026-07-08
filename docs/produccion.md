@@ -44,8 +44,11 @@ La plataforma de despliegue debe dirigir tráfico únicamente cuando
 
 ## Seguridad
 
-- Publicar la API solo mediante HTTPS.
-- Configurar `CORS_ORIGINS` con dominios exactos, sin `*`.
+- Publicar la API solo mediante HTTPS. Es obligatorio: la sesión viaja en una cookie
+  `auth_token` httpOnly con `SameSite=None; Secure` en producción (frontend y API pueden vivir
+  en dominios distintos), y los navegadores descartan cookies `Secure` fuera de HTTPS.
+- Configurar `CORS_ORIGINS` con dominios exactos, sin `*` (obligatorio además porque CORS ya
+  corre con `credentials: true` para que las cookies crucen dominios).
 - Rotar `JWT_SECRET` mediante el gestor de secretos del proveedor.
 - Mantener `DATABASE_SSL=require`.
 - Habilitar `TRUST_PROXY=true` detrás de un proxy confiable.
@@ -59,16 +62,27 @@ La plataforma de despliegue debe dirigir tráfico únicamente cuando
 
 ## Base de datos
 
-- Ejecutar respaldo diario de PostgreSQL.
-- Probar restauración mensualmente.
-- Conservar al menos 30 días de respaldos.
-- Ejecutar migraciones primero en staging.
+El respaldo diario está automatizado en `.github/workflows/backup.yml`: corre todos los días a
+las 08:00 UTC (y también a demanda, desde la pestaña Actions → "Backup base de datos" → "Run
+workflow"), hace `pg_dump` y sube el resultado como artifact de GitHub Actions con 90 días de
+retención (supera el mínimo de 30 días).
 
-Ejemplo de respaldo:
+**Configuración necesaria (una sola vez):** agregar el secret `BACKUP_DATABASE_URL` en
+GitHub → Settings → Secrets and variables → Actions. Debe ser la conexión con el rol
+`postgres`/admin de Supabase (no `app_runtime`): el respaldo necesita ver el esquema completo
+—incluidas las políticas de RLS y los permisos— y `app_runtime` está deliberadamente restringido
+a datos, sin visibilidad total de esos objetos.
 
-```bash
-pg_dump "$DATABASE_URL" --format=custom --file="mechanicpro-$(date +%F).dump"
-```
+**Restaurar un respaldo:**
+
+1. Descargar el artifact desde la corrida del workflow que lo generó (Actions → esa corrida →
+   "Artifacts").
+2. `pg_restore --clean --if-exists -d "$DATABASE_URL" mechanicpro-<fecha>.dump` (usar la
+   conexión `postgres`/admin, igual que para migraciones).
+
+Probar esta restauración mensualmente contra una base descartable (no la de producción) — el
+objetivo es confirmar que el respaldo sirve, no solo que se generó. Ejecutar migraciones primero
+en staging antes de aplicarlas en producción.
 
 ## Despliegue
 

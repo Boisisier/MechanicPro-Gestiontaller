@@ -40,5 +40,14 @@ export const loadConfig = () => {
       process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === "true",
     trustProxy: process.env.TRUST_PROXY === "true" ? 1 : false,
     bodyLimit: process.env.JSON_BODY_LIMIT || "1mb",
+    // El JWT viaja en una cookie httpOnly (no en localStorage), así que JavaScript nunca puede
+    // leerlo aunque haya un XSS. En producción el frontend y la API pueden vivir en dominios
+    // distintos, así que hace falta SameSite=None + Secure (HTTPS ya es obligatorio). En
+    // desarrollo, localhost:5173 -> localhost:3001 es same-site, así que Lax alcanza sin HTTPS.
+    authCookie: {
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+      maxAgeMs: 8 * 60 * 60 * 1000,
+    },
   };
 };
