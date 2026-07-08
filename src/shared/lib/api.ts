@@ -12,9 +12,14 @@ export const setAuthToken = (value: string) =>
 export const clearAuthToken = () =>
   localStorage.removeItem(sessionFlagStorageKey);
 
-const getCsrfToken = () => {
-  const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/);
-  return match ? decodeURIComponent(match[1]) : null;
+// El token CSRF también viaja como cookie legible por JS, pero eso solo sirve si el frontend y
+// la API comparten dominio. Cuando viven en subdominios distintos (ej. dos servicios separados
+// en producción), document.cookie no puede leer la cookie del otro dominio — aislamiento normal
+// entre orígenes, no tiene que ver con httpOnly. Por eso el servidor también lo manda en el body
+// de /auth/login, /auth/demo-login y /auth/me, y acá se cachea en memoria.
+let cachedCsrfToken: string | null = null;
+const setCsrfToken = (token?: string | null) => {
+  if (token) cachedCsrfToken = token;
 };
 
 const handleResponse = async (response: Response) => {
@@ -38,11 +43,8 @@ const handleResponse = async (response: Response) => {
 const apiFetch = (path: string, init: RequestInit = {}) => {
   const method = (init.method || "GET").toUpperCase();
   const headers: HeadersInit = { ...init.headers };
-  if (method !== "GET" && method !== "HEAD") {
-    const csrfToken = getCsrfToken();
-    if (csrfToken) {
-      (headers as Record<string, string>)["X-CSRF-Token"] = csrfToken;
-    }
+  if (method !== "GET" && method !== "HEAD" && cachedCsrfToken) {
+    (headers as Record<string, string>)["X-CSRF-Token"] = cachedCsrfToken;
   }
   return fetch(`${apiBaseUrl}${path}`, {
     ...init,
@@ -52,22 +54,35 @@ const apiFetch = (path: string, init: RequestInit = {}) => {
   });
 };
 
-export const loginDemo = async () =>
-  handleResponse(await apiFetch("/auth/demo-login", { method: "POST" }));
+export const loginDemo = async () => {
+  const body = await handleResponse(await apiFetch("/auth/demo-login", { method: "POST" }));
+  setCsrfToken(body.csrfToken);
+  return body;
+};
 
-export const login = async (body: { email: string; password: string }) =>
-  handleResponse(
+export const login = async (body: { email: string; password: string }) => {
+  const session = await handleResponse(
     await apiFetch("/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
   );
+  setCsrfToken(session.csrfToken);
+  return session;
+};
 
-export const logout = async () =>
-  handleResponse(await apiFetch("/auth/logout", { method: "POST" }));
+export const logout = async () => {
+  const result = await handleResponse(await apiFetch("/auth/logout", { method: "POST" }));
+  cachedCsrfToken = null;
+  return result;
+};
 
-export const getSession = async () => handleResponse(await apiFetch("/auth/me"));
+export const getSession = async () => {
+  const body = await handleResponse(await apiFetch("/auth/me"));
+  setCsrfToken(body.csrfToken);
+  return body;
+};
 
 export const getVehicles = async () => handleResponse(await apiFetch("/vehicles"));
 

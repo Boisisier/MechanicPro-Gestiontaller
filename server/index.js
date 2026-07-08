@@ -417,6 +417,11 @@ const ensureWritable = (req, res, next) => next();
 // Firma el JWT y lo manda por cookie httpOnly (nunca en el body JSON, para que un XSS no pueda
 // leerlo ni interceptando la respuesta del login) junto con una cookie csrf_token legible por
 // JS, que el frontend debe reenviar como header X-CSRF-Token en cada request que muta datos.
+// Devuelve el csrfToken además de setearlo como cookie: cuando la API y el frontend viven en
+// dominios distintos (ej. dos subdominios de onrender.com), el frontend no puede leer la cookie
+// csrf_token vía document.cookie —aislamiento normal entre dominios, no tiene que ver con
+// httpOnly— así que también hace falta mandarlo en el body para que el cliente lo guarde en
+// memoria y lo reenvíe como header X-CSRF-Token.
 const issueSession = (res, tokenPayload) => {
   const csrfToken = crypto.randomBytes(32).toString('hex');
   const cookieOptions = {
@@ -429,6 +434,7 @@ const issueSession = (res, tokenPayload) => {
   const token = jwt.sign(tokenPayload, jwtSecret, { expiresIn: '8h' });
   res.cookie('auth_token', token, cookieOptions);
   res.cookie('csrf_token', csrfToken, { ...cookieOptions, httpOnly: false });
+  return csrfToken;
 };
 
 const clearSession = (res) => {
@@ -739,13 +745,14 @@ app.post('/auth/demo-login', authRateLimiter, async (req, res) => {
 
     await client.query('commit');
 
-    issueSession(res, { user_id: user.id, company_id: company.id, role: 'admin' });
+    const csrfToken = issueSession(res, { user_id: user.id, company_id: company.id, role: 'admin' });
 
     res.json({
       user: { id: user.id, full_name: user.full_name, email: user.email },
       company: { id: company.id, name: company.name },
       role: 'admin',
       demo: true,
+      csrfToken,
     });
   } catch (error) {
     try {
@@ -820,12 +827,13 @@ app.post('/auth/login', authRateLimiter, async (req, res) => {
 
       await client.query('commit');
 
-      issueSession(res, { user_id: user.id, company_id: company.id, role: 'admin' });
+      const csrfToken = issueSession(res, { user_id: user.id, company_id: company.id, role: 'admin' });
 
       return res.json({
         user: { id: user.id, full_name: user.full_name, email: user.email },
         company: { id: company.id, name: company.name },
         role: 'admin',
+        csrfToken,
       });
     }
 
@@ -849,7 +857,7 @@ app.post('/auth/login', authRateLimiter, async (req, res) => {
       await client.query('commit');
 
       const user = rows[0];
-      issueSession(res, {
+      const csrfToken = issueSession(res, {
         user_id: user.id,
         company_id: user.company_id,
         role: user.role,
@@ -860,6 +868,7 @@ app.post('/auth/login', authRateLimiter, async (req, res) => {
         user: { id: user.id, full_name: user.full_name, email: user.email },
         company: { id: user.company_id, name: user.company_name },
         role: user.role,
+        csrfToken,
       });
     }
 
@@ -885,7 +894,7 @@ app.post('/auth/login', authRateLimiter, async (req, res) => {
     await client.query('commit');
 
     const workshopUser = workshopUserResult.rows[0];
-    issueSession(res, {
+    const csrfToken = issueSession(res, {
       user_id: workshopUser.id,
       company_id: workshopUser.company_id,
       role: workshopUser.role_name,
@@ -904,6 +913,7 @@ app.post('/auth/login', authRateLimiter, async (req, res) => {
         name: workshopUser.company_name,
       },
       role: workshopUser.role_name,
+      csrfToken,
     });
   } catch (error) {
     try {
@@ -948,6 +958,7 @@ app.get('/auth/me', (req, res) => {
           user: { id: row.id, full_name: row.name, email: row.email },
           company: { id: row.company_id, name: row.company_name },
           role: row.role_name,
+          csrfToken: req.cookies?.csrf_token,
         });
       })
       .catch((error) => {
@@ -975,6 +986,7 @@ app.get('/auth/me', (req, res) => {
         user: { id: row.id, full_name: row.full_name, email: row.email },
         company: { id: row.company_id, name: row.company_name },
         role: row.role,
+        csrfToken: req.cookies?.csrf_token,
       });
     })
     .catch((error) => {
