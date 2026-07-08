@@ -1,0 +1,48 @@
+# Blueprint de Render (render.com/docs/blueprint-spec). Define los dos servicios que necesita
+# la app: la API (Node/Express, tiene que estar siempre despierta para recibir webhooks de pago
+# más adelante) y el frontend (build estático de Vite).
+#
+# Las variables marcadas "sync: false" no se pueden completar acá (son secretos o dependen de
+# URLs que Render asigna recién al crear los servicios) — Render las va a pedir en el dashboard
+# al crear el Blueprint, o hay que completarlas después. Ver docs/produccion.md para el detalle
+# paso a paso.
+
+services:
+  - name: mechanicpro-gestiontaller-api
+    type: web
+    runtime: node
+    region: oregon
+    plan: starter
+    buildCommand: npm ci
+    startCommand: node server/index.js
+    healthCheckPath: /health/ready
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: DATABASE_SSL
+        value: require
+      - key: TRUST_PROXY
+        value: "true"
+      - key: ALLOW_DEMO_LOGIN
+        value: "false"
+
+  - name: mechanicpro-gestiontaller-web
+    type: web
+    runtime: static
+    region: oregon
+    plan: free
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

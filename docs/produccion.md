@@ -93,3 +93,39 @@ en staging antes de aplicarlas en producción.
 5. Desplegar API y frontend.
 6. Verificar `/health/ready`.
 7. Ejecutar una prueba de ingreso, taller, salida e inventario.
+
+## Desplegar en Render
+
+`render.yaml` en la raíz del repo define los dos servicios (API + frontend) como Blueprint —
+Render los crea juntos en un solo paso en vez de configurar cada uno a mano.
+
+1. En [dashboard.render.com](https://dashboard.render.com), **New → Blueprint**, conectar el
+   repo de GitHub (`Boisisier/MechanicPro-Gestiontaller`). Render detecta `render.yaml` solo.
+2. Al crear el Blueprint, Render pide valores para las variables marcadas `sync: false`.
+   Completar en la API (`mechanicpro-gestiontaller-api`):
+   - `DATABASE_URL`: la conexión de `app_runtime` del proyecto de Supabase (ver sección
+     Seguridad más arriba — nunca el rol `postgres`).
+   - `JWT_SECRET`: un secreto nuevo de al menos 32 caracteres, distinto del de desarrollo.
+   - `CORS_ORIGINS`: dejarlo vacío por ahora, se completa en el paso 4.
+   `VITE_API_BASE_URL` (en el servicio del frontend) también se puede dejar vacío por ahora.
+3. Esperar a que ambos servicios terminen de desplegar. Render les asigna URLs del tipo
+   `https://mechanicpro-gestiontaller-api.onrender.com` y
+   `https://mechanicpro-gestiontaller-web.onrender.com` (si esos nombres ya están tomados por
+   otra cuenta, Render ofrece una variante — anotar la URL real que quede asignada).
+4. Volver a cada servicio → **Environment** y completar lo que quedó pendiente con las URLs
+   reales del paso 3:
+   - En la API: `CORS_ORIGINS` = URL del frontend (ej.
+     `https://mechanicpro-gestiontaller-web.onrender.com`).
+   - En el frontend: `VITE_API_BASE_URL` = URL de la API (ej.
+     `https://mechanicpro-gestiontaller-api.onrender.com`). Como esta variable se usa en el
+     *build* (Vite la incrusta en el bundle, no la lee en runtime), hay que disparar un
+     **Manual Deploy** del frontend después de guardarla — si no, sigue apuntando a
+     `localhost:3001`.
+5. Aplicar las migraciones contra la base de Supabase (paso "Validación previa" más arriba,
+   con el rol `postgres`) si todavía no se hizo.
+6. Verificar `https://<api>.onrender.com/health/ready` → `{"status":"ready"}`, y probar el
+   login desde el frontend desplegado.
+
+El plan `starter` en la API evita que se "duerma" por inactividad (importante si más adelante
+hay webhooks de pago que necesitan llegar en cualquier momento); el frontend estático no se
+duerme nunca, así que el plan `free` alcanza.
