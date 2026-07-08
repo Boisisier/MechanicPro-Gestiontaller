@@ -10,6 +10,14 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
+      - name: Instalar cliente de PostgreSQL 17
+        # El runner trae pg_dump 16 por defecto; el proyecto de Supabase corre Postgres 17, y
+        # pg_dump se niega a respaldar un servidor más nuevo que él mismo.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
       - name: Respaldar PostgreSQL
         run: |
           filename="mechanicpro-$(date +%F).dump"
