@@ -1,6 +1,7 @@
-# Blueprint de Render (render.com/docs/blueprint-spec). Define los dos servicios que necesita
+# Blueprint de Render (render.com/docs/blueprint-spec). Define los tres servicios que necesita
 # la app: la API (Node/Express, tiene que estar siempre despierta para recibir webhooks de pago
-# más adelante) y el frontend (build estático de Vite).
+# más adelante), el frontend (build estático de Vite) y la landing de marketing (HTML estático,
+# sin build, vive en ./landing y no pasa por Vite — es una página aparte del dashboard).
 #
 # Las variables marcadas "sync: false" no se pueden completar acá (son secretos o dependen de
 # URLs que Render asigna recién al crear los servicios) — Render las va a pedir en el dashboard
@@ -40,3 +41,9 @@ services:
     envVars:
       - key: VITE_API_BASE_URL
         sync: false
+
+  - name: mechanicpro-landing
+    type: web
+    runtime: static
+    buildCommand: echo "sin build, HTML estático"
+    staticPublishPath: ./landing
