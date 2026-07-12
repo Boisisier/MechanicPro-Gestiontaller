@@ -41,3 +41,22 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
+
+  migrate-production:
+    name: Migrar producción
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Aplicar migraciones pendientes a producción
+        run: node scripts/migrate.mjs
+        env:
+          # Mismo secreto que ya usa el respaldo diario (rol postgres/admin, con permisos de
+          # DDL; app_runtime no los tiene a propósito). Solo corre si "validate" pasó antes.
+          DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}

@@ -33,6 +33,19 @@ propio, que aplica directo contra `DATABASE_URL` sin depender del link:
 DATABASE_URL=<conexión con permisos de DDL, ej. rol postgres> npm run migrate
 ```
 
+**Esto ya está automatizado.** El job `migrate-production` de `.github/workflows/ci.yml`
+corre `npm run migrate` contra producción en cada push a `main`, después de que el job
+`validate` (tests, lint, typecheck, build) pase — usa el mismo secreto `BACKUP_DATABASE_URL`
+que ya usa el respaldo diario (rol `postgres`/admin, con permisos de DDL). El comando manual de
+arriba solo hace falta si migrás a mano fuera de ese flujo (por ejemplo, contra una base nueva).
+
+Ojo con el orden: Render despliega el código nuevo apenas detecta el push, en paralelo a este
+job de GitHub Actions — no espera a que las migraciones terminen. En la práctica la migración
+tarda segundos y el riesgo de que el código nuevo pise una migración a medio aplicar es bajo,
+pero si algún día se vuelve un problema real, la forma de eliminarlo del todo es desactivar el
+auto-deploy de Render y disparar el deploy desde este mismo job (vía el Deploy Hook de cada
+servicio) recién después de que la migración termine.
+
 ## Salud del servicio
 
 - `/health/live`: proceso activo.
