@@ -38,6 +38,7 @@ export interface Vehicle {
   fecha_ingreso: string;
   created_at: string;
   updated_at: string;
+  public_token?: string;
 }
 
 export interface Notificacion {
@@ -219,4 +220,5 @@ export interface BudgetQuote {
   items: BudgetItem[];
   created_at: string;
   updated_at: string;
+  public_token?: string;
 }

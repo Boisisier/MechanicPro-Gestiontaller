@@ -995,6 +995,140 @@ app.get('/auth/me', (req, res) => {
     });
 });
 
+// --- Enlaces públicos (sin login): el cliente del taller ve el estado de su vehículo o
+// aprueba/rechaza un presupuesto con el link que le manda el staff. No pasan por authRequired:
+// se autentican con un token opaco en la URL, no con una sesión. Ver
+// supabase/migrations/20260712000000_add_public_tokens.sql para las columnas y policies.
+const publicLinkRateLimiter = createRateLimiter({
+  windowMs: 15 * 60_000,
+  max: 30,
+  key: (req) => `${req.ip}:${req.params.token}`,
+});
+
+// Bypass de solo lectura, acotado a una transacción (mismo patrón que enableLoginLookupBypass),
+// para resolver token -> company_id antes de conocer la empresa. Una vez resuelto se reaplica el
+// contexto real vía setTenantContext, y el resto de la operación (incluida cualquier escritura)
+// corre bajo la policy tenant_isolation normal — el bypass nunca se usa para escrituras.
+const withPublicLookup = async (table, token, handler) => {
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    await client.query("select set_config('app.public_lookup', 'on', true)");
+    const { rows } = await client.query(
+      `select id, company_id from ${table} where public_token = $1 limit 1`,
+      [token]
+    );
+    if (rows.length === 0) {
+      await client.query('rollback');
+      return null;
+    }
+    await setTenantContext(client, rows[0].company_id);
+    const result = await handler(client, rows[0].id);
+    await client.query('commit');
+    return result;
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+app.get('/public/vehicles/:token', publicLinkRateLimiter, async (req, res) => {
+  const token = normalizeUuid(req.params.token);
+  if (!token) {
+    return res.status(404).json({ error: 'not_found' });
+  }
+  try {
+    const vehicle = await withPublicLookup('vehicles', token, async (client, id) => {
+      const { rows } = await client.query(
+        `select patente, marca, modelo, ano, estado, fecha_ingreso, promised_delivery_date
+         from vehicles where id = $1`,
+        [id]
+      );
+      return rows[0] || null;
+    });
+    if (!vehicle) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+    res.json(vehicle);
+  } catch (error) {
+    console.error('GET /public/vehicles/:token failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.get('/public/budgets/:token', publicLinkRateLimiter, async (req, res) => {
+  const token = normalizeUuid(req.params.token);
+  if (!token) {
+    return res.status(404).json({ error: 'not_found' });
+  }
+  try {
+    const budget = await withPublicLookup('budget_quotes', token, async (client, id) => {
+      const { rows } = await client.query(
+        `select b.customer_name, b.patente, b.vehicle, b.issue_date, b.expiry_date,
+                b.discount_percent::float, b.tax_percent::float, b.advance_required::float,
+                b.payment_method, b.terms, b.total::float, b.status,
+                coalesce(json_agg(json_build_object(
+                  'name', bi.name, 'quantity', bi.quantity::float,
+                  'unit_price', bi.unit_price::float, 'price', bi.unit_price::float,
+                  'estimated_hours', bi.estimated_hours::float)
+                  order by bi.created_at) filter (where bi.id is not null), '[]') as items
+         from budget_quotes b
+         left join budget_quote_items bi on bi.budget_quote_id = b.id
+         where b.id = $1
+         group by b.id`,
+        [id]
+      );
+      return rows[0] || null;
+    });
+    if (!budget) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+    res.json(budget);
+  } catch (error) {
+    console.error('GET /public/budgets/:token failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.post('/public/budgets/:token/respond', publicLinkRateLimiter, async (req, res) => {
+  const token = normalizeUuid(req.params.token);
+  if (!token || typeof req.body.approved !== 'boolean') {
+    return res.status(400).json({ error: 'invalid_request' });
+  }
+  const newStatus = req.body.approved ? 'aprobado' : 'rechazado';
+  try {
+    const result = await withPublicLookup('budget_quotes', token, async (client, id) => {
+      const { rows } = await client.query(
+        `update budget_quotes
+         set status = $1, customer_responded_at = now(), updated_at = now()
+         where id = $2 and status = 'enviado'
+         returning status, customer_responded_at`,
+        [newStatus, id]
+      );
+      if (rows.length > 0) {
+        return { responded: true, ...rows[0] };
+      }
+      const { rows: current } = await client.query(
+        'select status from budget_quotes where id = $1',
+        [id]
+      );
+      return { responded: false, status: current[0]?.status || null };
+    });
+    if (!result) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+    if (!result.responded) {
+      return res.status(409).json({ error: 'already_responded', status: result.status });
+    }
+    res.json(result);
+  } catch (error) {
+    console.error('POST /public/budgets/:token/respond failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 app.get('/roles', authRequired, async (req, res) => {
   const { company_id: companyId } = req.user;
   try {

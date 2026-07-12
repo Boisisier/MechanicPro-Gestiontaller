@@ -67,4 +67,5 @@ export interface BudgetQuote {
   items: BudgetItem[];
   created_at: string;
   updated_at: string;
+  public_token?: string;
 }

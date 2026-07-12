@@ -10,6 +10,8 @@ import {
   Copy,
   Edit2,
   FileDown,
+  Link2,
+  MessageCircle,
   Plus,
   RotateCcw,
   Search,
@@ -327,6 +329,32 @@ export default function PresupuestoPage({
     }
   };
 
+  const buildPublicBudgetLink = (budget: BudgetQuote) =>
+    `${window.location.origin}/presupuesto.html?token=${budget.public_token}`;
+
+  const copyBudgetLink = async (budget: BudgetQuote) => {
+    if (!budget.public_token) {
+      onNotify("error", "Este presupuesto todavía no tiene link público.");
+      return;
+    }
+    const url = buildPublicBudgetLink(budget);
+    try {
+      await navigator.clipboard.writeText(url);
+      onNotify("success", "Link copiado al portapapeles.");
+    } catch {
+      window.prompt("Copiá el link para el cliente:", url);
+    }
+  };
+
+  const shareBudgetOnWhatsapp = (budget: BudgetQuote) => {
+    if (!budget.public_token) {
+      onNotify("error", "Este presupuesto todavía no tiene link público.");
+      return;
+    }
+    const message = `Hola ${budget.customer_name}, te comparto el presupuesto de tu vehículo: ${buildPublicBudgetLink(budget)}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+  };
+
   const annulBudget = (budget: BudgetQuote) =>
     requestConfirmation({
       title: "Anular presupuesto",
@@ -498,7 +526,7 @@ export default function PresupuestoPage({
             <table className="min-w-full divide-y divide-gray-200 text-sm">
               <thead className="bg-gray-50"><tr><th className="px-4 py-3 text-left">Cliente / vehículo</th><th className="px-4 py-3 text-left">Emisión</th><th className="px-4 py-3 text-left">Estado</th><th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Acciones</th></tr></thead>
               <tbody className="divide-y divide-gray-200">{paginatedBudgets.map((budget) => (
-                <tr key={budget.id}><td className="px-4 py-3"><p className="font-semibold">{budget.customer_name}</p><p className="text-xs text-gray-500">{budget.customer_rut || "-"} · {budget.patente || "Sin patente"} · {budget.vehicle || "Sin vehículo"}</p></td><td className="px-4 py-3">{budget.issue_date?.slice(0, 10)}</td><td className="px-4 py-3"><select value={budget.status} onChange={(event) => changeStatus(budget, event.target.value as BudgetStatus)} disabled={budget.status === "anulado" || budget.status === "convertido"} className={`rounded-full border-0 px-3 py-1 text-xs font-semibold ${statusStyles[budget.status]}`}>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></td><td className="px-4 py-3 text-right font-bold">{money(Number(budget.total) || 0)}</td><td className="px-4 py-3"><div className="flex justify-end gap-1"><button onClick={() => editBudget(budget)} className="p-2 text-[#0f4471]" title="Editar"><Edit2 className="h-4 w-4" /></button><button onClick={() => duplicateBudget(budget)} className="p-2 text-sky-600" title="Duplicar"><Copy className="h-4 w-4" /></button><button onClick={() => exportPdf(budget)} className="p-2 text-gray-600" title="PDF"><FileDown className="h-4 w-4" /></button><button onClick={() => convertBudget(budget)} className="p-2 text-green-600" title="Crear ingreso"><Send className="h-4 w-4" /></button><button onClick={() => annulBudget(budget)} className="p-2 text-[#fc3d3c]" title="Anular"><Trash2 className="h-4 w-4" /></button></div></td></tr>
+                <tr key={budget.id}><td className="px-4 py-3"><p className="font-semibold">{budget.customer_name}</p><p className="text-xs text-gray-500">{budget.customer_rut || "-"} · {budget.patente || "Sin patente"} · {budget.vehicle || "Sin vehículo"}</p></td><td className="px-4 py-3">{budget.issue_date?.slice(0, 10)}</td><td className="px-4 py-3"><select value={budget.status} onChange={(event) => changeStatus(budget, event.target.value as BudgetStatus)} disabled={budget.status === "anulado" || budget.status === "convertido"} className={`rounded-full border-0 px-3 py-1 text-xs font-semibold ${statusStyles[budget.status]}`}>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></td><td className="px-4 py-3 text-right font-bold">{money(Number(budget.total) || 0)}</td><td className="px-4 py-3"><div className="flex justify-end gap-1"><button onClick={() => editBudget(budget)} className="p-2 text-[#0f4471]" title="Editar"><Edit2 className="h-4 w-4" /></button><button onClick={() => duplicateBudget(budget)} className="p-2 text-sky-600" title="Duplicar"><Copy className="h-4 w-4" /></button><button onClick={() => exportPdf(budget)} className="p-2 text-gray-600" title="PDF"><FileDown className="h-4 w-4" /></button><button onClick={() => copyBudgetLink(budget)} className="p-2 text-gray-600" title="Copiar link para el cliente"><Link2 className="h-4 w-4" /></button><button onClick={() => shareBudgetOnWhatsapp(budget)} className="p-2 text-emerald-600" title="Enviar por WhatsApp"><MessageCircle className="h-4 w-4" /></button><button onClick={() => convertBudget(budget)} className="p-2 text-green-600" title="Crear ingreso"><Send className="h-4 w-4" /></button><button onClick={() => annulBudget(budget)} className="p-2 text-[#fc3d3c]" title="Anular"><Trash2 className="h-4 w-4" /></button></div></td></tr>
               ))}</tbody>
             </table>
             {paginatedBudgets.length === 0 && <p className="p-8 text-center text-sm text-gray-500">No hay presupuestos para los filtros seleccionados.</p>}

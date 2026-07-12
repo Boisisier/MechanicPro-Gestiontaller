@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from 'react';
 
-import { Edit2, Trash2, Search, AlertCircle, Send, FileDown } from 'lucide-react';
+import { Edit2, Trash2, Search, AlertCircle, Send, FileDown, Link2 } from 'lucide-react';
 
 import type { Vehicle } from '../../lib/types';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -72,6 +72,22 @@ export default function VehicleTable({
   const [deleteConfirm, setDeleteConfirm] = useState<Vehicle | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
+
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopyLink = async (vehicle: Vehicle) => {
+    if (!vehicle.public_token) {
+      return;
+    }
+    const url = `${window.location.origin}/seguimiento.html?token=${vehicle.public_token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedId(vehicle.id);
+      setTimeout(() => setCopiedId((current) => (current === vehicle.id ? null : current)), 2000);
+    } catch {
+      window.prompt('Copiá el link de seguimiento:', url);
+    }
+  };
 
   const getDisplayEstado = (vehicle: Vehicle) =>
     vehicle.en_estacionamiento_manual ? 'Estacionamiento' : vehicle.estado;
@@ -383,15 +399,11 @@ export default function VehicleTable({
 
                 </th>
 
-                {(showEdit || showDelete || onNotify || onExportPdf) && (
-
                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
 
                   Acciones
 
                 </th>
-
-              )}
 
               </tr>
 
@@ -469,11 +481,34 @@ export default function VehicleTable({
 
                   </td>
 
-                  {(showEdit || showDelete || onNotify || onExportPdf) && (
-
+                  {(
                     <td className="px-6 py-4">
 
                       <div className="flex items-center justify-center gap-2">
+
+                        {vehicle.public_token && (
+
+                          <button
+
+                            onClick={() => handleCopyLink(vehicle)}
+
+                            className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+
+                            title="Copiar link de seguimiento"
+
+                          >
+
+                            {copiedId === vehicle.id ? (
+                              <span className="text-xs font-semibold text-green-600 px-1">
+                                Copiado
+                              </span>
+                            ) : (
+                              <Link2 className="w-4 h-4" />
+                            )}
+
+                          </button>
+
+                        )}
 
                         {showEdit && onEdit && (
 

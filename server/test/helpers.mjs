@@ -85,7 +85,7 @@ export const createTestVehicle = async (pool, companyId, overrides = {}) => {
         (company_id, customer_name, customer_rut, customer_phone, customer_address,
          customer_city, patente, marca, modelo, ano, tipo_vehiculo, estado)
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-       returning id, patente, company_id`,
+       returning id, patente, company_id, public_token`,
       [
         companyId,
         overrides.customer_name || 'Cliente de prueba',
@@ -102,6 +102,44 @@ export const createTestVehicle = async (pool, companyId, overrides = {}) => {
       ],
     );
     return rows[0];
+  } finally {
+    client.release();
+  }
+};
+
+export const createTestBudget = async (pool, companyId, overrides = {}) => {
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    await client.query('select set_config($1, $2, false)', [
+      'app.current_company_id',
+      companyId,
+    ]);
+    const { rows } = await client.query(
+      `insert into budget_quotes (company_id, customer_name, customer_phone, patente, vehicle, status, total)
+       values ($1, $2, $3, $4, $5, $6, $7)
+       returning id, company_id, status, public_token`,
+      [
+        companyId,
+        overrides.customer_name || 'Cliente de prueba',
+        overrides.customer_phone || '+56911111111',
+        overrides.patente || randomPatente(),
+        overrides.vehicle || 'Toyota Yaris',
+        overrides.status || 'enviado',
+        overrides.total ?? 50000,
+      ],
+    );
+    const budget = rows[0];
+    await client.query(
+      `insert into budget_quote_items (budget_quote_id, item_type, name, quantity, unit_price, price)
+       values ($1, 'servicio', $2, 1, $3, $3)`,
+      [budget.id, 'Cambio de aceite', overrides.total ?? 50000],
+    );
+    await client.query('commit');
+    return budget;
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
   } finally {
     client.release();
   }

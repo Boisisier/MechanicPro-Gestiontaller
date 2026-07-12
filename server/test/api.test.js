@@ -21,15 +21,16 @@ if (!TEST_DATABASE_URL) {
   process.env.ALLOW_DEMO_LOGIN = 'false';
 
   const { app, pool, ensureSchemaReady } = await import('../index.js');
-  const { createTestCompany, createTestVehicle, cleanupTestCompany } = await import(
-    './helpers.mjs'
-  );
+  const { createTestCompany, createTestVehicle, createTestBudget, cleanupTestCompany } =
+    await import('./helpers.mjs');
 
   let server;
   let baseUrl;
   let companyA;
   let companyB;
   let vehicleA;
+  let vehicleB;
+  let budgetA;
 
   const login = (email, password) =>
     fetch(`${baseUrl}/auth/login`, {
@@ -87,6 +88,8 @@ if (!TEST_DATABASE_URL) {
     companyA = await createTestCompany(pool, `Test A ${Date.now()}`);
     companyB = await createTestCompany(pool, `Test B ${Date.now()}`);
     vehicleA = await createTestVehicle(pool, companyA.companyId);
+    vehicleB = await createTestVehicle(pool, companyB.companyId);
+    budgetA = await createTestBudget(pool, companyA.companyId);
   });
 
   after(async () => {
@@ -194,5 +197,58 @@ if (!TEST_DATABASE_URL) {
     assert.equal(res.status, 200);
     const setCookie = typeof res.headers.getSetCookie === 'function' ? res.headers.getSetCookie() : [];
     assert.ok(setCookie.some((c) => c.startsWith('auth_token=;') || c.includes('auth_token=;')));
+  });
+
+  test('GET /public/vehicles/:token funciona sin cookie de sesión y devuelve la empresa correcta', async () => {
+    const resA = await fetch(`${baseUrl}/public/vehicles/${vehicleA.public_token}`);
+    assert.equal(resA.status, 200);
+    const bodyA = await resA.json();
+    assert.equal(bodyA.patente, vehicleA.patente);
+
+    const resB = await fetch(`${baseUrl}/public/vehicles/${vehicleB.public_token}`);
+    assert.equal(resB.status, 200);
+    const bodyB = await resB.json();
+    assert.equal(bodyB.patente, vehicleB.patente);
+    assert.notEqual(bodyB.patente, bodyA.patente);
+  });
+
+  test('GET /public/vehicles/:token con un token inexistente devuelve 404', async () => {
+    const res = await fetch(`${baseUrl}/public/vehicles/00000000-0000-4000-8000-000000000000`);
+    assert.equal(res.status, 404);
+  });
+
+  test('GET /public/budgets/:token funciona sin cookie y trae los ítems', async () => {
+    const res = await fetch(`${baseUrl}/public/budgets/${budgetA.public_token}`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.status, 'enviado');
+    assert.equal(body.items.length, 1);
+    assert.equal(body.items[0].name, 'Cambio de aceite');
+  });
+
+  test('POST /public/budgets/:token/respond aprueba el presupuesto y bloquea una segunda respuesta', async () => {
+    const res = await fetch(`${baseUrl}/public/budgets/${budgetA.public_token}/respond`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approved: true }),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.status, 'aprobado');
+    assert.ok(body.customer_responded_at);
+
+    const second = await fetch(`${baseUrl}/public/budgets/${budgetA.public_token}/respond`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approved: false }),
+    });
+    assert.equal(second.status, 409);
+    const secondBody = await second.json();
+    assert.equal(secondBody.status, 'aprobado', 'el segundo intento no debe cambiar el estado');
+
+    const sessionA = await sessionFor(companyA.adminEmail, companyA.adminPassword);
+    const stored = await (await authedFetch(sessionA, '/budgets')).json();
+    const stillAprobado = stored.find((b) => b.id === budgetA.id);
+    assert.equal(stillAprobado.status, 'aprobado');
   });
 }
