@@ -172,13 +172,15 @@
   .btn-outline:hover { border-color: var(--brand-blue); color: var(--brand-blue); }
 
   /* ---------- nav ---------- */
+  /* El header queda siempre blanco, sin importar el tema del sistema: el logo tiene líneas
+     oscuras sin halo y se pierde contra un fondo oscuro. */
   header.site {
     position: sticky;
     top: 0;
     z-index: 40;
-    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    background: rgba(255, 255, 255, .92);
     backdrop-filter: blur(10px);
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid #e4e7ec;
   }
   .nav-row {
     display: flex;
@@ -200,15 +202,13 @@
     color: var(--brand-blue);
     letter-spacing: -0.01em;
   }
-  :root[data-theme="dark"] .brand span { color: #ffffff; }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .brand span { color: #ffffff; } }
 
   nav.links { display: flex; gap: 32px; }
   nav.links a {
     text-decoration: none;
     font-weight: 600;
     font-size: 15px;
-    color: var(--muted);
+    color: #4b5768;
     transition: color .15s ease;
   }
   nav.links a:hover { color: var(--brand-blue); }
@@ -721,7 +721,7 @@
           <a class="btn btn-primary" href="#contacto">Solicitar una demo</a>
           <a class="btn btn-ghost" href="#funciones">Ver funciones</a>
         </div>
-        <p class="hero-note">Sin instalaciones. Andá a la web desde cualquier navegador, en el taller o desde el celular.</p>
+        <p class="hero-note">Sin instalaciones. Entra a la web desde cualquier navegador, en el taller o desde el celular.</p>
       </div>
 
       <div class="mock" aria-hidden="true">
@@ -850,28 +850,28 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2"/><circle cx="6.5" cy="16.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg>
           </div>
           <h3>Control de vehículos</h3>
-          <p>Seguí cada vehículo desde que entra hasta que sale, con estado, prioridad y tiempo estimado siempre a la vista.</p>
+          <p>Sigue cada vehículo desde que entra hasta que sale, con estado, prioridad y tiempo estimado siempre a la vista.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 11h6"/></svg>
           </div>
           <h3>Presupuestos y cotizaciones</h3>
-          <p>Arma presupuestos, hacé seguimiento de su aprobación y convertilos en trabajo real sin perder el hilo.</p>
+          <p>Arma presupuestos, haz seguimiento de su aprobación y conviértelos en trabajo real sin perder el hilo.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/></svg>
           </div>
           <h3>Inventario y stock</h3>
-          <p>Stock, movimientos, proveedores y órdenes de compra en un solo lugar — sabé qué tenés y qué falta.</p>
+          <p>Stock, movimientos, proveedores y órdenes de compra en un solo lugar — sabe qué tienes y qué falta.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2"/><path d="M17 21v-6h4M13 21l4-6h4"/></svg>
           </div>
           <h3>Estacionamiento y entregas</h3>
-          <p>Controlá qué vehículos están listos para retiro y liberá la salida sin confusiones de última hora.</p>
+          <p>Controla qué vehículos están listos para retiro y libera la salida sin confusiones de última hora.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">
@@ -935,8 +935,8 @@
     <div class="wrap">
       <div class="section-head">
         <p class="eyebrow">Cómo funciona</p>
-        <h2>Empezar a usarlo es más simple de lo que pensás</h2>
-        <p>No hay autoservicio todavía — y eso significa que armamos tu sistema con vos, a mano, para que arranque bien desde el primer día.</p>
+        <h2>Empezar a usarlo es más simple de lo que piensas</h2>
+        <p>No hay autoservicio todavía — y eso significa que armamos tu sistema contigo, a mano, para que arranque bien desde el primer día.</p>
       </div>
       <div class="steps-row">
         <div class="step">
@@ -1031,7 +1031,7 @@
       <div class="faq-list">
         <details>
           <summary>¿Necesito instalar algo?<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary>
-          <p>No. MechanicPro es 100% web: entrás desde el navegador con tu usuario y contraseña, sin descargar ni instalar nada en ningún equipo.</p>
+          <p>No. MechanicPro es 100% web: entras desde el navegador con tu usuario y contraseña, sin descargar ni instalar nada en ningún equipo.</p>
         </details>
         <details>
           <summary>¿Mis datos están separados de otros talleres?<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary>
@@ -1047,7 +1047,7 @@
         </details>
         <details>
           <summary>¿Cómo empiezo?<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary>
-          <p>Escribinos, coordinamos una demo y conversamos qué necesita tu taller en particular. Hoy la puesta en marcha la hacemos nosotros a mano, para asegurarnos de que arranque bien.</p>
+          <p>Escríbenos, coordinamos una demo y conversamos qué necesita tu taller en particular. Hoy la puesta en marcha la hacemos nosotros a mano, para asegurarnos de que arranque bien.</p>
         </details>
       </div>
     </div>
@@ -1056,9 +1056,9 @@
   <section class="final-cta" id="contacto">
     <div class="wrap">
       <h2>¿Listo para ordenar tu taller?</h2>
-      <p>Contanos cómo trabaja tu taller hoy y te mostramos cómo se vería con MechanicPro.</p>
+      <p>Cuéntanos cómo trabaja tu taller hoy y te mostramos cómo se vería con MechanicPro.</p>
       <div class="hero-actions">
-        <a class="btn btn-primary" href="mailto:contacto@mechanicpro.cl">Escribir a contacto@mechanicpro.cl</a>
+        <a class="btn btn-primary" href="mailto:mechanicpro.contacto@gmail.com">Escribir a mechanicpro.contacto@gmail.com</a>
       </div>
     </div>
   </section>
@@ -1083,7 +1083,7 @@
         </div>
         <div class="footer-col">
           <span class="footer-col-title">Contacto</span>
-          <a href="mailto:contacto@mechanicpro.cl">contacto@mechanicpro.cl</a>
+          <a href="mailto:mechanicpro.contacto@gmail.com">mechanicpro.contacto@gmail.com</a>
           <a href="#preguntas">Preguntas frecuentes</a>
         </div>
       </div>
