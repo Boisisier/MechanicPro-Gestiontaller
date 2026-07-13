@@ -224,8 +224,8 @@ function App() {
   const [loginLoading, setLoginLoading] = useState(false);
 
   const [loginForm, setLoginForm] = useState({
-    email: "demo@local",
-    password: "demo1234",
+    email: import.meta.env.DEV ? "demo@local" : "",
+    password: import.meta.env.DEV ? "demo1234" : "",
   });
 
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -2034,20 +2034,24 @@ function App() {
             </button>
           </form>
 
-          <button
-            type="button"
-            onClick={handleDemoLogin}
-            disabled={demoLoading}
-            className="mt-3 w-full rounded-lg border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-          >
-            {demoLoading ? "Preparando acceso..." : "Entrar con demo"}
-          </button>
+          {import.meta.env.DEV && (
+            <>
+              <button
+                type="button"
+                onClick={handleDemoLogin}
+                disabled={demoLoading}
+                className="mt-3 w-full rounded-lg border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                {demoLoading ? "Preparando acceso..." : "Entrar con demo"}
+              </button>
 
-          <div className="mt-5 rounded-lg bg-gray-50 px-4 py-3 text-xs text-gray-600">
-            <p className="font-semibold text-gray-800">Acceso administrador</p>
-            <p>Usuario: demo@local</p>
-            <p>Contraseña: demo1234</p>
-          </div>
+              <div className="mt-5 rounded-lg bg-gray-50 px-4 py-3 text-xs text-gray-600">
+                <p className="font-semibold text-gray-800">Acceso administrador</p>
+                <p>Usuario: demo@local</p>
+                <p>Contraseña: demo1234</p>
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
