@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, follow" />
+<title>Política de Privacidad — MechanicPro</title>
+<style>
+  :root {
+    --brand-blue: #0f4471;
+    --brand-blue-dark: #0b365c;
+    --brand-red: #fc3d3c;
+    --ink: #101828;
+    --muted: #4b5768;
+    --paper: #f6f7fb;
+    --surface: #ffffff;
+    --border: #e4e7ec;
+    --accent-soft: #e7f0f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", ui-sans-serif, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  header.site {
+    background: rgba(255,255,255,.95);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 0;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 800; font-size: 19px; color: var(--brand-blue); }
+  main.wrap { padding: 48px 24px 90px; }
+  .doc-eyebrow {
+    font-size: 12.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--brand-red); margin: 0 0 10px;
+  }
+  h1 { font-size: 32px; font-weight: 800; margin: 0 0 8px; letter-spacing: -0.01em; }
+  .updated { color: var(--muted); font-size: 14px; margin: 0 0 40px; }
+  .notice {
+    background: var(--accent-soft); border: 1px solid #c7dbea; border-radius: 10px;
+    padding: 16px 20px; font-size: 14px; color: var(--ink); margin-bottom: 40px;
+  }
+  .notice strong { color: var(--brand-blue); }
+  h2 {
+    font-size: 20px; font-weight: 800; color: var(--brand-blue); margin: 40px 0 12px;
+    padding-top: 12px; border-top: 1px solid var(--border);
+  }
+  h2:first-of-type { border-top: none; padding-top: 0; }
+  p { margin: 0 0 14px; font-size: 15.5px; color: var(--ink); }
+  ul { margin: 0 0 14px; padding-left: 22px; }
+  li { font-size: 15.5px; margin-bottom: 6px; }
+  strong { color: var(--ink); }
+  a { color: var(--brand-blue); }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 14.5px; }
+  th, td { text-align: left; padding: 10px 12px; border: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface); font-weight: 700; }
+  footer.site { border-top: 1px solid var(--border); padding: 28px 0; }
+  footer.site .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; font-size: 13.5px; color: var(--muted); }
+  footer.site a { color: var(--muted); text-decoration: none; }
+  footer.site a:hover { color: var(--brand-blue); }
+
+  @media (prefers-color-scheme: dark) {
+    :root { --ink: #eef1f6; --muted: #9aa7ba; --paper: #10161d; --surface: #182230; --border: #2a3644; --accent-soft: #16283b; }
+    header.site, footer.site { background: rgba(16,22,29,.95); }
+  }
+</style>
+</head>
+<body>
+  <header class="site">
+    <div class="wrap">
+      <a class="brand" href="/">MechanicPro</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <p class="doc-eyebrow">Legal</p>
+    <h1>Política de Privacidad</h1>
+    <p class="updated">Última actualización: 13 de julio de 2026</p>
+
+    <div class="notice">
+      <strong>Nota:</strong> este documento describe en lenguaje simple qué datos personales trata
+      MechanicPro y qué hacemos con ellos. Está preparado en el contexto de la Ley N° 21.719 de
+      Protección de Datos Personales de Chile.
+    </div>
+
+    <h2>1. Quiénes somos</h2>
+    <p>
+      MechanicPro es un software de gestión para talleres mecánicos. Cuando un taller contrata
+      MechanicPro, esa relación se rige por dos roles distintos según de quién sean los datos:
+    </p>
+    <ul>
+      <li>
+        <strong>Sobre los datos de las personas que usan el sistema en el taller</strong>
+        (administradores, mecánicos, personal administrativo): MechanicPro es el
+        <strong>responsable del tratamiento</strong>.
+      </li>
+      <li>
+        <strong>Sobre los datos de los clientes del taller</strong> (el dueño de cada vehículo
+        que ingresa al taller: nombre, RUT, teléfono, dirección): el <strong>responsable del
+        tratamiento es el taller</strong>, y MechanicPro actúa como
+        <strong>encargado del tratamiento</strong> — procesamos esos datos únicamente para
+        prestarle el servicio al taller, siguiendo sus instrucciones.
+      </li>
+    </ul>
+
+    <h2>2. Qué datos recopilamos</h2>
+    <table>
+      <tr><th>Categoría</th><th>Datos</th><th>De quién</th></tr>
+      <tr>
+        <td>Cuenta y acceso</td>
+        <td>Nombre, RUT, email, contraseña (encriptada), rol dentro del taller</td>
+        <td>Personal del taller que usa el sistema</td>
+      </tr>
+      <tr>
+        <td>Vehículos y clientes del taller</td>
+        <td>Nombre, RUT, teléfono, email, dirección del cliente; patente, marca, modelo del vehículo</td>
+        <td>Clientes del taller (cargados por el taller)</td>
+      </tr>
+      <tr>
+        <td>Presupuestos</td>
+        <td>Datos de contacto del cliente, servicios cotizados, montos</td>
+        <td>Clientes del taller</td>
+      </tr>
+      <tr>
+        <td>Uso técnico</td>
+        <td>Dirección IP, fecha y hora de acceso, registro de acciones dentro del sistema</td>
+        <td>Todas las personas que usan el sistema</td>
+      </tr>
+    </table>
+    <p>No solicitamos ni tratamos categorías especiales de datos (salud, biométricos, origen
+      étnico, afiliación sindical, orientación sexual, antecedentes penales) como parte del
+      funcionamiento normal del servicio.</p>
+
+    <h2>3. Para qué usamos estos datos</h2>
+    <ul>
+      <li>Prestar el servicio: gestionar vehículos, presupuestos, inventario y usuarios del taller.</li>
+      <li>Autenticar a las personas que usan el sistema y proteger sus cuentas.</li>
+      <li>Permitir que el cliente de un taller consulte el estado de su vehículo o apruebe un
+        presupuesto mediante un link con token, sin necesidad de crear una cuenta.</li>
+      <li>Generar respaldos diarios para evitar pérdida de información.</li>
+      <li>Cumplir obligaciones legales, incluidas las que impone la Ley N° 21.719.</li>
+    </ul>
+    <p>No usamos estos datos con fines de publicidad ni los vendemos ni los compartimos con
+      terceros para fines de marketing.</p>
+
+    <h2>4. Con quién compartimos los datos</h2>
+    <p>Usamos proveedores de infraestructura para operar el servicio. Cada uno actúa como
+      encargado de tratamiento bajo nuestras instrucciones:</p>
+    <table>
+      <tr><th>Proveedor</th><th>Función</th><th>Ubicación de los datos</th></tr>
+      <tr><td>Supabase (Postgres)</td><td>Base de datos</td><td>Oregon, Estados Unidos</td></tr>
+      <tr><td>Render</td><td>Hosting de la aplicación y la API</td><td>Estados Unidos</td></tr>
+      <tr><td>GitHub</td><td>Respaldo automático de la base de datos</td><td>Estados Unidos</td></tr>
+    </table>
+    <p>
+      Como algunos de estos proveedores almacenan datos fuera de Chile, esto constituye una
+      <strong>transferencia internacional de datos</strong>. Solo trabajamos con proveedores que
+      ofrecen garantías de seguridad estándar de la industria (cifrado en tránsito y en reposo,
+      controles de acceso).
+    </p>
+
+    <h2>5. Cuánto tiempo conservamos los datos</h2>
+    <p>
+      Mientras el taller mantenga una cuenta activa. Si un taller da de baja el servicio, sus
+      datos y los de sus clientes se eliminan de la base de datos activa; los respaldos diarios
+      se conservan hasta 90 días y luego se eliminan automáticamente.
+    </p>
+
+    <h2>6. Cómo protegemos los datos</h2>
+    <ul>
+      <li><strong>Aislamiento por taller:</strong> cada taller tiene sus datos completamente
+        separados de los de cualquier otro, forzado a nivel de base de datos (Row Level
+        Security en Postgres), no solo por lógica de la aplicación.</li>
+      <li><strong>Cifrado:</strong> todo el tráfico viaja por HTTPS. Las contraseñas se guardan
+        encriptadas, nunca en texto plano.</li>
+      <li><strong>Sesión protegida:</strong> el inicio de sesión usa una cookie que JavaScript no
+        puede leer (httpOnly), con protección contra los ataques web más comunes (CSRF).</li>
+      <li><strong>Respaldos diarios</strong> automáticos, con acceso restringido.</li>
+    </ul>
+
+    <h2>7. Tus derechos (Derechos ARCO)</h2>
+    <p>Cualquier persona cuyos datos tratamos puede solicitar:</p>
+    <ul>
+      <li><strong>Acceso:</strong> saber qué datos suyos tenemos.</li>
+      <li><strong>Rectificación:</strong> corregir datos incorrectos o desactualizados.</li>
+      <li><strong>Cancelación:</strong> pedir que eliminemos sus datos, cuando corresponda.</li>
+      <li><strong>Oposición:</strong> oponerse a un uso específico de sus datos.</li>
+    </ul>
+    <p>
+      Para ejercer estos derechos, escribí a
+      <a href="mailto:mechanicpro.contacto@gmail.com">mechanicpro.contacto@gmail.com</a>.
+      Si tu solicitud es sobre datos que un taller cargó sobre vos como su cliente (por ejemplo,
+      los datos de tu vehículo), también podés dirigirte directamente a ese taller, que es el
+      responsable de esos datos.
+    </p>
+
+    <h2>8. Notificación de brechas de seguridad</h2>
+    <p>
+      Si ocurriera un incidente de seguridad que afecte datos personales, lo notificaremos a la
+      Agencia de Protección de Datos Personales dentro de las 72 horas de tomar conocimiento, y
+      a las personas afectadas sin dilación indebida cuando exista un riesgo alto para sus
+      derechos.
+    </p>
+
+    <h2>9. Cookies</h2>
+    <p>
+      MechanicPro usa únicamente cookies técnicas necesarias para el funcionamiento del sistema
+      (mantener la sesión iniciada y proteger los formularios contra ataques). No usamos cookies
+      de publicidad, seguimiento ni analítica de terceros.
+    </p>
+
+    <h2>10. Cambios a esta política</h2>
+    <p>
+      Podemos actualizar este documento para reflejar cambios en el servicio o en la normativa
+      vigente. La fecha de la última actualización siempre figura arriba.
+    </p>
+
+    <h2>11. Contacto</h2>
+    <p>
+      Ante cualquier duda sobre esta política o sobre cómo tratamos tus datos, escribinos a
+      <a href="mailto:mechanicpro.contacto@gmail.com">mechanicpro.contacto@gmail.com</a>.
+    </p>
+  </main>
+
+  <footer class="site">
+    <div class="wrap">
+      <span>© 2026 MechanicPro.</span>
+      <a href="/">Volver al inicio</a>
+    </div>
+  </footer>
+</body>
+</html>
