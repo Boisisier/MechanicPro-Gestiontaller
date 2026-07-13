@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="description" content="MechanicPro: software de gestión para talleres mecánicos en Chile. Vehículos, presupuestos, inventario y tu equipo en un solo sistema." />
 <title>MechanicPro — Software de gestión para talleres mecánicos</title>
+<script>document.documentElement.classList.add('js');</script>
 <style>
   @font-face {
     font-family: 'Poppins';
@@ -656,6 +657,72 @@
 
   ::selection { background: var(--brand-red); color: #fff; }
 
+  /* ---------- animaciones al hacer scroll ---------- */
+  /* Progressive enhancement: sin JS (o con prefers-reduced-motion) el contenido se ve normal
+     desde el principio — el fade solo se activa si document.documentElement tiene la clase
+     "js" (agregada por un script mínimo al cargar) y el visitante no pidió menos movimiento. */
+  .js [data-reveal] {
+    opacity: 0;
+    transform: translateY(22px);
+    transition: opacity .7s cubic-bezier(.16,.84,.44,1), transform .7s cubic-bezier(.16,.84,.44,1);
+  }
+  .js [data-reveal].in-view { opacity: 1; transform: none; }
+
+  /* ---------- hover: tarjetas y filas ---------- */
+  .feature-card, .diff-card, .step, .price-card, .pain-item, details {
+    transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+  }
+  .feature-card:hover, .step:hover {
+    transform: translateY(-6px);
+    border-color: var(--accent-light);
+    box-shadow: 0 16px 32px rgba(0,0,0,.35);
+  }
+  .diff-card:hover .diff-icon { transform: scale(1.08); background: rgba(127,178,229,.28); }
+  .diff-icon { transition: transform .25s ease, background-color .25s ease; }
+  .pain-item:hover { transform: translateX(4px); border-color: rgba(252,61,60,.4); }
+  .price-card:not(.featured):hover { transform: translateY(-6px); border-color: var(--accent-light); }
+  .price-card.featured:hover { transform: translateY(-16px); }
+  details:hover { border-color: var(--accent-light); }
+
+  /* subrayado que se desliza en los links de la nav */
+  nav.links a { position: relative; }
+  nav.links a::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 100%; bottom: -4px;
+    height: 2px;
+    background: var(--brand-blue);
+    transition: right .2s ease;
+  }
+  nav.links a:hover::after { right: 0; }
+
+  /* flecha que aparece en hover dentro de los botones principales */
+  .btn-arrow {
+    display: inline-block;
+    max-width: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-width .25s ease, opacity .2s ease, margin-left .25s ease;
+  }
+  .btn:hover .btn-arrow { max-width: 20px; opacity: 1; margin-left: 2px; }
+
+  /* pulso suave en el botón de la nav para llamar la atención sin ser invasivo */
+  .nav-cta .btn-primary { position: relative; }
+  .nav-cta .btn-primary::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    animation: pulse-ring 2.6s ease-out infinite;
+    pointer-events: none;
+  }
+  .nav-cta .btn-primary:hover::before { animation-play-state: paused; }
+  @keyframes pulse-ring {
+    0% { box-shadow: 0 0 0 0 rgba(15,68,113,.55); }
+    70% { box-shadow: 0 0 0 12px rgba(15,68,113,0); }
+    100% { box-shadow: 0 0 0 0 rgba(15,68,113,0); }
+  }
+
 </style>
 </head>
 <body>
@@ -674,7 +741,7 @@
       <a href="#preguntas">Preguntas</a>
     </nav>
     <div class="nav-cta">
-      <a class="btn btn-primary" href="#contacto">Solicitar demo</a>
+      <a class="btn btn-primary" href="#contacto">Solicitar demo<span class="btn-arrow">→</span></a>
     </div>
   </div>
 </header>
@@ -690,7 +757,7 @@
           solo sistema — pensado para cómo trabaja de verdad un taller en Chile.
         </p>
         <div class="hero-actions">
-          <a class="btn btn-primary" href="#contacto">Solicitar una demo</a>
+          <a class="btn btn-primary" href="#contacto">Solicitar una demo<span class="btn-arrow">→</span></a>
           <a class="btn btn-ghost" href="#funciones">Ver funciones</a>
         </div>
         <p class="hero-note">Sin instalaciones. Entra a la web desde cualquier navegador, en el taller o desde el celular.</p>
@@ -778,19 +845,19 @@
           <p class="eyebrow">El problema</p>
           <h2 style="font-size:34px;margin-top:10px">¿Te suena familiar?</h2>
           <div class="pain-list" style="margin-top:24px">
-            <div class="pain-item">
+            <div class="pain-item" data-reveal>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               <p>Presupuestos que se aprueban por WhatsApp y se pierden entre conversaciones.</p>
             </div>
-            <div class="pain-item">
+            <div class="pain-item" data-reveal>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               <p>Nadie sabe con certeza qué repuestos quedan en bodega hasta que falta uno.</p>
             </div>
-            <div class="pain-item">
+            <div class="pain-item" data-reveal>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               <p>Un vehículo puede pasar días "perdido" entre que entra y que alguien lo toma.</p>
             </div>
-            <div class="pain-item">
+            <div class="pain-item" data-reveal>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               <p>Cada persona del equipo ve y toca todo, aunque no le corresponda.</p>
             </div>
@@ -817,42 +884,42 @@
         <p>Sin módulos sueltos ni integraciones raras: un sistema completo, listo desde el primer día.</p>
       </div>
       <div class="features-grid">
-        <div class="feature-card">
+        <div class="feature-card" data-reveal>
           <div class="feature-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2"/><circle cx="6.5" cy="16.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg>
           </div>
           <h3>Control de vehículos</h3>
           <p>Sigue cada vehículo desde que entra hasta que sale, con estado, prioridad y tiempo estimado siempre a la vista.</p>
         </div>
-        <div class="feature-card">
+        <div class="feature-card" data-reveal>
           <div class="feature-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 11h6"/></svg>
           </div>
           <h3>Presupuestos y cotizaciones</h3>
           <p>Arma presupuestos, haz seguimiento de su aprobación y conviértelos en trabajo real sin perder el hilo.</p>
         </div>
-        <div class="feature-card">
+        <div class="feature-card" data-reveal>
           <div class="feature-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/></svg>
           </div>
           <h3>Inventario y stock</h3>
           <p>Stock, movimientos, proveedores y órdenes de compra en un solo lugar — sabe qué tienes y qué falta.</p>
         </div>
-        <div class="feature-card">
+        <div class="feature-card" data-reveal>
           <div class="feature-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2"/><path d="M17 21v-6h4M13 21l4-6h4"/></svg>
           </div>
           <h3>Estacionamiento y entregas</h3>
           <p>Controla qué vehículos están listos para retiro y libera la salida sin confusiones de última hora.</p>
         </div>
-        <div class="feature-card">
+        <div class="feature-card" data-reveal>
           <div class="feature-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </div>
           <h3>Roles y permisos</h3>
           <p>Cada persona del equipo ve solo lo que le corresponde: administración, mecánica o control total.</p>
         </div>
-        <div class="feature-card">
+        <div class="feature-card" data-reveal>
           <div class="feature-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18.7 8 13 13.7l-3-3L5 16.3"/></svg>
           </div>
@@ -871,28 +938,28 @@
         <p>No es solo una planilla en la nube. Es infraestructura pensada para un negocio que no se puede dar el lujo de perder información.</p>
       </div>
       <div class="diff-grid">
-        <div class="diff-card">
+        <div class="diff-card" data-reveal>
           <div class="diff-icon">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           </div>
           <h3>Tus datos, solo tuyos</h3>
           <p>La información de tu taller está completamente aislada de la de cualquier otro cliente de la plataforma, a nivel de base de datos.</p>
         </div>
-        <div class="diff-card">
+        <div class="diff-card" data-reveal>
           <div class="diff-icon">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3.5-7.1"/><path d="M21 3v6h-6"/></svg>
           </div>
           <h3>Respaldo todos los días</h3>
           <p>Copias de seguridad automáticas de tu información, sin que tengas que acordarte de nada.</p>
         </div>
-        <div class="diff-card">
+        <div class="diff-card" data-reveal>
           <div class="diff-icon">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/><path d="M12 15v2"/></svg>
           </div>
           <h3>Sesión protegida</h3>
           <p>Acceso con contraseña y protección contra los ataques web más comunes, de fábrica.</p>
         </div>
-        <div class="diff-card">
+        <div class="diff-card" data-reveal>
           <div class="diff-icon">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
           </div>
@@ -911,17 +978,17 @@
         <p>No hay autoservicio todavía — y eso significa que armamos tu sistema contigo, a mano, para que arranque bien desde el primer día.</p>
       </div>
       <div class="steps-row">
-        <div class="step">
+        <div class="step" data-reveal>
           <div class="step-num">01</div>
           <h3>Agendas una demo</h3>
           <p>Te mostramos el sistema funcionando con casos reales de un taller como el tuyo.</p>
         </div>
-        <div class="step">
+        <div class="step" data-reveal>
           <div class="step-num">02</div>
           <h3>Configuramos tu taller</h3>
           <p>Cargamos tus servicios, roles y usuarios. Empiezas a usarlo con tus datos, no con datos de prueba.</p>
         </div>
-        <div class="step">
+        <div class="step" data-reveal>
           <div class="step-num">03</div>
           <h3>Tu equipo empieza a trabajar</h3>
           <p>Sin curvas de aprendizaje eternas: el mismo día tu equipo ya está cargando vehículos.</p>
@@ -939,7 +1006,7 @@
       </div>
 
       <div class="pricing-grid">
-        <div class="price-card">
+        <div class="price-card" data-reveal>
           <h3>Taller</h3>
           <p class="price-sub">Para talleres chicos, hasta 3 usuarios</p>
           <div class="price-amount">$27.990 <span class="per">/mes</span></div>
@@ -956,7 +1023,7 @@
           <a class="btn btn-primary" href="#contacto">Elegir plan Taller</a>
         </div>
 
-        <div class="price-card featured">
+        <div class="price-card featured" data-reveal>
           <span class="price-tag">Más elegido</span>
           <h3>Taller Pro</h3>
           <p class="price-sub">Para talleres con más de un mecánico</p>
@@ -974,7 +1041,7 @@
           <a class="btn btn-primary" href="#contacto">Elegir plan Taller Pro</a>
         </div>
 
-        <div class="price-card">
+        <div class="price-card" data-reveal>
           <h3>Cadena</h3>
           <p class="price-sub">Para más de un taller o sucursal</p>
           <div class="price-amount" style="font-size:30px">A cotizar</div>
@@ -1001,23 +1068,23 @@
         <h2>Lo que más nos preguntan</h2>
       </div>
       <div class="faq-list">
-        <details>
+        <details data-reveal>
           <summary>¿Necesito instalar algo?<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary>
           <p>No. MechanicPro es 100% web: entras desde el navegador con tu usuario y contraseña, sin descargar ni instalar nada en ningún equipo.</p>
         </details>
-        <details>
+        <details data-reveal>
           <summary>¿Mis datos están separados de otros talleres?<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary>
           <p>Sí. Cada taller tiene su información completamente aislada a nivel de base de datos — no es solo un filtro en la pantalla, es una barrera real que impide que un taller vea datos de otro.</p>
         </details>
-        <details>
+        <details data-reveal>
           <summary>¿Puedo tener varios usuarios de mi equipo?<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary>
           <p>Sí. Puedes crear los usuarios que necesites y asignarle a cada uno el rol que le corresponde: administración, mecánica o acceso total.</p>
         </details>
-        <details>
+        <details data-reveal>
           <summary>¿Qué pasa si necesito ayuda?<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary>
           <p>Nos contactas directamente a nosotros — sin mesas de ayuda ni tickets que se pierden.</p>
         </details>
-        <details>
+        <details data-reveal>
           <summary>¿Cómo empiezo?<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary>
           <p>Escríbenos, coordinamos una demo y conversamos qué necesita tu taller en particular. Hoy la puesta en marcha la hacemos nosotros a mano, para asegurarnos de que arranque bien.</p>
         </details>
@@ -1030,7 +1097,7 @@
       <h2>¿Listo para ordenar tu taller?</h2>
       <p>Cuéntanos cómo trabaja tu taller hoy y te mostramos cómo se vería con MechanicPro.</p>
       <div class="hero-actions">
-        <a class="btn btn-primary" href="mailto:mechanicpro.contacto@gmail.com">Escribir a mechanicpro.contacto@gmail.com</a>
+        <a class="btn btn-primary" href="mailto:mechanicpro.contacto@gmail.com">Escribir a mechanicpro.contacto@gmail.com<span class="btn-arrow">→</span></a>
       </div>
     </div>
   </section>
@@ -1070,5 +1137,25 @@
     </div>
   </div>
 </footer>
+<script>
+  var prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var revealEls = document.querySelectorAll('[data-reveal]');
+  if (prefersReducedMotion || !('IntersectionObserver' in window)) {
+    revealEls.forEach(function (el) { el.classList.add('in-view'); });
+  } else {
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in-view');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+    revealEls.forEach(function (el, i) {
+      el.style.transitionDelay = (i % 3) * 90 + 'ms';
+      observer.observe(el);
+    });
+  }
+</script>
 </body>
 </html>
