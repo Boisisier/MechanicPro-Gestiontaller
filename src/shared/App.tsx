@@ -1997,7 +1997,6 @@ function App() {
                   }))
                 }
                 className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-[#0f4471] focus:outline-none"
-                placeholder="usuario@taller.cl"
                 autoComplete="username"
               />
             </div>
@@ -2020,7 +2019,6 @@ function App() {
                   }))
                 }
                 className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-[#0f4471] focus:outline-none"
-                placeholder="Contraseña"
                 autoComplete="current-password"
               />
             </div>
