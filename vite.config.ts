@@ -16,6 +16,8 @@ const estadoRoutePlugin: Plugin = {
     server.middlewares.use((req, _res, next) => {
       if (req.url && req.url.startsWith('/estado/')) {
         req.url = '/estado.html';
+      } else if (req.url === '/recuperar' || req.url?.startsWith('/recuperar?')) {
+        req.url = '/recuperar.html';
       }
       next();
     });
@@ -39,6 +41,7 @@ export default defineConfig({
         seguimiento: resolvePath('./seguimiento.html'),
         presupuesto: resolvePath('./presupuesto.html'),
         estado: resolvePath('./estado.html'),
+        recuperar: resolvePath('./recuperar.html'),
       },
     },
   },

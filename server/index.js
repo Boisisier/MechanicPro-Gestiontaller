@@ -16,6 +16,7 @@ import {
 } from './security.js';
 import {
   calculateBudgetTotal,
+  cleanRut,
   formatRut,
   isValidRut,
   normalizePatente,
@@ -1214,6 +1215,89 @@ app.post(
     }
   }
 );
+
+// Fase 4 del portal de clientes: recuperación de acceso. El cliente no guarda el link (lo
+// recibió una vez por WhatsApp/SMS y lo perdió), así que puede pedir que se lo reenvíen dando
+// la patente y los primeros dígitos del RUT del titular. Deliberadamente NO hay todavía un
+// proveedor de SMS/WhatsApp conectado (decisión explícita, ver conversación): esta función es
+// el único lugar que un futuro proveedor real necesita reemplazar. Todo lo demás del flujo
+// (validación, límite de intentos, respuesta genérica) ya queda listo y probado.
+const sendRecoveryLink = async ({ phone, url }) => {
+  // A propósito no se loguea el teléfono completo ni el link ni en modo simulado: si alguien
+  // copia este stub a producción tal cual (conectando un proveedor real pero dejando el log),
+  // que el log ya tenga la disciplina correcta evita que se filtren datos sensibles por un
+  // console.log de más.
+  const phoneMasked = phone ? `***${phone.slice(-4)}` : null;
+  console.log(
+    JSON.stringify({
+      type: 'recovery_link_simulated',
+      phone_last4: phoneMasked,
+      sent_at: new Date().toISOString(),
+    })
+  );
+  if (!config.isProduction) {
+    // Solo en dev/test, para poder probar el flujo de punta a punta sin un proveedor real.
+    console.log(`[recover-access][dev] link generado (no se envía de verdad): ${url}`);
+  }
+};
+
+// Dos límites independientes: uno por IP (evita que una sola fuente pruebe muchas
+// patente+RUT distintas) y uno por patente (evita que se reparta el intento de fuerza bruta
+// contra UNA patente entre varias IPs). Ventanas cortas y máximos bajos a propósito: es un
+// formulario de baja frecuencia de uso legítimo.
+const recoveryIpRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, max: 8, key: (req) => req.ip });
+const recoveryPlateRateLimiter = createRateLimiter({
+  windowMs: 60 * 60_000,
+  max: 5,
+  key: (req) => normalizePatente(req.body?.patente || '') || 'sin_patente',
+});
+
+app.post('/public/recover-access', recoveryIpRateLimiter, recoveryPlateRateLimiter, async (req, res) => {
+  const patente = normalizePatente(req.body.patente || '');
+  const rutPrefix = cleanRut(req.body.rut_prefix || req.body.rutPrefix || '');
+  // Respuesta genérica SIEMPRE, se cumplan o no los mínimos de formato, haya o no coincidencia,
+  // falle o no la consulta: si el mensaje cambiara según el caso, este formulario se podría usar
+  // para ir confirmando de a poco la patente + RUT de otra persona sin llegar a ver el link.
+  const genericResponse = () =>
+    res.json({
+      ok: true,
+      message: 'Si los datos coinciden con una orden activa, enviamos el link al teléfono registrado.',
+    });
+
+  if (!patente || rutPrefix.length < 4) {
+    return genericResponse();
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    await client.query("select set_config('app.public_lookup', 'on', true)");
+    const { rows } = await client.query(
+      `select customer_phone, public_token
+       from vehicles
+       where patente = $1
+         and regexp_replace(customer_rut, '[^0-9Kk]', '', 'g') like $2 || '%'
+         and public_token_expires_at > now()
+       order by fecha_ingreso desc
+       limit 1`,
+      [patente, rutPrefix]
+    );
+    await client.query('commit');
+    const match = rows[0];
+    if (match?.customer_phone && config.publicWebUrl) {
+      await sendRecoveryLink({
+        phone: match.customer_phone,
+        url: `${config.publicWebUrl}/estado/${match.public_token}`,
+      });
+    }
+  } catch (error) {
+    await client.query('rollback');
+    console.error('POST /public/recover-access failed', error);
+  } finally {
+    client.release();
+  }
+  genericResponse();
+});
 
 app.get('/public/budgets/:token', publicLinkRateLimiter, async (req, res) => {
   const token = normalizeUuid(req.params.token);

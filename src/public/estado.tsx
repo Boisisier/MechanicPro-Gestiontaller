@@ -285,7 +285,14 @@ export default function EstadoPage() {
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
           {loading && <p className="text-center text-gray-500 py-8">Cargando...</p>}
 
-          {!loading && error && <p className="text-center text-gray-600 py-8">{error}</p>}
+          {!loading && error && (
+            <div className="text-center py-8">
+              <p className="text-gray-600">{error}</p>
+              <a href="/recuperar" className="inline-block mt-3 text-sm font-semibold text-[#0f4471] underline">
+                ¿Perdiste el link? Recuperalo acá
+              </a>
+            </div>
+          )}
 
           {!loading && data && (
             <>

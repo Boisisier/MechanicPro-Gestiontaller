@@ -32,6 +32,8 @@ services:
         value: "true"
       - key: ALLOW_DEMO_LOGIN
         value: "false"
+      - key: PUBLIC_WEB_URL
+        sync: false
 
   - name: mechanicpro-gestiontaller-web
     type: web
@@ -49,6 +51,9 @@ services:
       - type: rewrite
         source: /estado/*
         destination: /estado.html
+      - type: rewrite
+        source: /recuperar
+        destination: /recuperar.html
 
   - name: mechanicpro-landing
     type: web

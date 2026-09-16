@@ -35,6 +35,12 @@ export const loadConfig = () => {
     corsOrigins: parseList(process.env.CORS_ORIGINS, isProduction
       ? []
       : ["http://localhost:5173", "http://127.0.0.1:5173"]),
+    // Fase 4 del portal de clientes: para armar el link de recuperación
+    // (`${publicWebUrl}/estado/<token>`) el server necesita saber dónde vive el frontend
+    // estático (son servicios separados en Render, ver render.yaml). No es obligatoria: si
+    // falta, /public/recover-access sigue respondiendo igual (nunca revela si hubo
+    // coincidencia) pero no llega a "enviar" nada, y queda logueado para notarlo.
+    publicWebUrl: process.env.PUBLIC_WEB_URL || (isProduction ? "" : "http://localhost:5173"),
     databaseSsl: process.env.DATABASE_SSL !== "disable",
     databaseSslRejectUnauthorized:
       process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === "true",
