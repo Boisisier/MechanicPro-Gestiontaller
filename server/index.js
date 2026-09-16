@@ -1171,20 +1171,25 @@ app.post(
         async (client, vehicleId, companyId) => {
           // La partida tiene que pertenecer a un presupuesto convertido a ESTA orden — el
           // dueño de un link de estado no puede aprobar partidas de otra orden adivinando ids.
+          // b.status <> 'anulado': un presupuesto anulado no debería poder seguir
+          // aprobándose partida por partida aunque su converted_vehicle_id siga apuntando acá
+          // (DELETE /budgets/:id anula sin desvincular converted_vehicle_id).
           const { rows: itemRows } = await client.query(
             `select bi.id, bi.approval_status, bi.budget_quote_id
              from budget_quote_items bi
              join budget_quotes b on b.id = bi.budget_quote_id
-             where bi.id = $1 and b.converted_vehicle_id = $2`,
+             where bi.id = $1 and b.converted_vehicle_id = $2 and b.status <> 'anulado'`,
             [itemId, vehicleId]
           );
           const item = itemRows[0];
           if (!item) {
             return null;
           }
+          // budget_quote_items no tiene columna updated_at (a diferencia de casi todas las
+          // otras tablas del esquema) — no incluirla acá.
           const { rows: updated } = await client.query(
             `update budget_quote_items
-             set approval_status = $1, approval_decided_at = now(), updated_at = now()
+             set approval_status = $1, approval_decided_at = now()
              where id = $2 and approval_status = 'pendiente'
              returning approval_status, approval_decided_at`,
             [newStatus, itemId]
@@ -2546,20 +2551,23 @@ app.patch(
   async (req, res) => {
     const { company_id: companyId } = req.user;
     const itemId = normalizeUuid(req.params.itemId);
-    if (!itemId) {
+    const budgetId = normalizeUuid(req.params.budgetId);
+    if (!itemId || !budgetId) {
       return res.status(400).json({ error: 'invalid_request' });
     }
     const client = await pool.connect();
     try {
       await client.query('begin');
+      // budget_quote_items no tiene columna updated_at (a diferencia de casi todas las otras
+      // tablas del esquema) — no incluirla acá.
       const { rows } = await client.query(
         `update budget_quote_items bi
-         set approval_status = 'pendiente', approval_decided_at = null, updated_at = now()
+         set approval_status = 'pendiente', approval_decided_at = null
          from budget_quotes b
          where bi.id = $1 and bi.budget_quote_id = $2
            and b.id = bi.budget_quote_id and b.company_id = $3
          returning bi.id, bi.budget_quote_id`,
-        [itemId, req.params.budgetId, companyId]
+        [itemId, budgetId, companyId]
       );
       if (rows.length === 0) {
         await client.query('rollback');
