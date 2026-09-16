@@ -32,6 +32,8 @@ export interface BudgetItem {
   quantity: number;
   unit_price: number;
   estimated_hours?: number;
+  approval_status?: "pendiente" | "aprobado" | "rechazado";
+  approval_decided_at?: string | null;
 }
 
 export type BudgetStatus =

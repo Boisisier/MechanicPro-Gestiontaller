@@ -1103,7 +1103,9 @@ app.get('/public/estado/:token', publicLinkRateLimiter, async (req, res) => {
                   b.advance_required::float,
                   coalesce(json_agg(json_build_object(
                     'id', bi.id, 'name', bi.name, 'item_type', bi.item_type,
-                    'quantity', bi.quantity::float, 'unit_price', bi.unit_price::float)
+                    'quantity', bi.quantity::float, 'unit_price', bi.unit_price::float,
+                    'approval_status', bi.approval_status,
+                    'approval_decided_at', bi.approval_decided_at)
                     order by bi.created_at) filter (where bi.id is not null), '[]') as items
            from budget_quotes b
            left join budget_quote_items bi on bi.budget_quote_id = b.id
@@ -1143,6 +1145,75 @@ app.get('/public/estado/:token', publicLinkRateLimiter, async (req, res) => {
     res.status(500).json({ error: 'internal_error' });
   }
 });
+
+// Fase 3: el cliente aprueba o rechaza una partida individual desde /estado/<token>. Cada
+// decisión queda en budget_quote_item_approvals con fecha, ip y user agent (requisito
+// explícito), y la partida solo se puede tocar una vez desde 'pendiente' — la propia query de
+// UPDATE lo exige (where approval_status = 'pendiente'), así que una segunda decisión sobre la
+// misma partida no pisa la primera, aparezca en el orden que aparezca.
+app.post(
+  '/public/estado/:token/items/:itemId/respond',
+  publicLinkRateLimiter,
+  async (req, res) => {
+    const token = normalizeUuid(req.params.token);
+    const itemId = normalizeUuid(req.params.itemId);
+    if (!token || !itemId || typeof req.body.approved !== 'boolean') {
+      return res.status(404).json({ error: 'not_found' });
+    }
+    const newStatus = req.body.approved ? 'aprobado' : 'rechazado';
+    const ip = req.ip || null;
+    const userAgent = String(req.get('user-agent') || '').slice(0, 500) || null;
+    try {
+      const result = await withPublicLookup(
+        'vehicles',
+        token,
+        async (client, vehicleId, companyId) => {
+          // La partida tiene que pertenecer a un presupuesto convertido a ESTA orden — el
+          // dueño de un link de estado no puede aprobar partidas de otra orden adivinando ids.
+          const { rows: itemRows } = await client.query(
+            `select bi.id, bi.approval_status, bi.budget_quote_id
+             from budget_quote_items bi
+             join budget_quotes b on b.id = bi.budget_quote_id
+             where bi.id = $1 and b.converted_vehicle_id = $2`,
+            [itemId, vehicleId]
+          );
+          const item = itemRows[0];
+          if (!item) {
+            return null;
+          }
+          const { rows: updated } = await client.query(
+            `update budget_quote_items
+             set approval_status = $1, approval_decided_at = now(), updated_at = now()
+             where id = $2 and approval_status = 'pendiente'
+             returning approval_status, approval_decided_at`,
+            [newStatus, itemId]
+          );
+          if (updated.length === 0) {
+            return { responded: false, status: item.approval_status };
+          }
+          await client.query(
+            `insert into budget_quote_item_approvals
+              (company_id, budget_quote_item_id, budget_quote_id, action, actor, ip, user_agent)
+             values ($1, $2, $3, $4, 'cliente', $5, $6)`,
+            [companyId, itemId, item.budget_quote_id, newStatus, ip, userAgent]
+          );
+          return { responded: true, ...updated[0] };
+        },
+        { requireUnexpired: true }
+      );
+      if (!result) {
+        return res.status(404).json({ error: 'not_found' });
+      }
+      if (!result.responded) {
+        return res.status(409).json({ error: 'already_responded', status: result.status });
+      }
+      res.json(result);
+    } catch (error) {
+      console.error('POST /public/estado/:token/items/:itemId/respond failed', error);
+      res.status(500).json({ error: 'internal_error' });
+    }
+  }
+);
 
 app.get('/public/budgets/:token', publicLinkRateLimiter, async (req, res) => {
   const token = normalizeUuid(req.params.token);
@@ -2151,7 +2222,9 @@ app.get('/budgets', authRequired, async (req, res) => {
                 'id', bi.id, 'item_type', bi.item_type, 'reference_id', bi.reference_id,
                 'name', bi.name, 'quantity', bi.quantity::float,
                 'unit_price', bi.unit_price::float, 'price', bi.unit_price::float,
-                'estimated_hours', bi.estimated_hours::float)
+                'estimated_hours', bi.estimated_hours::float,
+                'approval_status', bi.approval_status,
+                'approval_decided_at', bi.approval_decided_at)
                 order by bi.created_at) filter (where bi.id is not null), '[]') as items
        from budget_quotes b
        left join budget_quote_items bi on bi.budget_quote_id = b.id
@@ -2299,7 +2372,14 @@ app.put('/budgets/:id', authRequired, ensureWritable, async (req, res) => {
       await client.query('rollback');
       return res.status(404).json({ error: 'not_found' });
     }
-    await client.query('delete from budget_quote_items where budget_quote_id = $1', [req.params.id]);
+    // Solo se reemplazan las partidas pendientes. Una partida que el cliente ya aprobó no se
+    // toca acá (además, la base la rechazaría: ver trg_guard_budget_quote_item_approval en
+    // 20260916020000_client_portal_item_approval.sql) — para editarla hay que reiniciar su
+    // aprobación primero vía PATCH /budgets/:budgetId/items/:itemId/reset-approval.
+    await client.query(
+      "delete from budget_quote_items where budget_quote_id = $1 and approval_status = 'pendiente'",
+      [req.params.id]
+    );
     for (const item of items) {
       await client.query(
         `insert into budget_quote_items
@@ -2368,6 +2448,58 @@ app.patch('/budgets/:id/status', authRequired, requireModule('Presupuesto'), ens
     res.status(500).json({ error: 'internal_error' });
   }
 });
+
+// Única forma de tocar una partida que el cliente ya aprobó: la base la protege (ver
+// guard_budget_quote_item_approval), así que primero hay que reiniciar su aprobación acá, lo
+// que queda registrado igual que cualquier otra decisión sobre la partida. No es
+// requireWorkshopAdmin a propósito: cualquiera con acceso al módulo de Presupuesto puede
+// necesitar corregir una partida, pero la acción siempre queda a nombre de quien la hizo.
+app.patch(
+  '/budgets/:budgetId/items/:itemId/reset-approval',
+  authRequired,
+  requireModule('Presupuesto'),
+  ensureWritable,
+  async (req, res) => {
+    const { company_id: companyId } = req.user;
+    const itemId = normalizeUuid(req.params.itemId);
+    if (!itemId) {
+      return res.status(400).json({ error: 'invalid_request' });
+    }
+    const client = await pool.connect();
+    try {
+      await client.query('begin');
+      const { rows } = await client.query(
+        `update budget_quote_items bi
+         set approval_status = 'pendiente', approval_decided_at = null, updated_at = now()
+         from budget_quotes b
+         where bi.id = $1 and bi.budget_quote_id = $2
+           and b.id = bi.budget_quote_id and b.company_id = $3
+         returning bi.id, bi.budget_quote_id`,
+        [itemId, req.params.budgetId, companyId]
+      );
+      if (rows.length === 0) {
+        await client.query('rollback');
+        return res.status(404).json({ error: 'not_found' });
+      }
+      const actor =
+        req.user.full_name || req.user.name || req.user.email || 'staff';
+      await client.query(
+        `insert into budget_quote_item_approvals
+          (company_id, budget_quote_item_id, budget_quote_id, action, actor)
+         values ($1, $2, $3, 'reiniciado', $4)`,
+        [companyId, rows[0].id, rows[0].budget_quote_id, actor]
+      );
+      await client.query('commit');
+      res.json({ ok: true });
+    } catch (error) {
+      await client.query('rollback');
+      console.error('PATCH /budgets/:budgetId/items/:itemId/reset-approval failed', error);
+      res.status(500).json({ error: 'internal_error' });
+    } finally {
+      client.release();
+    }
+  }
+);
 
 app.get('/audit-logs', authRequired, requireModule('Registro de acciones'), async (req, res) => {
   const { company_id: companyId } = req.user;
