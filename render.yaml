@@ -41,6 +41,14 @@ services:
     envVars:
       - key: VITE_API_BASE_URL
         sync: false
+    # Portal de clientes: /estado/<token> es una ruta sin archivo real (el token va en el path,
+    # no en query string). Scoped a /estado/* a propósito — un rewrite general a /index.html ya
+    # rompió el sitio una vez (ver comentario arriba), así que este no toca nada fuera de esa
+    # ruta.
+    routes:
+      - type: rewrite
+        source: /estado/*
+        destination: /estado.html
 
   - name: mechanicpro-landing
     type: web

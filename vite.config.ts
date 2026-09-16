@@ -1,12 +1,30 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'url';
 
 const resolvePath = (relative: string) => fileURLToPath(new URL(relative, import.meta.url));
 
+// /estado/<token> es una ruta "bonita" (sin query string) que no existe como archivo. En prod
+// (Render, ver render.yaml) un rewrite scoped a /estado/* resuelve esto a nivel del hosting
+// estático; en dev necesita el mismo rewrite pero a nivel del server de Vite, si no pide
+// /estado/<token> como si fuera un archivo y devuelve 404. Scoped a /estado/ nada más, a
+// propósito: un rewrite general a index.html rompió el resto del sitio la vez que se probó
+// (ver commit de Render en render.yaml).
+const estadoRoutePlugin: Plugin = {
+  name: 'estado-route-rewrite',
+  configureServer(server) {
+    server.middlewares.use((req, _res, next) => {
+      if (req.url && req.url.startsWith('/estado/')) {
+        req.url = '/estado.html';
+      }
+      next();
+    });
+  },
+};
+
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), estadoRoutePlugin],
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
@@ -20,6 +38,7 @@ export default defineConfig({
         // de App.tsx.
         seguimiento: resolvePath('./seguimiento.html'),
         presupuesto: resolvePath('./presupuesto.html'),
+        estado: resolvePath('./estado.html'),
       },
     },
   },

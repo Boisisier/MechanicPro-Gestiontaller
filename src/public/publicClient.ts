@@ -32,3 +32,16 @@ export const publicFetch = async (path: string, init?: RequestInit) => {
 };
 
 export const getTokenFromUrl = () => new URLSearchParams(window.location.search).get("token");
+
+// La página de estado usa una ruta "bonita" (/estado/<token>) en vez de query string. El
+// rewrite de Render (render.yaml) y el middleware de Vite en dev (vite.config.ts) mandan esa
+// ruta a estado.html sin cambiar la URL que ve el navegador, así que el token sigue estando en
+// el path cuando este código corre en el cliente.
+export const getTokenFromPath = (prefix: string) => {
+  const path = window.location.pathname;
+  if (!path.startsWith(prefix)) {
+    return null;
+  }
+  const rest = path.slice(prefix.length).replace(/^\/+/, "").replace(/\/+$/, "");
+  return rest || null;
+};

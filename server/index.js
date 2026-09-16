@@ -1009,13 +1009,18 @@ const publicLinkRateLimiter = createRateLimiter({
 // para resolver token -> company_id antes de conocer la empresa. Una vez resuelto se reaplica el
 // contexto real vía setTenantContext, y el resto de la operación (incluida cualquier escritura)
 // corre bajo la policy tenant_isolation normal — el bypass nunca se usa para escrituras.
-const withPublicLookup = async (table, token, handler) => {
+const withPublicLookup = async (table, token, handler, { requireUnexpired = false } = {}) => {
   const client = await pool.connect();
   try {
     await client.query('begin');
     await client.query("select set_config('app.public_lookup', 'on', true)");
+    // El filtro de expiración va en la MISMA query que resuelve el token, no en un chequeo
+    // aparte después: así un token vencido y uno inexistente terminan en la misma rama (rows
+    // vacío) y responden exactamente igual, sin una señal que distinga "vencido" de "nunca
+    // existió".
+    const expiryClause = requireUnexpired ? 'and public_token_expires_at > now()' : '';
     const { rows } = await client.query(
-      `select id, company_id from ${table} where public_token = $1 limit 1`,
+      `select id, company_id from ${table} where public_token = $1 ${expiryClause} limit 1`,
       [token]
     );
     if (rows.length === 0) {
@@ -1023,7 +1028,7 @@ const withPublicLookup = async (table, token, handler) => {
       return null;
     }
     await setTenantContext(client, rows[0].company_id);
-    const result = await handler(client, rows[0].id);
+    const result = await handler(client, rows[0].id, rows[0].company_id);
     await client.query('commit');
     return result;
   } catch (error) {
@@ -1040,20 +1045,101 @@ app.get('/public/vehicles/:token', publicLinkRateLimiter, async (req, res) => {
     return res.status(404).json({ error: 'not_found' });
   }
   try {
-    const vehicle = await withPublicLookup('vehicles', token, async (client, id) => {
-      const { rows } = await client.query(
-        `select patente, marca, modelo, ano, estado, fecha_ingreso, promised_delivery_date
-         from vehicles where id = $1`,
-        [id]
-      );
-      return rows[0] || null;
-    });
+    const vehicle = await withPublicLookup(
+      'vehicles',
+      token,
+      async (client, id) => {
+        const { rows } = await client.query(
+          `select patente, marca, modelo, ano, estado, fecha_ingreso, promised_delivery_date
+           from vehicles where id = $1`,
+          [id]
+        );
+        return rows[0] || null;
+      },
+      { requireUnexpired: true }
+    );
     if (!vehicle) {
       return res.status(404).json({ error: 'not_found' });
     }
     res.json(vehicle);
   } catch (error) {
     console.error('GET /public/vehicles/:token failed', error);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// Fase 2 del portal de clientes: /public/estado/:token alimenta la página /estado/<token>
+// (src/public/estado.tsx). A diferencia de /public/vehicles/:token (que solo devuelve el
+// estado básico, usado por la página de seguimiento vieja), este junta todo lo que esa página
+// necesita en una sola llamada: la orden solo tiene este token, no uno separado para el
+// presupuesto, así que el presupuesto asociado se resuelve server-side vía
+// budget_quotes.converted_vehicle_id.
+//
+// Allowlist explícita de columnas en cada query: nunca se expone comentario_tecnico,
+// observaciones, customer_advance, costos de inventario ni ningún otro dato interno del taller.
+app.get('/public/estado/:token', publicLinkRateLimiter, async (req, res) => {
+  const token = normalizeUuid(req.params.token);
+  if (!token) {
+    return res.status(404).json({ error: 'not_found' });
+  }
+  try {
+    const payload = await withPublicLookup(
+      'vehicles',
+      token,
+      async (client, id, companyId) => {
+        const { rows: vehicleRows } = await client.query(
+          `select patente, marca, modelo, ano, estado, fecha_ingreso, promised_delivery_date
+           from vehicles where id = $1`,
+          [id]
+        );
+        const vehicle = vehicleRows[0];
+        if (!vehicle) {
+          return null;
+        }
+
+        const { rows: budgets } = await client.query(
+          `select b.id, b.status, b.issue_date,
+                  b.total::float, b.discount_percent::float, b.tax_percent::float,
+                  b.advance_required::float,
+                  coalesce(json_agg(json_build_object(
+                    'id', bi.id, 'name', bi.name, 'item_type', bi.item_type,
+                    'quantity', bi.quantity::float, 'unit_price', bi.unit_price::float)
+                    order by bi.created_at) filter (where bi.id is not null), '[]') as items
+           from budget_quotes b
+           left join budget_quote_items bi on bi.budget_quote_id = b.id
+           where b.converted_vehicle_id = $1
+           group by b.id
+           order by b.created_at asc`,
+          [id]
+        );
+
+        const { rows: photos } = await client.query(
+          `select id, url, caption, created_at from vehicle_photos
+           where vehicle_id = $1 order by created_at desc`,
+          [id]
+        );
+
+        const { rows: workshopRows } = await client.query(
+          `select name, contact_phone, contact_email, contact_address
+           from companies where id = $1`,
+          [companyId]
+        );
+
+        return {
+          vehicle,
+          budgets,
+          photos,
+          workshop: workshopRows[0] || null,
+        };
+      },
+      { requireUnexpired: true }
+    );
+    if (!payload) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+    res.json(payload);
+  } catch (error) {
+    console.error('GET /public/estado/:token failed', error);
     res.status(500).json({ error: 'internal_error' });
   }
 });
