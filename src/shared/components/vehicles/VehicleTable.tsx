@@ -79,7 +79,7 @@ export default function VehicleTable({
     if (!vehicle.public_token) {
       return;
     }
-    const url = `${window.location.origin}/seguimiento.html?token=${vehicle.public_token}`;
+    const url = `${window.location.origin}/estado/${vehicle.public_token}`;
     try {
       await navigator.clipboard.writeText(url);
       setCopiedId(vehicle.id);
