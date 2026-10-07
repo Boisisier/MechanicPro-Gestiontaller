@@ -461,19 +461,13 @@ export default function VehicleForm({
     <div className="vehicle-entry-form bg-white rounded-xl border border-gray-200 p-4 shadow-sm sm:p-6">
       <ConfirmDialog
         open={sendConfirmOpen}
-        title="Enviar a En Taller"
-        message="El vehículo ingresar? al submódulo En Taller para que el mecánico pueda registrar trabajos, repuestos y observaciones."
+        title="¿Ingresar Vehículo a Taller?"
+        message=""
         confirmLabel="Enviar a En Taller"
         variant="info"
         onConfirm={performSendToReview}
         onCancel={() => setSendConfirmOpen(false)}
       />
-      <div className="mb-6">
-        <h3 className="text-xl font-bold text-gray-900">
-          {editingVehicle ? 'Editar vehículo' : 'Registro de vehículo'}
-        </h3>
-        <p className="text-sm text-gray-500 mt-1">Complete los datos del vehículo</p>
-      </div>
 
       <div className="mb-5 px-3 sm:px-6">
         <div className="relative mx-5">
