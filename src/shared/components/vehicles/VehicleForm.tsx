@@ -179,7 +179,7 @@ export default function VehicleForm({
     ...initialFormData,
     ...(initialData || {}),
     ...(editingVehicle || {}),
-    servicios: editingVehicle?.servicios || [],
+    servicios: editingVehicle?.servicios || initialData?.servicios || [],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadedPatente, setLoadedPatente] = useState('');
