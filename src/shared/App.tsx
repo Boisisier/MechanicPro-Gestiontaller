@@ -26,6 +26,7 @@ import {
   updateBudgetStatus,
   getServiceCatalog,
   getServiceCategories,
+  SUBSCRIPTION_INACTIVE_EVENT,
 } from "./lib/api";
 
 import type {
@@ -181,6 +182,21 @@ function App() {
 
   const { notification, showNotification, clearNotification } =
     useNotification();
+
+  // Suspensión de la cuenta. No se limpia solo: una vez que el servidor devolvió 402, el cartel
+  // queda hasta recargar, porque la cuenta sigue suspendida y cualquier otro intento de guardar
+  // va a fallar igual. Es la única forma de que el usuario entienda por qué no puede guardar
+  // nada, en vez de ver un error distinto en cada pantalla.
+  const [subscriptionInactive, setSubscriptionInactive] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ status?: string }>).detail;
+      setSubscriptionInactive(detail?.status || "suspendida");
+    };
+    window.addEventListener(SUBSCRIPTION_INACTIVE_EVENT, handler);
+    return () => window.removeEventListener(SUBSCRIPTION_INACTIVE_EVENT, handler);
+  }, []);
 
   const [accentColor, setAccentColor] = useState(
     () => localStorage.getItem("accentColor") || "#0f4471",
@@ -2088,6 +2104,27 @@ function App() {
           userName={sessionUser?.name || "Usuario general"}
           userRole={sessionUser?.role || "acceso general"}
         />
+
+        {subscriptionInactive && (
+          <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <p className="font-semibold">
+              {subscriptionInactive === "cancelada"
+                ? "Tu cuenta está cancelada"
+                : "Tu cuenta está suspendida"}
+            </p>
+            <p className="mt-0.5">
+              Podés seguir consultando y exportando toda tu información, pero no se puede
+              guardar ni modificar nada hasta regularizar el pago. Escribinos a{" "}
+              <a
+                href="mailto:mechanicpro.contacto@gmail.com"
+                className="font-semibold underline"
+              >
+                mechanicpro.contacto@gmail.com
+              </a>
+              .
+            </p>
+          </div>
+        )}
 
         <Toast notification={notification} onClose={clearNotification} />
         <ConfirmDialog

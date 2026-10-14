@@ -22,6 +22,12 @@ const setCsrfToken = (token?: string | null) => {
   if (token) cachedCsrfToken = token;
 };
 
+// Evento que avisa que la cuenta del taller está suspendida o cancelada. Se emite en un evento
+// del window en vez de propagarse por el valor de retorno porque cualquiera de las decenas de
+// llamadas a la API puede ser la que reciba el 402, y todas tienen su propio catch con un
+// mensaje propio ("no se pudo guardar el vehículo", etc.) que no explicaría la causa real.
+export const SUBSCRIPTION_INACTIVE_EVENT = "mechanicpro:subscription-inactive";
+
 const handleResponse = async (response: Response) => {
   if (!response.ok) {
     let payload = null;
@@ -29,6 +35,16 @@ const handleResponse = async (response: Response) => {
       payload = await response.json();
     } catch {
       payload = null;
+    }
+    // 402 = la empresa está suspendida (ver ensureWritable en server/index.js). Solo afecta a
+    // las operaciones que escriben; la lectura sigue funcionando, así que la app no se cierra:
+    // se avisa con un cartel fijo y el usuario puede seguir consultando sus datos.
+    if (response.status === 402) {
+      window.dispatchEvent(
+        new CustomEvent(SUBSCRIPTION_INACTIVE_EVENT, {
+          detail: { status: payload?.subscription_status || "suspendida" },
+        }),
+      );
     }
     const error = new Error(payload?.error || "request_failed");
     (error as Error & { status?: number }).status = response.status;

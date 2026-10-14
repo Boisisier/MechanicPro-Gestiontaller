@@ -8,6 +8,15 @@
 - `CORS_ORIGINS`: dominios permitidos separados por coma
 - `VITE_API_BASE_URL`: URL pública de la API
 
+## Variables opcionales con efecto visible
+
+- `PUBLIC_WEB_URL`: URL pública del frontend. Sin ella, la recuperación de acceso del portal de
+  clientes (`/public/recover-access`) responde igual que siempre —nunca revela si hubo
+  coincidencia— pero **no llega a enviar nada**. En producción el frontend y la API son servicios
+  distintos con dominios distintos, así que el servidor no puede deducirla.
+- `WHATSAPP_PHONE_NUMBER_ID` + `WHATSAPP_ACCESS_TOKEN`: sin estos dos, el envío del link queda
+  en modo simulado (solo deja un registro en el log). Ver "Portal de clientes" más abajo.
+
 Usar `.env.example` como referencia. Nunca versionar `.env`.
 
 ## Validación previa
@@ -142,3 +151,76 @@ Render los crea juntos en un solo paso en vez de configurar cada uno a mano.
 El plan `starter` en la API evita que se "duerma" por inactividad (importante si más adelante
 hay webhooks de pago que necesitan llegar en cualquier momento); el frontend estático no se
 duerme nunca, así que el plan `free` alcanza.
+
+## Portal de clientes: envío del link por WhatsApp
+
+El cliente del taller recibe un link `https://<frontend>/estado/<token>` con el estado de su
+vehículo y, si hay presupuesto, la posibilidad de aprobar o rechazar cada partida. Ese link es
+una credencial: quien lo tiene ve la ficha, así que no se loguea nunca completo.
+
+Si el cliente lo pierde, puede pedir que se lo reenvíen en `/recuperar` dando su patente y los
+primeros 4 dígitos del RUT. Ese reenvío es lo único que necesita un proveedor de mensajería.
+
+**Sin configurar, funciona en modo simulado:** el flujo completo corre y solo queda un registro
+`recovery_link_simulated` en el log (en desarrollo además imprime el link en consola). No hace
+falta configurar nada para que el resto del portal funcione.
+
+**Para activar el envío real** hay que dar de alta la WhatsApp Cloud API en Meta:
+
+1. En [developers.facebook.com](https://developers.facebook.com) crear una app de tipo Business
+   y agregarle el producto **WhatsApp**.
+2. Asociar un número de teléfono dedicado (no puede ser uno que ya esté en WhatsApp normal o
+   Business) y completar la **verificación del negocio**. Este paso lo revisa Meta a mano y
+   puede tardar varios días; hasta que lo apruebe, solo se puede enviar a números de prueba.
+3. Crear una **plantilla de mensaje** (Message Template) y esperar su aprobación. Meta no
+   permite texto libre en un mensaje que inicia el negocio. La plantilla tiene que tener
+   **exactamente un parámetro en el cuerpo**, que es el link. Por ejemplo:
+
+   > Hola, acá está el link para seguir el estado de tu vehículo: {{1}}
+
+   El nombre que se le dé va en `WHATSAPP_RECOVERY_TEMPLATE` (por defecto
+   `recuperar_link_seguimiento`) y su idioma en `WHATSAPP_TEMPLATE_LANGUAGE` (por defecto `es`).
+4. Completar en el servicio de la API de Render: `WHATSAPP_PHONE_NUMBER_ID` (lo da el panel de
+   WhatsApp, no es el número en sí) y `WHATSAPP_ACCESS_TOKEN`.
+
+**Ojo con el token:** el token temporal que muestra el panel dura 24 horas y sirve solo para
+probar. Para producción hay que generar un token permanente desde un usuario del sistema
+(Business Settings → System Users → Generate Token) con los permisos `whatsapp_business_messaging`
+y `whatsapp_business_management`.
+
+Qué mirar en los logs (ninguno incluye el teléfono completo ni el link):
+
+| Registro | Significa |
+| --- | --- |
+| `recovery_link_sent` | Meta aceptó el mensaje |
+| `recovery_link_simulated` | No hay credenciales configuradas |
+| `recovery_link_phone_unusable` | El teléfono de la ficha no se pudo normalizar: hay que corregirlo |
+| `recovery_link_failed` | Meta rechazó el envío (incluye el código y el motivo) |
+
+## Suspender un taller que deja de pagar
+
+Cada empresa tiene un `plan` y un `subscription_status` (`activa`, `suspendida`, `cancelada`).
+Una empresa que no está `activa` **puede seguir entrando y leyendo todo lo suyo**, pero el
+servidor rechaza con **402** cualquier operación que escriba, y el frontend le muestra un cartel
+fijo explicando por qué. Cortar también la lectura sería retenerle sus propios datos al taller,
+que además es justo lo que querría llevarse si decide irse.
+
+```bash
+# Ver cómo está cada empresa
+node scripts/set-subscription.mjs --listar
+
+# Suspender y reactivar
+node scripts/set-subscription.mjs "Taller del Centro" --estado suspendida
+node scripts/set-subscription.mjs "Taller del Centro" --estado activa
+
+# Cambiar de plan
+node scripts/set-subscription.mjs "Taller del Centro" --plan taller_pro
+```
+
+El servidor cachea el estado en memoria 30 segundos, así que un cambio puede tardar hasta ese
+tiempo en hacerse efectivo. Si no se puede consultar el estado (problema de base de datos), el
+middleware **deja escribir** a propósito: dejar sin trabajar a un taller que está al día es peor
+que cobrarle un mes de más.
+
+Cuando se conecte un proveedor de pagos, su webhook solo tiene que escribir `subscription_status`
+en `companies` — no hace falta tocar las rutas.

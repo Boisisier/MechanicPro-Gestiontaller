@@ -34,6 +34,12 @@ services:
         value: "false"
       - key: PUBLIC_WEB_URL
         sync: false
+      # WhatsApp Cloud API: sin estos dos valores el envío del link al cliente queda en modo
+      # simulado (solo loguea). Se completan cuando Meta aprueba el número y la plantilla.
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_ACCESS_TOKEN
+        sync: false
 
   - name: mechanicpro-gestiontaller-web
     type: web

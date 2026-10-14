@@ -114,6 +114,19 @@ const approvalLabel: Record<ApprovalStatus, string> = {
   rechazado: "Rechazado",
 };
 
+// El estado interno del presupuesto no se muestra crudo: "convertido" o "borrador" es
+// vocabulario del taller, no del cliente. Lo que el cliente necesita saber es si tiene algo que
+// responder o no. Un estado que no esté acá no se muestra (devuelve null) en vez de filtrarse
+// como texto técnico.
+const budgetStatusLabel = (status: string): string | null =>
+  ({
+    enviado: "Esperando tu respuesta",
+    aprobado: "Aprobado",
+    rechazado: "Rechazado",
+    convertido: "En ejecución",
+    vencido: "Vencido",
+  })[status] || null;
+
 function BudgetItemRow({
   item,
   onRespond,
@@ -189,15 +202,24 @@ function BudgetSection({
   onRespondItem: (itemId: string, approved: boolean) => Promise<void>;
 }) {
   const subtotal = budget.items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
+  // Se recalculan acá los mismos pasos que calculateBudgetTotal() en el servidor (descuento y
+  // después impuesto) para poder mostrar el desglose. El Total que se muestra sigue siendo
+  // budget.total, el que calculó el servidor: si alguna vez dejaran de coincidir, manda el del
+  // servidor y no una cuenta hecha en el navegador.
+  const discountAmount = (subtotal * budget.discount_percent) / 100;
+  const taxAmount = ((subtotal - discountAmount) * budget.tax_percent) / 100;
+  const statusLabel = budgetStatusLabel(budget.status);
   return (
     <div className="border border-gray-200 rounded-xl p-4 mt-3">
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm font-semibold text-gray-700">
           Presupuesto del {formatDate(budget.issue_date)}
         </span>
-        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 capitalize">
-          {budget.status}
-        </span>
+        {statusLabel && (
+          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+            {statusLabel}
+          </span>
+        )}
       </div>
       <ul className="divide-y divide-gray-100">
         {budget.items.map((item) => (
@@ -212,7 +234,13 @@ function BudgetSection({
         {budget.discount_percent > 0 && (
           <div className="flex justify-between">
             <span>Descuento ({budget.discount_percent}%)</span>
-            <span>-{formatMoney((subtotal * budget.discount_percent) / 100)}</span>
+            <span>-{formatMoney(discountAmount)}</span>
+          </div>
+        )}
+        {budget.tax_percent > 0 && (
+          <div className="flex justify-between">
+            <span>IVA ({budget.tax_percent}%)</span>
+            <span>{formatMoney(taxAmount)}</span>
           </div>
         )}
         <div className="flex justify-between font-semibold text-gray-900">
@@ -347,17 +375,18 @@ export default function EstadoPage() {
                 </div>
               )}
 
-              {data.workshop &&
-                (data.workshop.contact_phone ||
-                  data.workshop.contact_email ||
-                  data.workshop.contact_address) && (
-                  <div className="mt-6 pt-4 border-t border-gray-100 text-sm text-gray-500 space-y-1">
-                    <p className="font-semibold text-gray-700">{data.workshop.name}</p>
-                    {data.workshop.contact_phone && <p>{data.workshop.contact_phone}</p>}
-                    {data.workshop.contact_email && <p>{data.workshop.contact_email}</p>}
-                    {data.workshop.contact_address && <p>{data.workshop.contact_address}</p>}
-                  </div>
-                )}
+              {/* El nombre del taller se muestra aunque no haya datos de contacto cargados
+                  (hoy se completan a mano, así que lo normal es que estén vacíos): el cliente
+                  tiene que poder ver de qué taller es esta página. El encabezado dice
+                  "MechanicPro", que es el sistema, no quien tiene su auto. */}
+              {data.workshop && (
+                <div className="mt-6 pt-4 border-t border-gray-100 text-sm text-gray-500 space-y-1">
+                  <p className="font-semibold text-gray-700">{data.workshop.name}</p>
+                  {data.workshop.contact_phone && <p>{data.workshop.contact_phone}</p>}
+                  {data.workshop.contact_email && <p>{data.workshop.contact_email}</p>}
+                  {data.workshop.contact_address && <p>{data.workshop.contact_address}</p>}
+                </div>
+              )}
             </>
           )}
         </div>

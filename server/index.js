@@ -21,6 +21,7 @@ import {
   isValidRut,
   normalizePatente,
   splitServicePrice,
+  toWhatsappNumber,
 } from './lib/core.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -413,7 +414,69 @@ const authRequired = (req, res, next) => {
   return next();
 };
 
-const ensureWritable = (req, res, next) => next();
+// Suspensión por estado de suscripción. Va en un middleware aparte de authRequired —y aplicado
+// solo a las rutas que mutan datos— a propósito: una empresa suspendida tiene que poder seguir
+// ENTRANDO y LEYENDO lo suyo (consultar fichas, exportar, ver su historial), lo que se corta es
+// escribir. Cortar también la lectura sería retenerle sus propios datos al taller.
+//
+// El estado NO se mete en el JWT: si viajara en el token, una suspensión recién no tendría
+// efecto hasta que el token expire y el usuario vuelva a entrar. Se consulta a la base, con un
+// cache en memoria corto para no pagar un SELECT en cada escritura.
+const SUBSCRIPTION_CACHE_TTL_MS = 30_000;
+const SUBSCRIPTION_CACHE_MAX_ENTRIES = 1000;
+const subscriptionStatusCache = new Map();
+
+const readSubscriptionStatus = async (companyId) => {
+  const cached = subscriptionStatusCache.get(companyId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.status;
+  }
+  const { rows } = await pool.query(
+    'select subscription_status from companies where id = $1 limit 1',
+    [companyId]
+  );
+  const status = rows[0]?.subscription_status || 'activa';
+  // Poda simple: este cache tiene una entrada por empresa activa, así que en la práctica no
+  // crece. El tope es para que un bug que inventara company_ids no lo haga crecer sin fin.
+  if (subscriptionStatusCache.size >= SUBSCRIPTION_CACHE_MAX_ENTRIES) {
+    for (const [key, value] of subscriptionStatusCache) {
+      if (value.expiresAt <= Date.now()) subscriptionStatusCache.delete(key);
+    }
+  }
+  subscriptionStatusCache.set(companyId, {
+    status,
+    expiresAt: Date.now() + SUBSCRIPTION_CACHE_TTL_MS,
+  });
+  return status;
+};
+
+// Para que una reactivación (o una suspensión) hecha por script o por un futuro webhook de
+// pagos se note enseguida, sin esperar el TTL del cache.
+export const forgetSubscriptionStatus = (companyId) => {
+  if (companyId) subscriptionStatusCache.delete(companyId);
+  else subscriptionStatusCache.clear();
+};
+
+const ensureWritable = async (req, res, next) => {
+  const companyId = req.user?.company_id;
+  if (!companyId) {
+    return next();
+  }
+  try {
+    const status = await readSubscriptionStatus(companyId);
+    if (status !== 'activa') {
+      // 402 Payment Required: es exactamente este caso, y lo distingue de un 403 por permisos
+      // del usuario (que el frontend tiene que tratar de otra forma).
+      return res.status(402).json({ error: 'subscription_inactive', subscription_status: status });
+    }
+  } catch (error) {
+    // Fail open deliberado: si no se puede verificar el estado, se deja escribir. Un problema
+    // nuestro de base de datos no debe dejar sin trabajar a un taller que está al día; el daño
+    // de cortarle la operación por error es mucho peor que el de cobrarle un mes de más.
+    console.error('ensureWritable: no se pudo verificar la suscripción', error);
+  }
+  return next();
+};
 
 // Firma el JWT y lo manda por cookie httpOnly (nunca en el body JSON, para que un XSS no pueda
 // leerlo ni interceptando la respuesta del login) junto con una cookie csrf_token legible por
@@ -1098,6 +1161,10 @@ app.get('/public/estado/:token', publicLinkRateLimiter, async (req, res) => {
           return null;
         }
 
+        // Mismo filtro de 'anulado' que usa el endpoint de aprobación de partidas: sin él, un
+        // presupuesto anulado seguía apareciendo en la página pública con sus partidas en
+        // 'pendiente' y sus botones de Aprobar/Rechazar, que el POST después rechaza con 404 —
+        // el cliente quedaba en un callejón sin salida, reintentando algo imposible.
         const { rows: budgets } = await client.query(
           `select b.id, b.status, b.issue_date,
                   b.total::float, b.discount_percent::float, b.tax_percent::float,
@@ -1110,7 +1177,7 @@ app.get('/public/estado/:token', publicLinkRateLimiter, async (req, res) => {
                     order by bi.created_at) filter (where bi.id is not null), '[]') as items
            from budget_quotes b
            left join budget_quote_items bi on bi.budget_quote_id = b.id
-           where b.converted_vehicle_id = $1
+           where b.converted_vehicle_id = $1 and b.status <> 'anulado'
            group by b.id
            order by b.created_at asc`,
           [id]
@@ -1227,22 +1294,95 @@ app.post(
 // proveedor de SMS/WhatsApp conectado (decisión explícita, ver conversación): esta función es
 // el único lugar que un futuro proveedor real necesita reemplazar. Todo lo demás del flujo
 // (validación, límite de intentos, respuesta genérica) ya queda listo y probado.
+// El envío va por WhatsApp Cloud API (Meta). Si no está configurada, se mantiene el modo
+// simulado de antes: el flujo completo sigue funcionando y solo queda logueado, así que la
+// función se puede probar de punta a punta sin credenciales.
+//
+// En ningún caso se loguea el teléfono completo ni el link: el link ES la credencial de acceso
+// a la ficha del vehículo, y los logs de Render los puede leer cualquiera con acceso al
+// dashboard.
 const sendRecoveryLink = async ({ phone, url }) => {
-  // A propósito no se loguea el teléfono completo ni el link ni en modo simulado: si alguien
-  // copia este stub a producción tal cual (conectando un proveedor real pero dejando el log),
-  // que el log ya tenga la disciplina correcta evita que se filtren datos sensibles por un
-  // console.log de más.
-  const phoneMasked = phone ? `***${phone.slice(-4)}` : null;
-  console.log(
-    JSON.stringify({
-      type: 'recovery_link_simulated',
-      phone_last4: phoneMasked,
-      sent_at: new Date().toISOString(),
-    })
-  );
-  if (!config.isProduction) {
-    // Solo en dev/test, para poder probar el flujo de punta a punta sin un proveedor real.
-    console.log(`[recover-access][dev] link generado (no se envía de verdad): ${url}`);
+  const phoneLast4 = phone ? `***${String(phone).slice(-4)}` : null;
+  const { apiVersion, phoneNumberId, accessToken, recoveryTemplate, templateLanguage } =
+    config.whatsapp;
+
+  if (!phoneNumberId || !accessToken) {
+    console.log(
+      JSON.stringify({
+        type: 'recovery_link_simulated',
+        phone_last4: phoneLast4,
+        sent_at: new Date().toISOString(),
+      })
+    );
+    if (!config.isProduction) {
+      // Solo en dev/test, para poder probar el flujo de punta a punta sin un proveedor real.
+      console.log(`[recover-access][dev] link generado (no se envía de verdad): ${url}`);
+    }
+    return;
+  }
+
+  const to = toWhatsappNumber(phone);
+  if (!to) {
+    // El teléfono del cliente es texto libre cargado por el taller: si no se puede normalizar,
+    // no se adivina. Queda logueado para que el taller pueda corregir la ficha.
+    console.warn(
+      JSON.stringify({ type: 'recovery_link_phone_unusable', phone_last4: phoneLast4 })
+    );
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          to,
+          type: 'template',
+          // Meta no permite texto libre en un mensaje que inicia el negocio: tiene que ser una
+          // plantilla aprobada. La plantilla lleva un único parámetro de cuerpo, el link.
+          template: {
+            name: recoveryTemplate,
+            language: { code: templateLanguage },
+            components: [{ type: 'body', parameters: [{ type: 'text', text: url }] }],
+          },
+        }),
+        // Sin timeout, un cuelgue de la API de Meta dejaría la promesa viva indefinidamente.
+        signal: AbortSignal.timeout(10_000),
+      }
+    );
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      console.error(
+        JSON.stringify({
+          type: 'recovery_link_failed',
+          phone_last4: phoneLast4,
+          status: response.status,
+          detail: detail.slice(0, 300),
+        })
+      );
+      return;
+    }
+    console.log(
+      JSON.stringify({
+        type: 'recovery_link_sent',
+        phone_last4: phoneLast4,
+        sent_at: new Date().toISOString(),
+      })
+    );
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        type: 'recovery_link_failed',
+        phone_last4: phoneLast4,
+        detail: String(error?.message || error).slice(0, 300),
+      })
+    );
   }
 };
 
@@ -1290,7 +1430,13 @@ app.post('/public/recover-access', recoveryIpRateLimiter, recoveryPlateRateLimit
     await client.query('commit');
     const match = rows[0];
     if (match?.customer_phone && config.publicWebUrl) {
-      await sendRecoveryLink({
+      // Deliberadamente SIN await: con un proveedor real conectado, esperar el envío hacía que
+      // una búsqueda con coincidencia tardara cientos de milisegundos y una sin coincidencia
+      // respondiera al instante. Esa diferencia de tiempo es un canal lateral que delata lo
+      // mismo que el mensaje genérico se esfuerza en ocultar — se podría ir confirmando
+      // patente + RUT de otra persona solo cronometrando las respuestas. El envío se dispara y
+      // la respuesta sale igual de rápido en los dos casos; los errores ya se loguean adentro.
+      void sendRecoveryLink({
         phone: match.customer_phone,
         url: `${config.publicWebUrl}/estado/${match.public_token}`,
       });

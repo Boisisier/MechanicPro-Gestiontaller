@@ -6,6 +6,7 @@ import {
   isValidRut,
   normalizePatente,
   splitServicePrice,
+  toWhatsappNumber,
 } from "./core.js";
 
 test("normaliza patentes chilenas antiguas y nuevas", () => {
@@ -56,4 +57,27 @@ test("acepta K como dígito verificador y es insensible a mayúsculas", () => {
 test("formatea RUT con puntos y guión", () => {
   assert.equal(formatRut("111111111"), "11.111.111-1");
   assert.equal(formatRut("98786350"), "9.878.635-0");
+});
+
+test("normaliza teléfonos chilenos al formato de la API de WhatsApp", () => {
+  // Con código de país, en los formatos en que la gente lo escribe.
+  assert.equal(toWhatsappNumber("+56 9 1111 1111"), "56911111111");
+  assert.equal(toWhatsappNumber("+56911111111"), "56911111111");
+  assert.equal(toWhatsappNumber("56 2 2345 6789"), "56223456789");
+  // Móvil sin código de país: se le agrega el 56.
+  assert.equal(toWhatsappNumber("911111111"), "56911111111");
+  assert.equal(toWhatsappNumber("9 1111 1111"), "56911111111");
+});
+
+test("no adivina un teléfono que no se puede normalizar con confianza", () => {
+  // Ocho dígitos es ambiguo (fijo sin código de área, o móvil al que le falta el 9).
+  assert.equal(toWhatsappNumber("11111111"), null);
+  // Demasiado corto o basura: mejor no enviar que enviar a un desconocido.
+  assert.equal(toWhatsappNumber("123"), null);
+  assert.equal(toWhatsappNumber("sin teléfono"), null);
+  assert.equal(toWhatsappNumber(""), null);
+  assert.equal(toWhatsappNumber(), null);
+  // Con código de país pero con una cantidad de dígitos que no existe en Chile.
+  assert.equal(toWhatsappNumber("+56 9 1111"), null);
+  assert.equal(toWhatsappNumber("569111111111111"), null);
 });

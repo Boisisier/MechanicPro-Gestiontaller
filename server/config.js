@@ -41,6 +41,19 @@ export const loadConfig = () => {
     // falta, /public/recover-access sigue respondiendo igual (nunca revela si hubo
     // coincidencia) pero no llega a "enviar" nada, y queda logueado para notarlo.
     publicWebUrl: process.env.PUBLIC_WEB_URL || (isProduction ? "" : "http://localhost:5173"),
+    // WhatsApp Cloud API (Meta) para reenviar el link de seguimiento al cliente del taller.
+    // Todo opcional: sin phoneNumberId + accessToken el envío queda en modo simulado (solo
+    // loguea), que es el comportamiento que tenía antes de conectar un proveedor. Un mensaje
+    // iniciado por el negocio exige una PLANTILLA aprobada por Meta — no se puede mandar texto
+    // libre — así que el nombre de la plantilla también es configurable; ver docs/produccion.md
+    // para cómo tiene que estar armada (un parámetro de cuerpo: el link).
+    whatsapp: {
+      apiVersion: process.env.WHATSAPP_API_VERSION || "v21.0",
+      phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || "",
+      accessToken: process.env.WHATSAPP_ACCESS_TOKEN || "",
+      recoveryTemplate: process.env.WHATSAPP_RECOVERY_TEMPLATE || "recuperar_link_seguimiento",
+      templateLanguage: process.env.WHATSAPP_TEMPLATE_LANGUAGE || "es",
+    },
     databaseSsl: process.env.DATABASE_SSL !== "disable",
     databaseSslRejectUnauthorized:
       process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === "true",

@@ -68,3 +68,25 @@ export const formatRut = (value = "") => {
   const withDots = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   return `${withDots}-${verifier}`;
 };
+
+// Normaliza un teléfono chileno al formato que exige la Graph API de WhatsApp: solo dígitos,
+// con código de país y sin "+".
+//
+// Devuelve null cuando el número no se puede normalizar con confianza, en vez de arriesgar un
+// envío a un número equivocado: el teléfono viene de un campo de texto libre cargado por el
+// taller, así que puede tener cualquier cosa. Preferible no mandar nada (queda logueado) a
+// mandarle el link de seguimiento de un auto a un desconocido.
+export const toWhatsappNumber = (value = "") => {
+  const digits = String(value).replace(/\D/g, "");
+  if (!digits) return null;
+  // Ya trae el código de país: +56 9 XXXX XXXX (móvil) o +56 X XXX XXXX (fijo).
+  if (digits.startsWith("56")) {
+    const national = digits.slice(2);
+    return national.length === 8 || national.length === 9 ? digits : null;
+  }
+  // Móvil chileno sin código de país: 9 XXXX XXXX.
+  if (digits.length === 9 && digits.startsWith("9")) return `56${digits}`;
+  // Ocho dígitos es ambiguo (puede ser un fijo sin código de área o un móvil sin el 9): no se
+  // adivina.
+  return null;
+};
