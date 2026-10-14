@@ -24,6 +24,15 @@ const hashPassword = (password) => {
   return `${salt}:${hash}`;
 };
 
+// Contraseñas de las cuentas demo desde el entorno, no del código (repo público). El fallback
+// "demo-dev-local" es un marcador de dato de juguete, no un secreto, y solo sirve para una base
+// LOCAL de prueba. Ver seed-demo-review-data.js, que usa el mismo esquema.
+const demoPassword = (role) => {
+  if (role === "Administrador de Taller") return process.env.DEMO_ADMIN_PASSWORD || "demo-dev-local";
+  if (role === "Mecánico") return process.env.DEMO_MECHANIC_PASSWORD || "demo-dev-local";
+  return process.env.DEMO_STAFF_PASSWORD || "demo-dev-local";
+};
+
 const normalizePatente = (value) => {
   const clean = String(value).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
   return clean.length > 4 ? `${clean.slice(0, 4)}-${clean.slice(4)}` : clean;
@@ -34,12 +43,12 @@ const partText = (item, quantity = 1) =>
   `[REPUESTO] ${[item.id, item.name, item.sku, quantity, item.unit, item.sale_price || item.cost || 0, item.location || "", item.item_type].join("|")}`;
 
 const users = [
-  ["Carolina Medina Castro", "15.876.543-2", "admin.operaciones@mechanicpro.cl", "AdminPro2026!", "Administrador de Taller"],
-  ["Javiera Soto Navarro", "18.654.321-7", "administrativo3@mechanicpro.cl", "AdminiPro2026!", "Administrativo"],
-  ["Cristian Lagos Paredes", "16.222.333-4", "administrativo4@mechanicpro.cl", "AdminiPro2026!", "Administrativo"],
-  ["Mauricio Pena Rojas", "13.444.555-6", "mecanico4@mechanicpro.cl", "MecanicoPro2026!", "Mecánico"],
-  ["Andres Valdes Mena", "17.555.666-8", "mecanico5@mechanicpro.cl", "MecanicoPro2026!", "Mecánico"],
-  ["Sebastian Cortes Diaz", "19.111.222-3", "mecanico6@mechanicpro.cl", "MecanicoPro2026!", "Mecánico"],
+  ["Carolina Medina Castro", "15.876.543-2", "admin.operaciones@mechanicpro.cl", "Administrador de Taller"],
+  ["Javiera Soto Navarro", "18.654.321-7", "administrativo3@mechanicpro.cl", "Administrativo"],
+  ["Cristian Lagos Paredes", "16.222.333-4", "administrativo4@mechanicpro.cl", "Administrativo"],
+  ["Mauricio Pena Rojas", "13.444.555-6", "mecanico4@mechanicpro.cl", "Mecánico"],
+  ["Andres Valdes Mena", "17.555.666-8", "mecanico5@mechanicpro.cl", "Mecánico"],
+  ["Sebastian Cortes Diaz", "19.111.222-3", "mecanico6@mechanicpro.cl", "Mecánico"],
 ];
 
 const inventory = [
@@ -158,7 +167,7 @@ const main = async () => {
     }
 
     const workshopUsers = new Map();
-    for (const [name, rut, email, password, role] of users) {
+    for (const [name, rut, email, role] of users) {
       const row = (await client.query(
         `insert into workshop_users (company_id, name, rut, email, password_hash, role_id, role_name, active)
          values ($1,$2,$3,$4,$5,$6,$7,true)
@@ -166,7 +175,7 @@ const main = async () => {
          do update set name=excluded.name, rut=excluded.rut, password_hash=excluded.password_hash,
                        role_id=excluded.role_id, role_name=excluded.role_name, active=true, updated_at=now()
          returning id, name, email, role_name`,
-        [company.id, name, rut, email, hashPassword(password), roleIds.get(role), role],
+        [company.id, name, rut, email, hashPassword(demoPassword(role)), roleIds.get(role), role],
       )).rows[0];
       workshopUsers.set(email, row);
     }

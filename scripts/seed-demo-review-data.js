@@ -25,6 +25,17 @@ const hashPassword = (password) => {
   return `${salt}:${hash}`;
 };
 
+// Las contraseñas de las cuentas demo salen del entorno, no del código: este script vive en un
+// repo público, así que una contraseña escrita acá quedaría a la vista de cualquiera. El
+// fallback "demo-dev-local" no es un secreto —es un marcador obvio de dato de juguete— y solo
+// sirve para sembrar una base LOCAL de prueba. Para sembrar cualquier base real hay que pasar
+// las tres variables con valores propios. Ver scripts como referencia en .env.example.
+const demoPassword = (role) => {
+  if (role === "Administrador de Taller") return process.env.DEMO_ADMIN_PASSWORD || "demo-dev-local";
+  if (role === "Mecánico") return process.env.DEMO_MECHANIC_PASSWORD || "demo-dev-local";
+  return process.env.DEMO_STAFF_PASSWORD || "demo-dev-local";
+};
+
 const normalizePatente = (value = "") => {
   const normalized = String(value)
     .toUpperCase()
@@ -55,42 +66,36 @@ const users = [
     name: "Marcela Rojas Castillo",
     rut: "15.432.987-6",
     email: "admin.revision@mechanicpro.cl",
-    password: "AdminPro2026!",
     role: "Administrador de Taller",
   },
   {
     name: "Paula Fuentes Silva",
     rut: "17.987.456-2",
     email: "administrativo1@mechanicpro.cl",
-    password: "AdminiPro2026!",
     role: "Administrativo",
   },
   {
     name: "Diego Morales Herrera",
     rut: "16.345.789-1",
     email: "administrativo2@mechanicpro.cl",
-    password: "AdminiPro2026!",
     role: "Administrativo",
   },
   {
     name: "Gustavo Munoz Rivas",
     rut: "18.456.123-9",
     email: "mecanico1@mechanicpro.cl",
-    password: "MecanicoPro2026!",
     role: "Mecánico",
   },
   {
     name: "Claudio Henriquez Vega",
     rut: "14.876.321-5",
     email: "mecanico2@mechanicpro.cl",
-    password: "MecanicoPro2026!",
     role: "Mecánico",
   },
   {
     name: "Felipe Araya Soto",
     rut: "19.765.432-8",
     email: "mecanico3@mechanicpro.cl",
-    password: "MecanicoPro2026!",
     role: "Mecánico",
   },
 ];
@@ -383,7 +388,7 @@ const upsertUsers = async (client, companyId, roleIds) => {
         user.name,
         user.rut,
         user.email.toLowerCase(),
-        hashPassword(user.password),
+        hashPassword(demoPassword(user.role)),
         roleIds.get(user.role),
         user.role,
       ],
